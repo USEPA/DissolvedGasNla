@@ -1,0 +1,90 @@
+---
+title: "NLA17 Dissolved Gas Spatial Autocorrelation"
+author: "J. Beaulieu"
+date: "10/28/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Background
+
+During the 2017 National Lakes Assessment, dissolved gas samples and air samples were collected from the index site at each waterbody.  Samples were analyzed for CO~2~, CH~4~, and N~2~O concentration via gas chromatography.  The following is an analysis of spatial autocorrelation via lagged scatterplots
+
+## Analysis
+
+This .rmd assumes 'DissolvedGasNla.prj' working environment.  Data is available as an sf and sp object.
+```{r}
+# Unique samples are identified by site.id and visit.no.  Some sites were sampled twice during the NLA17 index period.
+# sample.source column discriminates between 'AIR' and dissolved gas 'DG" samples.  "AIR" samples were removed in
+# readDissolvedGas.R.  Dissolved gas concentrations are reported in mol/L.
+
+# Inspect sf object
+dg.sf[ , c("site.id", "visit.no", "sample.source", "dissolved.co2", "dissolved.ch4", "dissolved.n2o")]
+
+# Inspect sp object
+dg.sp[ , c("site.id", "visit.no", "sample.source", "dissolved.co2", "dissolved.ch4", "dissolved.n2o")]
+```
+
+
+
+Bubble plots are a useful tool for visualizing spatial patterns.  Dissolved CH4 and N2O don't display obvious spatial patterns, but dissolved CO2 seems to greater along east coast, upper midwest, and a SW by NE transect between Texas and Wisconsin.  Pretty interesting.  
+
+```{r}
+# bubble function requires sp object and can't handle missing values.
+bubble(dg.sp[!is.na(dg.sp$dissolved.ch4), "dissolved.ch4"]) #
+bubble(dg.sp[!is.na(dg.sp$dissolved.co2), "dissolved.co2"])
+bubble(dg.sp[!is.na(dg.sp$dissolved.n2o), "dissolved.n2o"])
+```
+
+
+Lagged scatterplots are a useful tool for detecting spatial autocorrelation.  Evidence for spatial autocorrelation is stronger correltation among close vs. distant pairs of observations.  This pattern is not evident for any of the gases.
+
+```{r}
+# Need to select appropriate distance bins.
+# What are distance between points in the data?
+gdis <- spDists(dg.sp)
+max(gdis) # 5617, this must be km.  5617 km = 3490 miles, AK to FL
+
+hscat(dissolved.ch4 ~ 1,  
+      dg.sp[!is.na(dg.sp$dissolved.ch4), ], # remove missing
+      # 5617275m = 3490 miles. AK to FL
+      c(0, 1000, 2000, 3000, 4000, 5000, 6000)) 
+
+hscat(dissolved.co2 ~ 1,  
+      dg.sp[!is.na(dg.sp$dissolved.co2), ], # remove missing
+      # 5617275m = 3490 miles. AK to FL
+      c(0, 1000, 2000, 3000, 4000, 5000, 6000)) 
+
+hscat(dissolved.n2o ~ 1,  
+      dg.sp[!is.na(dg.sp$dissolved.n2o), ], # remove missing
+      # 5617275m = 3490 miles. AK to FL
+      c(0, 1000, 2000, 3000, 4000, 5000, 6000)) 
+
+```
+
+
+Perhaps spatial autocoreltation is more apparent within particular ecoregions.  Can we do lagged scatterplots by ecoregion?
+```{r}
+
+# Loop to create lagged scatterplot by ecoregion x gas.  Not working yet....
+# Need to customize size bins per ecoregion, I think.
+# for(i in 1:length(unique(dg.sp@data$WSA9_NAME))) {
+#   WSA9.i <- unique(dg.sp@data$WSA9_NAME)[i] # unique ecoregion
+#   dg.sp.i <- filter(dg.sp, WSA9_NAME == WSA9.i) # subset spatial object for ecoregion of interest
+#   gDis.1 <- spDists(dg.sp.i) # matrix of distances
+#   gDis.2 <- seq(from = 0, to = max(gDis.1), by = max(gDis.1) / 6) # input to breaks argument in hscat()
+#   
+#   for(j in 1:3) { # for each gas
+#     gas.j <- c("dissolved.ch4", "dissolved.co2", "dissolved.n2o")[j] # gas of interest
+#     dg.sp.i.j <- filter(dg.sp.i, !is.na(gas.j)) # remove missing
+#     
+#     hscat(gas.j ~ 1, # not interpretting 'gas.j' correctly.  Works if "dissolved.ch4' is specified.
+#           dg.sp.i, 
+#           gDis.2) 
+#   }
+#   
+# }
+```
