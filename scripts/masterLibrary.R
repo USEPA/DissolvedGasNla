@@ -1,3 +1,5 @@
 library(rgdal) # spatial data
+library(sf) # spatial data
 library(gstat) # lagged scatterplot
-library(raster) # for pointDistance
+library(spdplyr) # apply dplyr verbs to sp objects
+library(rmarkdown)

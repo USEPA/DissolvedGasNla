@@ -10,12 +10,15 @@ dg <- read.table(file = paste0("C:/Users/JBEAULIE/Environmental Protection Agenc
 # sp
 # Define coordinates
 coords <- data.frame(longitude = dg$map.lon.dd, latitude = dg$map.lat.dd)
-# spatial points df
+
+# to spatial points df
 dg.sp <- SpatialPointsDataFrame(coords, dg)
+
 # projection
 dg.sp@proj4string <- CRS('+proj=longlat +ellps=GRS80 +datum=NAD83 +no_defs')
 
-
+# remove air data
+dg.sp <- filter(dg.sp, sample.source == "DG")
 
 # sf
-dg.sf <- st_as_sf(dg, coords = c("map.lon.dd", "map.lat.dd"), crs = 4269)
+dg.sf <- st_as_sf(dg.sp, coords = c("map.lon.dd", "map.lat.dd"), crs = 4269)
