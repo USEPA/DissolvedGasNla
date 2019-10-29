@@ -1,8 +1,11 @@
 ---
 title: "NLA17 Dissolved Gas Spatial Autocorrelation"
 author: "J. Beaulieu"
-date: "10/28/2019"
-output: html_document
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    self_contained: yes
+    mode: selfcontained
 ---
 
 ```{r setup, include=FALSE}
@@ -53,15 +56,15 @@ hscat(dissolved.ch4 ~ 1,
       # 5617275m = 3490 miles. AK to FL
       c(0, 1000, 2000, 3000, 4000, 5000, 6000)) 
 
-hscat(dissolved.co2 ~ 1,  
-      dg.sp[!is.na(dg.sp$dissolved.co2), ], # remove missing
-      # 5617275m = 3490 miles. AK to FL
-      c(0, 1000, 2000, 3000, 4000, 5000, 6000)) 
-
-hscat(dissolved.n2o ~ 1,  
-      dg.sp[!is.na(dg.sp$dissolved.n2o), ], # remove missing
-      # 5617275m = 3490 miles. AK to FL
-      c(0, 1000, 2000, 3000, 4000, 5000, 6000)) 
+# hscat(dissolved.co2 ~ 1,  
+#       dg.sp[!is.na(dg.sp$dissolved.co2), ], # remove missing
+#       # 5617275m = 3490 miles. AK to FL
+#       c(0, 1000, 2000, 3000, 4000, 5000, 6000)) 
+# 
+# hscat(dissolved.n2o ~ 1,  
+#       dg.sp[!is.na(dg.sp$dissolved.n2o), ], # remove missing
+#       # 5617275m = 3490 miles. AK to FL
+#       c(0, 1000, 2000, 3000, 4000, 5000, 6000)) 
 
 ```
 
