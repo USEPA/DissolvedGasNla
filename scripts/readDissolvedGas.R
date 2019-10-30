@@ -8,7 +8,7 @@
 #                  header = TRUE, sep = "\t", as.is = TRUE)
 
 dg <- read.table(file = paste0(localPath, 
-                               "Environmental Protection Agency (EPA)/",
+                               "/Environmental Protection Agency (EPA)/",
                                "ORD NLA17 Dissolved Gas - Documents/",
                                "inputData/nla17gasDataAggregated_2019-10-25.txt"), 
                  header = TRUE, sep = "\t", as.is = TRUE)
