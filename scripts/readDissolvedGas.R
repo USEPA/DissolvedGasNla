@@ -28,4 +28,4 @@ dg.sp@proj4string <- CRS('+proj=longlat +ellps=GRS80 +datum=NAD83 +no_defs')
 dg.sp <- filter(dg.sp, sample.source == "DG")
 
 # sf
-dg.sf <- st_as_sf(dg.sp, coords = c("map.lon.dd", "map.lat.dd"), crs = 4269)
+adg.sf <- st_as_sf(dg.sp, coords = c("map.lon.dd", "map.lat.dd"), crs = 4269)
