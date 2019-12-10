@@ -57,7 +57,9 @@ dg <- read.table(file = paste0(localPath,
          # add source/sink column
          co2.src.snk = ifelse(co2.sat.ratio > 1, "source", "sink"),
          ch4.src.snk = ifelse(ch4.sat.ratio > 1, "source", "sink"),
-         n2o.src.snk = ifelse(n2o.sat.ratio > 1, "source", "sink"))
+         n2o.src.snk = ifelse(n2o.sat.ratio > 1, "source", "sink"),
+         # add state
+         state = substr(site.id, 7, 8))
 
 ```
 Concentrations of CO~2~, CH~4~, and N~2~O in ambient air over the waterbodies were measured and used in the dissolved gas concentrations.  These data are not needed in subsequent analysis and will be removed from the dataframe.
@@ -246,11 +248,12 @@ ggplot(pop.eco.sat, aes(estimate, subpopulation)) +
 
 ## Summarizing distances
 Getting distances between sites overall and by ecoregion to help set distances for lagged scatterplots.  First, Worked out steps on a sample of NLA sites.  Could only get parts of Anna Springsteen's code to work.
-```{r, distances}
+```{r, eval=FALSE, echo=FALSE, distances}
 names(dg.sf)
 head(dg.sf$WSA9_NAME)
-distinct(dg.sf, WSA9_NAME) # is distinct on sf object only returning first 10 distinct coordinates, and not WSA9_NAME
-distinct.Spatial(dg.sf, WSA9_NAME) # this doesn't work either.
+# distinct returns all unique geometry + attribute combinations.  convert to df if not interested in geometry
+dg.sf %>% as.data.frame() %>% distinct(WSA9_NAME) 
+# distinct.Spatial(dg.sf, WSA9_NAME) # this doesn't work either.
 distinct(dg, WSA9_NAME)
 
 # take a small sample of dg.sf to test getting distances
@@ -350,7 +353,7 @@ round(max(rdistmat1_cpl[rdistmat1_cpl!=0]))
 
 ## Lagged scatterplots
 Note that can use simple feature object, such as cpl, for histogram, but spatial object needed for lagged scatterplots.  I took log10 transform to  get data somewhat unimodal and symmetric.
-```{r, laggedscatterplot}
+```{r, eval=FALSE, echo=FALSE, laggedscatterplot}
 # cpl
 cpl_sp <- as(cpl, "Spatial")
 class(cpl_sp)
@@ -687,7 +690,17 @@ The effect of denitrification and nitrification on dissolved N2O concentrations 
 
 DelSontrol et al. (2019) reported that N2O emission rates were positively related to chl a.  The authors (inlcuding me, I'm one of the 'authors'!) speculate that chla is a surrogate for labile carbon.  Denitrification requires carbon, so perhaps high rates of denitrification-N2O production occur in the presence of abundant carbon availability.
 
-We do not yet have depth profiles of DO or temperature.  When these data become available, we can include bottom water DO and strength of thermal stratification in the model.  For now, we can explore correlations with chemistry variables.  A correlation matrix of dissolved N2O concentration and potential controlling variables doesn't show any striking relationships, though the strongest relationship is with nitrate.  
+We do not yet have depth profiles of DO or temperature.  When these data become available, we can include bottom water DO and strength of thermal stratification in the model.  For now, we can explore correlations with the following variables.  
+
+* MeanDUsed - mean depth  
+* ph.result - pH  
+* nitrate.n.result - NO3-N (mg/L)  
+* ntl.lab.result - total nitrogen (mg/L)  
+* chla.result.vol - chlorophyll a (ug/L)  
+* ptl.lab.result - total phosphorus (mg/L)  
+* surftemp - surface water temperature (C)  
+
+A correlation matrix of dissolved N2O concentration and potential controlling variables doesn't show any striking relationships, though the strongest relationship is with nitrate.  
 
 ```{r}
 library(corrr)
@@ -707,4 +720,17 @@ text(model)
 
 ```
 
+We may also want to include design variables in the analysis.  The specifics of the NLA17 design have not been disseminated, but are likely very similar to the NLA12 design.  Per the NLA12 Design Documentation (https://www.epa.gov/sites/production/files/2014-03/documents/nla2012_design_documentation_20110320.pdf):
 
+> Stratification  
+The survey design was stratified by state and by NLA12_CLS. NLA12_CLS has three classes: (1) NLA07RVT – defined as all NLA 2007 lakes that were target and sampled, (2) NLA12NEW – remaining lakes in NHD-Plus that are included in the sample frame, and (3) Exclude – lakes in NHD-Plus that are excluded from the sample frame (see Sample Frame section above). Each state design has two strata, ST_ NLA07RVT and ST_ NLA12NEW (where ST is replaced by two letter state abbreviation. The total number of strata is 96 (two for each state).
+
+> Unequal Probability Categories  
+The 48 state strata for lakes from the NLA 2007 that would be visited again in 2012 was an equal probability design within each stratum. The 48 state strata NLA12NEW was an unequal probability design within each state stratum. The unequal probability categories were defined based on lake area: 1 to 4 ha, 4 to 10 ha, 10 to 20 ha, 20 to 50 ha and greater than 50 ha.
+
+As you can see, the design is actually pretty complicated.  The file currently contains the following design elements:  
+
+* state - two digit state abbreviation.  See line 62 above.
+* AREASQKM - waterbody area (km2)
+
+Corvallis has not yet shared the other design elements (i.e. NLA17_CLS) and sample weights.  Presumably this file will be delivered with the code to execute the population estimates via spSurvey.  Steve Paulsen will speak to Tom Kincaid about this during the week of Dec. 16.
