@@ -1,1 +1,0 @@
-localPath <- Sys.getenv("USERPROFILE") 
