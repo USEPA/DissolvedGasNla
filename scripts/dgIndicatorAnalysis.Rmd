@@ -145,11 +145,6 @@ ggplot(pop.eco.diss, aes(estimate, subpopulation)) +
 ```
 
 
-
-## Bubble plots
-Bubble plots can be used to visualize patterns in geospatial data.  In the plots below, bubble size reflects the gas concentration and color reflects saturation status (i.e. source or sink).  The code immediately below converts the dataframe to a spatial object and reads in the ecoregion ploygons.  The first bubble plot below is of dissolved CO2 which seems to show a pattern of higher concentrations along the eastern seaboard. 
-
-
 ```{r}
 # To enable spatial analysis of the data, the dataframe will be converted to a 'simple features' (sf) object.
 # Define coordinates
@@ -185,7 +180,7 @@ st_crs(ecoR) # 5070
 
 
 # Bubble plots
-
+Bubble plots can be used to visualize patterns in geospatial data.  In the plots below, bubble size reflects the gas concentration and color reflects saturation status (i.e. source or sink).  The code immediately below converts the dataframe to a spatial object and reads in the ecoregion ploygons.  The first bubble plot below is of dissolved CO2 which seems to show a pattern of higher concentrations along the eastern seaboard.
 ```{r}
 # CO2 Bubble plots
 
