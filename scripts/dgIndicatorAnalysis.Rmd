@@ -48,12 +48,12 @@ The dissolved gas data were currated in the 'NLA' dissolved gas project in RStud
 dg <- read.table(file = paste0(localPath, 
                                "/Environmental Protection Agency (EPA)/",
                                "ORD NLA17 Dissolved Gas - Documents/",
-                               "inputData/nla17gasDataAggregated_2019-10-25.txt"), 
+                               "inputData/nla17gasDataAggregated_2019-11-12.txt"), 
                  header = TRUE, sep = "\t", as.is = TRUE) %>%
   # unit conversion
   mutate(dissolved.ch4 = dissolved.ch4 * 1000000, # mol/L -> umol/L
          dissolved.co2 = dissolved.co2 * 1000000, # mol/L -> umol/L,
-         dissolved.n20 = dissolved.n2o * 1000000000, # mol/L -> nmol/L
+         dissolved.n2o = dissolved.n2o * 1000000000, # mol/L -> nmol/L
          # add source/sink column
          co2.src.snk = ifelse(co2.sat.ratio > 1, "source", "sink"),
          ch4.src.snk = ifelse(ch4.sat.ratio > 1, "source", "sink"),
@@ -140,7 +140,7 @@ ggplot(pop.eco.diss, aes(estimate, subpopulation)) +
 
 
 ## Bubble plots
-Bubble plots can be used to visualize patterns in geospatial data.  In the plots below, bubble size reflects the gas concentration and color reflects saturation status (i.e. source or sink).  The code immediately below converts the dataframe to a spatial object and reads in the ecoregion ploygons.  The first bubble plot below is of dissolved CO2 which seems to show a pattern of higher concentrations along the eastern seaboard. 
+Bubble plots can be used to visualize patterns in geospatial data.  In the plots below, bubble size reflects the gas concentration and color reflects saturation status (i.e. source or sink).  The code immediately below converts the dataframe to a spatial object and reads in the ecoregion polygons.  The first bubble plot below is of dissolved CO2 which seems to show a pattern of higher concentrations along the eastern seaboard. 
 
 
 ```{r}
@@ -275,8 +275,33 @@ plot(n2o.v, main = "N2O semivariogram")
 
 ```
 
+# Exploratory analysis of N2O data
+The mean N2O saturation ratio for the country is `r pop.eco.sat %>% filter(type == "National", subpopulation == "National", indicator == "N2O_SAT_RATIO") %>% select(estimate) %>% pull() %>% round(2)` (95% CI = `r pop.eco.sat %>% filter(type == "National", subpopulation == "National", indicator == "N2O_SAT_RATIO") %>% select(lcb95pct) %>% pull() %>% round(2)` - `r pop.eco.sat %>% filter(type == "National", subpopulation == "National", indicator == "N2O_SAT_RATIO") %>% select(ucb95pct) %>% pull() %>% round(2)`), suggesting that US waterbodies are a new N2O sink during the NLA index period.  This finding is consistent with a recent report that 67% of 101 agricultural ponds in Canada were undersaturated in N2O during the summer (Webb et al. 2019, PNAS).
+
+There are several sources of N2O in surface waters.  The overlying atmosphere contains trace quantities of N2O (~300 ppb) that dissolve into surface waters as a function of barometric pressure and water temperature.  N2O is also produced and consumed in aquatic ecosystems via denitrification.  Denitrification is the reduction of oxidized forms of N (i.e. NO3) to more reduced forms (i.e. N2).  It is a form of anaerobic respiration where oxidized forms of N serve as the electron acceptor in the absence of more energetically favorable alternatives, such as oxygen.  N2O concentrations/fluxes are therefore somewhat dependent upon the availability of oxidized N and low dissolved oxygen.  N2O can also be produced via nitrification.  Nitrification is the aerobic oxidation of NH4 to more oxidized forms.  N2O can be produced as a byproduct during the process and rates are somewhat dependent upon the availability of ammonium.  See Beaulieu et al. 2011, 2014, and 2015 for more information. 
+
+The effect of denitrification and nitrification on dissolved N2O concentrations near the air-water interface is somewhat mediated by hydrology.  Denitrification is an anaerobic process that occurs predominantly in the sediment or anoxic hypolimnion.  Therefore, N2O must advect or diffuse from the sediment/hyoplimion to the water surface before it can affect dissolved N2O concentration near the air/water interface (where NLA samples were collected).  Previous invesitgations have interpretted correlations between N2O and lake size and degree of thermal stratification as indicative of hydrologic control (DelSontro et al. 2019, Webb et al. 2019).
+
+DelSontrol et al. (2019) reported that N2O emission rates were positively related to chl a.  The authors (inlcuding me, I'm one of the 'authors'!) speculate that chla is a surrogate for labile carbon.  Denitrification requires carbon, so perhaps high rates of denitrification-N2O production occur in the presence of abundant carbon availability.
 
 
+We do not yet have depth profiles of DO or temperature.  When these data become available, we can include bottom water DO and strength of thermal stratification in the model.  For now, we can explore correlations with chemistry variables.  A correlation matrix of dissolved N2O concentration and potential controlling variables doesn't show any striking relationships, though the strongest relationship is with nitrate.  
 
+```{r}
+library(corrr)
+dg %>%
+  select(dissolved.n2o, MeanDUsed, ph.result, nitrate.n.result, ntl.lab.result, chla.result.vol, ptl.lab.result, surftemp) %>%
+  correlate()
+```
 
+Categorization and regression analysis (CART), which can accomodate non-linear and interactive relationships, also identified nitrate as the most important predictor variable.  The CART analysis did not identify splits associated with ecoregion.
+
+```{r}
+library(tree)
+model <- tree(dissolved.n2o ~ MeanDUsed + nitrate.n.result + ntl.lab.result + chla.result.vol + ptl.lab.result + surftemp + WSA9, data = dg)
+
+plot(model)
+text(model)
+
+```
 

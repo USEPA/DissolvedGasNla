@@ -1,16 +1,12 @@
 # READ IN DISSOLVED GAS DATA
 # This file contains the aggregated (by duplicates) dissolved gas data
 # from NLA17.  See data dictionary in documents library for details.
-# 
-# dg <- read.table(file = paste0("C:/Users/JBEAULIE/Environmental Protection Agency (EPA)/",
-#                                "ORD NLA17 Dissolved Gas - Documents/",
-#                                "inputData/nla17gasDataAggregated_2019-10-25.txt"), 
-#                  header = TRUE, sep = "\t", as.is = TRUE)
+
 
 dg <- read.table(file = paste0(localPath, 
                                "/Environmental Protection Agency (EPA)/",
                                "ORD NLA17 Dissolved Gas - Documents/",
-                               "inputData/nla17gasDataAggregated_2019-10-25.txt"), 
+                               "inputData/nla17gasDataAggregated_2019-11-12.txt"), 
                  header = TRUE, sep = "\t", as.is = TRUE)
 
 
