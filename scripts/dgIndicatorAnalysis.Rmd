@@ -1,6 +1,6 @@
 ---
 title: "Analysis of NLA17 Dissolved Gas Indicator"
-author: "J. Beaulieu"
+authors: "J. Beaulieu, R. Martin, and M. McManus"
 date: "`r Sys.Date()`"
 output:
   html_document:
@@ -10,6 +10,8 @@ output:
     fig_caption: yes
     depth: 2
     number_sections: true
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r results='hide', message=FALSE, warning=FALSE}
@@ -30,7 +32,7 @@ During the 2017 National Lakes Assesment, duplicate dissolved gas samples were c
 # Data
 
 The dissolved gas data were currated the 'NLA' dissolved gas project in RStudio.  The code can be found at a private github repository (https://github.com/USEPA/NLA).  After aggregating across duplicate samples, the data were written to nla17gasDataAggregated_2019-10-25.txt.  A copy of this data file is stored in documents library associated with the 'ORD NLA17 Dissolved Gas' Private Group on SharePoint (https://usepa.sharepoint.com/sites/ORD_NLA17_Dissolved_Gas).  When synced to a local computer, the documents library can be read directly with R, after identifying the local directory path.
-
+## Getting data and filtering
 ```{r}
 # Identify local path for each user
 localPath <- Sys.getenv("USERPROFILE")
@@ -40,7 +42,7 @@ localPath <- Sys.getenv("USERPROFILE")
 dg <- read.table(file = paste0(localPath, 
                                "/Environmental Protection Agency (EPA)/",
                                "ORD NLA17 Dissolved Gas - Documents/",
-                               "inputData/nla17gasDataAggregated_2019-10-25.txt"), 
+                               "inputData/nla17gasDataAggregated_2019-11-12.txt"), 
                  header = TRUE, sep = "\t", as.is = TRUE)
 ```
 Concentrations of CO~2~, CH~4~, and N~2~O in ambient air over the waterbodies were measured and used in the dissolved gas concentrations.  These data are not needed in subsequent analysis and will be removed from the dataframe.
@@ -58,6 +60,7 @@ The data file contains `r dg %>% distinct(site.id, visit.no) %>% summarize(n = n
 
 
 ```{r}
+# are these the main response variables we'll be looking at?
 dg %>% select(dissolved.co2, dissolved.ch4, dissolved.n2o, co2.sat.ratio, ch4.sat.ratio, n2o.sat.ratio) %>%
   {summary(.)}
 ```
@@ -98,6 +101,8 @@ st_crs(ecoR) # no EPSG code
 ecoR <- st_transform(ecoR, 5070) # convert to CONUS Albers
 st_crs(ecoR) # 5070
 
+# head(ecoR, 9) throws Error: C stack usage  30746119 is too close to the limit
+# eventuall get the head output
 # Bubble plots
 ggplot() +
   geom_sf(data = ecoR, color = NA, aes(fill = WSA9_NAME)) +
@@ -114,3 +119,403 @@ ggplot() +
   geom_sf(data = dg.sf, aes(size = dissolved.n2o)) +
   ggtitle("Dissolved N2O")
 ```
+
+## Summarizing distances
+Getting distances between sites overall and by ecoregion to help set distances for lagged scatterplots.  First, Worked out steps on a sample of NLA sites.  Could only get parts of Anna Springsteen's code to work.
+```{r, distances}
+names(dg.sf)
+head(dg.sf$WSA9_NAME)
+distinct(dg.sf, WSA9_NAME) # is distinct on sf object only returning first 10 distinct coordinates, and not WSA9_NAME
+distinct.Spatial(dg.sf, WSA9_NAME) # this doesn't work either.
+distinct(dg, WSA9_NAME)
+
+# take a small sample of dg.sf to test getting distances
+set.seed(1859)
+# st_sample only returns a list of coordinates
+nla_samp <- st_sample(dg.sf, 10, type = "random", exact = TRUE)
+plot(nla_samp)
+class(nla_samp)
+head(nla_samp)
+
+# sample_n keeps attributes and geometries
+nla_samp1 <- sample_n(dg.sf, 10)
+plot(nla_samp1, max.plot=1)
+class(nla_samp1)
+head(nla_samp1$site.id, 10)
+distmat <- st_distance(nla_samp1,nla_samp1,by_element = FALSE)
+class(distmat) # thought this would return matrix
+max(distmat)
+min(distmat)
+summary(distmat) # think this returns summary of all pairwise distances on each obs, v1-v10
+dim(distmat)
+
+rdistmat <- distmat[1:10, ]
+print(rdistmat)
+rdistmat1 <- as.vector(rdistmat)
+round(min(rdistmat1[rdistmat1!=0]))
+round(quantile(rdistmat1[rdistmat1!=0], probs=seq(0,1, 0.25), names=F)[2])
+round(median(rdistmat1[rdistmat1!=0]))
+round(quantile(rdistmat1[rdistmat1!=0], probs=seq(0,1, 0.25), names=F)[4])
+round(max(rdistmat1[rdistmat1!=0]))
+
+names(ecoR)
+class(ecoR)
+# contrast ecoRname <- as.data.frame(select(ecoR,"WSA9_NAME"))
+# geom is sticky with select but not pull
+# ecoRname <- as.data.frame(pull(ecoR,"WSA9_NAME"))
+ecoRname1 <- as.character(pull(ecoR,"WSA9_NAME")) #Springsteen code needs to be character to populate columns of matrix below
+class(ecoRname1)
+head(ecoRname1, 9)
+# initialize summary tables
+euc.summary <- matrix(NA, nrow=5, ncol=length(ecoRname1)+1) # initializing blank matrices to fill in the loop
+dim(euc.summary)
+colnames(euc.summary) <- c("ALL",ecoRname1) #indicates same assignment in each object
+rownames(euc.summary) <- c("Min","Q1","Median","Q3","Max")
+euc.summary
+
+# Add all distances summary statistics to column 1 of the summary table (i.e. not by region)
+euc.summary[,1] <- round(c( min(rdistmat1[rdistmat1!=0]), quantile(rdistmat1[rdistmat1!=0], probs=seq(0,1, 0.25), names=F)[2], median(rdistmat1[rdistmat1!=0]), quantile(rdistmat1[rdistmat1!=0], probs=seq(0,1, 0.25), names=F)[4], max(rdistmat1[rdistmat1!=0]) ),1)
+
+print(euc.summary)
+
+# Unsure that Springsteen function below will work as euc is an spDists created object that I think retained ecoregional & not sure that's so with rdistmat1
+# Add within-region summary statistics to summary table 
+for (r in 1:length(ecoRname1)){ # loop through regions and fill in the matrices
+  euc.reg <- euc[grep(ecoRname1[r], rownames(euc)), grep(ecoRname1[r],colnames(euc))] # retrieving only columns and rows in the distance matrix that contain the same region code in their column/row name
+  # retrieving only columns and rows in the distance matrix that contain the same region code in their column/row name
+  euc.summary[, (r+1)] <- round(c( min(euc.reg[euc.reg!=0]), quantile(euc.reg[euc.reg!=0], probs=seq(0,1, 0.25), names=F)[2], median(euc.reg[euc.reg!=0]), quantile(euc.reg[euc.reg!=0], probs=seq(0,1, 0.25), names=F)[4], max(euc.reg[euc.reg!=0]) ),1)
+}
+
+# Distances for all NLA sites
+distmat_dg <- st_distance(dg.sf,dg.sf,by_element = FALSE)
+rdistmat_dg <- distmat_dg[1:1185, ]
+rdistmat1_dg <- as.vector(rdistmat_dg)
+
+# initialize summary tables
+euc.summary_dg <- matrix(NA, nrow=5, ncol=length(ecoRname1)+1) # initializing blank matrices to fill in the loop
+dim(euc.summary_dg)
+colnames(euc.summary_dg) <- c("ALL",ecoRname1) #indicates same assignment in each object
+rownames(euc.summary_dg) <- c("Min","Q1","Median","Q3","Max")
+
+
+euc.summary_dg[,1] <- round(c( min(rdistmat1_dg[rdistmat1_dg!=0]), quantile(rdistmat1_dg[rdistmat1_dg!=0], probs=seq(0,1, 0.25), names=F)[2], median(rdistmat1_dg[rdistmat1_dg!=0]), quantile(rdistmat1_dg[rdistmat1_dg!=0], probs=seq(0,1, 0.25), names=F)[4], max(rdistmat1_dg[rdistmat1_dg!=0]) ),1)
+
+print(euc.summary_dg)
+
+# brute force to get 5-number summary of ecoregions cut-n-paste ecoregions to get specific data frames:  cpl, nap, npl, sap, spl, tpl, umw, wmt, xer
+names(dg.sf)
+
+count(dg.sf, WSA9_NAME) %>% print(n = Inf)
+
+# Get ecoregion-specific NLA sites
+cpl <- dg.sf %>% filter(WSA9_NAME == "Coastal Plains")
+
+distmat_cpl <- st_distance(cpl, cpl,by_element = FALSE)
+dim(distmat_cpl)
+rdistmat_cpl <- distmat_cpl[1:150, ] # change to match # sites/rows
+rdistmat1_cpl <- as.vector(rdistmat_cpl)
+
+round(min(rdistmat1_cpl[rdistmat1_cpl!=0]))
+round(quantile(rdistmat1_cpl[rdistmat1_cpl!=0], probs=seq(0,1, 0.25), names=F)[2])
+round(median(rdistmat1_cpl[rdistmat1_cpl!=0]))
+round(quantile(rdistmat1_cpl[rdistmat1_cpl!=0], probs=seq(0,1, 0.25), names=F)[4])
+round(max(rdistmat1_cpl[rdistmat1_cpl!=0]))
+
+# GitHub question:  if I save a workspace, .RData, will that be pushed when I push to GitHub?  Or, should data frames go in .gitignore?
+```
+
+## Lagged scatterplots
+Note that can use simple feature object, such as cpl, for histogram, but spatial object needed for lagged scatterplots.  I took log10 transform to  get data somewhat unimodal and symmetric.
+```{r, laggedscatterplot}
+# cpl
+cpl_sp <- as(cpl, "Spatial")
+class(cpl_sp)
+ggplot(cpl,aes(dissolved.ch4)) + geom_histogram()
+ggplot(cpl,aes(dissolved.ch4)) + geom_histogram() + scale_x_log10()
+hscat(log10(dissolved.ch4)~1, cpl_sp, c(0, 50000, 150000, 250000, 500000, 1000000, 1500000))
+
+hscat(dissolved.ch4~1, cpl_sp, c(0, 50000, 150000, 250000, 500000, 1000000, 1500000))
+
+hscat(dissolved.ch4~1, cpl_sp, c(0, 10000, 25000, 50000, 150000, 250000, 500000))
+
+ggplot(cpl,aes(dissolved.co2)) + geom_histogram()
+ggplot(cpl,aes(dissolved.co2)) + geom_histogram() + scale_x_log10()
+
+hscat(log10(dissolved.co2)~1, cpl_sp, c(0, 50000, 150000, 250000, 500000, 1000000, 1500000))
+
+hscat(dissolved.co2~1, cpl_sp, c(0, 50000, 150000, 250000, 500000, 1000000, 1500000))
+
+hscat(log10(dissolved.co2)~1, cpl_sp, c(0, 10000, 25000, 50000, 150000, 250000, 500000))
+
+ggplot(cpl,aes(dissolved.n2o)) + geom_histogram()
+ggplot(cpl,aes(dissolved.n2o)) + geom_histogram() + scale_x_log10()
+
+hscat(log10(dissolved.n2o)~1, cpl_sp, c(0, 50000, 150000, 250000, 500000, 1000000, 1500000))
+
+hscat(dissolved.n2o~1, cpl_sp, c(0, 50000, 150000, 250000, 500000, 1000000, 1500000))
+
+hscat(log10(dissolved.n2o)~1, cpl_sp, c(0, 10000, 25000, 50000, 150000, 250000, 500000))
+
+# nap
+nap_sp <- as(nap, "Spatial")
+class(nap_sp)
+ggplot(nap,aes(dissolved.ch4)) + geom_histogram()
+ggplot(nap,aes(dissolved.ch4)) + geom_histogram() + scale_x_log10()
+hscat(log10(dissolved.ch4)~1, nap_sp, c(0, 10000, 50000, 100000, 200000, 300000, 400000))
+
+hscat(dissolved.ch4~1, nap_sp, c(0, 10000, 50000, 100000, 200000, 300000, 400000))
+
+hscat(log10(dissolved.ch4)~1, nap_sp, c(0, 25000, 50000, 100000, 200000, 300000, 400000))
+
+ggplot(nap,aes(dissolved.co2)) + geom_histogram()
+ggplot(nap,aes(dissolved.co2)) + geom_histogram() + scale_x_log10()
+
+hscat(log10(dissolved.co2)~1, nap_sp, c(0, 10000, 50000, 100000, 200000, 300000, 400000))
+
+hscat(dissolved.co2~1, nap_sp, c(0, 10000, 50000, 100000, 200000, 300000, 400000))
+
+hscat(log10(dissolved.co2)~1, nap_sp, c(0, 25000, 50000, 100000, 200000, 300000, 400000))
+
+ggplot(nap,aes(dissolved.n2o)) + geom_histogram()
+ggplot(nap,aes(dissolved.n2o)) + geom_histogram() + scale_x_log10()
+
+hscat(log10(dissolved.n2o)~1, nap_sp, c(0, 10000, 50000, 100000, 200000, 300000, 400000))
+
+hscat(dissolved.n2o~1, nap_sp, c(0, 10000, 50000, 100000, 200000, 300000, 400000))
+
+hscat(log10(dissolved.n2o)~1, nap_sp, c(0, 25000, 50000, 100000, 200000, 300000, 400000))
+
+# npl
+npl_sp <- as(npl, "Spatial")
+class(npl_sp)
+ggplot(npl,aes(dissolved.ch4)) + geom_histogram()
+ggplot(npl,aes(dissolved.ch4)) + geom_histogram() + scale_x_log10()
+hscat(log10(dissolved.ch4)~1, npl_sp, c(0, 10000, 50000, 100000, 200000, 300000, 400000))
+
+hscat(dissolved.ch4~1, npl_sp, c(0, 10000, 50000, 100000, 200000, 300000, 400000))
+
+hscat(log10(dissolved.ch4)~1, npl_sp, c(0, 25000, 50000, 100000, 200000, 300000, 400000))
+
+ggplot(npl,aes(dissolved.co2)) + geom_histogram()
+ggplot(npl,aes(dissolved.co2)) + geom_histogram() + scale_x_log10()
+
+hscat(log10(dissolved.co2)~1, npl_sp, c(0, 10000, 50000, 100000, 200000, 300000, 400000))
+
+hscat(dissolved.co2~1, npl_sp, c(0, 10000, 50000, 100000, 200000, 300000, 400000))
+
+hscat(log10(dissolved.co2)~1, npl_sp, c(0, 25000, 50000, 100000, 200000, 300000, 400000))
+
+ggplot(npl,aes(dissolved.n2o)) + geom_histogram()
+ggplot(npl,aes(dissolved.n2o)) + geom_histogram() + scale_x_log10()
+
+hscat(log10(dissolved.n2o)~1, npl_sp, c(0, 10000, 50000, 100000, 200000, 300000, 400000))
+
+hscat(dissolved.n2o~1, npl_sp, c(0, 10000, 50000, 100000, 200000, 300000, 400000))
+
+hscat(log10(dissolved.n2o)~1, npl_sp, c(0, 25000, 50000, 100000, 200000, 300000, 400000))
+
+# sap
+sap_sp <- as(sap, "Spatial")
+class(sap_sp)
+ggplot(sap,aes(dissolved.ch4)) + geom_histogram()
+ggplot(sap,aes(dissolved.ch4)) + geom_histogram() + scale_x_log10()
+hscat(log10(dissolved.ch4)~1, sap_sp, c(0, 10000, 50000, 150000, 300000, 450000, 650000))
+
+hscat(dissolved.ch4~1, sap_sp, c(0, 10000, 50000, 150000, 300000, 450000, 650000))
+
+hscat(log10(dissolved.ch4)~1, sap_sp, c(0, 25000, 50000, 75000, 100000, 125000, 150000))
+
+ggplot(sap,aes(dissolved.co2)) + geom_histogram()
+ggplot(sap,aes(dissolved.co2)) + geom_histogram() + scale_x_log10()
+
+hscat(log10(dissolved.co2)~1, sap_sp, c(0, 10000, 50000, 150000, 300000, 450000, 650000))
+
+hscat(dissolved.co2~1, sap_sp, c(0, 10000, 50000, 150000, 300000, 450000, 650000))
+
+hscat(log10(dissolved.co2)~1, sap_sp, c(0, 25000, 50000, 75000, 100000, 125000, 150000))
+
+ggplot(sap,aes(dissolved.n2o)) + geom_histogram()
+ggplot(sap,aes(dissolved.n2o)) + geom_histogram() + scale_x_log10()
+
+hscat(log10(dissolved.n2o)~1, sap_sp, c(0, 10000, 50000, 150000, 300000, 450000, 650000))
+
+hscat(dissolved.n2o~1, sap_sp, c(0, 10000, 50000, 150000, 300000, 450000, 650000))
+
+hscat(log10(dissolved.n2o)~1, sap_sp, c(0, 25000, 50000, 75000, 100000, 125000, 150000))
+
+# spl
+spl_sp <- as(spl, "Spatial")
+class(spl_sp)
+ggplot(spl,aes(dissolved.ch4)) + geom_histogram()
+ggplot(spl,aes(dissolved.ch4)) + geom_histogram() + scale_x_log10()
+hscat(log10(dissolved.ch4)~1, spl_sp, c(0, 10000, 50000, 150000, 250000, 350000, 500000))
+
+hscat(dissolved.ch4~1, spl_sp, c(0, 10000, 50000, 150000, 250000, 350000, 500000))
+
+hscat(log10(dissolved.ch4)~1, spl_sp, c(0, 25000, 50000, 75000, 100000, 125000, 150000))
+
+ggplot(spl,aes(dissolved.co2)) + geom_histogram()
+ggplot(spl,aes(dissolved.co2)) + geom_histogram() + scale_x_log10()
+
+hscat(log10(dissolved.co2)~1, spl_sp, c(0, 10000, 50000, 150000, 250000, 350000, 500000))
+
+hscat(dissolved.co2~1, spl_sp, c(0, 10000, 50000, 150000, 250000, 350000, 500000))
+
+hscat(log10(dissolved.co2)~1, spl_sp, c(0, 25000, 50000, 75000, 100000, 125000, 150000))
+
+ggplot(spl,aes(dissolved.n2o)) + geom_histogram()
+ggplot(spl,aes(dissolved.n2o)) + geom_histogram() + scale_x_log10()
+
+hscat(log10(dissolved.n2o)~1, spl_sp, c(0, 10000, 50000, 150000, 250000, 350000, 500000))
+
+hscat(dissolved.n2o~1, spl_sp, c(0, 10000, 50000, 100000, 200000, 300000, 400000))
+
+hscat(log10(dissolved.n2o)~1, spl_sp, c(0, 25000, 50000, 75000, 100000, 125000, 150000))
+
+# tpl
+tpl_sp <- as(tpl, "Spatial")
+class(tpl_sp)
+ggplot(tpl,aes(dissolved.ch4)) + geom_histogram()
+ggplot(tpl,aes(dissolved.ch4)) + geom_histogram() + scale_x_log10()
+hscat(log10(dissolved.ch4)~1, tpl_sp, c(0, 10000, 50000, 100000, 200000, 300000, 600000))
+
+hscat(dissolved.ch4~1, tpl_sp, c(0, 10000, 50000, 100000, 200000, 300000, 600000))
+
+hscat(log10(dissolved.ch4)~1, tpl_sp, c(0, 25000, 50000, 75000, 100000, 125000, 150000))
+
+ggplot(tpl,aes(dissolved.co2)) + geom_histogram()
+ggplot(tpl,aes(dissolved.co2)) + geom_histogram() + scale_x_log10()
+
+hscat(log10(dissolved.co2)~1, tpl_sp, c(0, 10000, 50000, 100000, 200000, 300000, 600000))
+
+hscat(dissolved.co2~1, tpl_sp, c(0, 10000, 50000, 100000, 200000, 300000, 600000))
+
+hscat(log10(dissolved.co2)~1, tpl_sp, c(0, 25000, 50000, 75000, 100000, 125000, 150000))
+
+ggplot(tpl,aes(dissolved.n2o)) + geom_histogram()
+ggplot(tpl,aes(dissolved.n2o)) + geom_histogram() + scale_x_log10()
+
+hscat(log10(dissolved.n2o)~1, tpl_sp, c(0, 10000, 50000, 100000, 200000, 300000, 600000))
+
+hscat(dissolved.n2o~1, tpl_sp, c(0, 10000, 50000, 100000, 200000, 300000, 600000))
+
+hscat(log10(dissolved.n2o)~1, tpl_sp, c(0, 25000, 50000, 75000, 100000, 125000, 150000))
+
+# umw
+umw_sp <- as(umw, "Spatial")
+class(umw_sp)
+ggplot(umw,aes(dissolved.ch4)) + geom_histogram()
+ggplot(umw,aes(dissolved.ch4)) + geom_histogram() + scale_x_log10()
+hscat(log10(dissolved.ch4)~1, umw_sp, c(0, 10000, 50000, 75000, 100000, 200000, 350000))
+
+hscat(dissolved.ch4~1, umw_sp, c(0, 10000, 50000, 75000, 100000, 200000, 350000))
+
+hscat(log10(dissolved.ch4)~1, umw_sp, c(0, 25000, 50000, 75000, 100000, 250000, 350000))
+
+ggplot(umw,aes(dissolved.co2)) + geom_histogram()
+ggplot(umw,aes(dissolved.co2)) + geom_histogram() + scale_x_log10()
+
+hscat(log10(dissolved.co2)~1, umw_sp, c(0, 10000, 50000, 75000, 100000, 200000, 350000))
+
+hscat(dissolved.co2~1, umw_sp, c(0, 25000, 50000, 75000, 100000, 250000, 350000))
+
+hscat(log10(dissolved.co2)~1, umw_sp, c(0, 25000, 50000, 100000, 200000, 300000, 400000))
+
+ggplot(umw,aes(dissolved.n2o)) + geom_histogram()
+ggplot(umw,aes(dissolved.n2o)) + geom_histogram() + scale_x_log10()
+
+hscat(log10(dissolved.n2o)~1, umw_sp, c(0, 25000, 50000, 75000, 100000, 250000, 350000))
+
+hscat(dissolved.n2o~1, umw_sp, c(0, 25000, 50000, 75000, 100000, 250000, 350000))
+
+hscat(log10(dissolved.n2o)~1, umw_sp, c(0, 25000, 50000, 100000, 200000, 300000, 400000))
+
+# wmt
+wmt_sp <- as(wmt, "Spatial")
+class(wmt_sp)
+ggplot(wmt,aes(dissolved.ch4)) + geom_histogram()
+ggplot(wmt,aes(dissolved.ch4)) + geom_histogram() + scale_x_log10()
+hscat(log10(dissolved.ch4)~1, wmt_sp, c(0, 10000, 50000, 100000, 200000, 350000, 700000))
+
+hscat(dissolved.ch4~1, wmt_sp, c(0, 10000, 50000, 100000, 200000, 350000, 700000))
+
+hscat(log10(dissolved.ch4)~1, wmt_sp, c(0, 25000, 50000, 100000, 200000, 350000, 700000))
+
+ggplot(wmt,aes(dissolved.co2)) + geom_histogram()
+ggplot(wmt,aes(dissolved.co2)) + geom_histogram() + scale_x_log10()
+
+hscat(log10(dissolved.co2)~1, wmt_sp, c(0, 10000, 50000, 100000, 200000, 350000, 700000))
+
+hscat(dissolved.co2~1, wmt_sp, c(0, 10000, 50000, 100000, 200000, 350000, 700000))
+
+hscat(log10(dissolved.co2)~1, wmt_sp, c(0, 25000, 50000, 100000, 200000, 350000, 700000))
+
+ggplot(wmt,aes(dissolved.n2o)) + geom_histogram()
+ggplot(wmt,aes(dissolved.n2o)) + geom_histogram() + scale_x_log10()
+
+hscat(log10(dissolved.n2o)~1, wmt_sp, c(0, 10000, 50000, 100000, 200000, 350000, 700000))
+
+hscat(dissolved.n2o~1, wmt_sp, c(0, 10000, 50000, 100000, 200000, 350000, 700000))
+
+hscat(log10(dissolved.n2o)~1, wmt_sp, c(0, 25000, 50000, 100000, 200000, 350000, 700000))
+
+# xer
+xer_sp <- as(xer, "Spatial")
+class(xer_sp)
+ggplot(xer,aes(dissolved.ch4)) + geom_histogram()
+ggplot(xer,aes(dissolved.ch4)) + geom_histogram() + scale_x_log10()
+# 10 km bin/lag only has 2 points plotted so start with 50 km
+hscat(log10(dissolved.ch4)~1, xer_sp, c(0, 50000, 100000, 200000, 400000, 800000))
+
+hscat(dissolved.ch4~1, xer_sp, c(0, 50000, 100000, 200000, 400000, 800000))
+
+hscat(log10(dissolved.ch4)~1, xer_sp, c(0, 25000, 50000, 750000, 100000, 200000, 400000, 800000))
+
+ggplot(xer,aes(dissolved.co2)) + geom_histogram()
+ggplot(xer,aes(dissolved.co2)) + geom_histogram() + scale_x_log10()
+
+hscat(log10(dissolved.co2)~1, xer_sp, c(0, 50000, 100000, 200000, 400000, 800000))
+
+hscat(dissolved.co2~1, xer_sp, c(0, 50000, 100000, 200000, 400000, 800000))
+
+hscat(log10(dissolved.co2)~1, xer_sp, c(0, 25000, 50000, 750000, 100000, 200000, 400000, 800000))
+
+ggplot(xer,aes(dissolved.n2o)) + geom_histogram()
+ggplot(xer,aes(dissolved.n2o)) + geom_histogram() + scale_x_log10()
+
+hscat(log10(dissolved.n2o)~1, xer_sp, c(0, 50000, 100000, 200000, 400000, 800000))
+
+hscat(dissolved.n2o~1, xer_sp, c(0, 50000, 100000, 200000, 400000, 800000))
+
+hscat(log10(dissolved.n2o)~1, xer_sp, c(0, 25000, 50000, 750000, 100000, 200000, 400000, 800000))
+
+# all
+dg_sp <- as(dg.sf, "Spatial")
+class(dg_sp)
+ggplot(dg.sf,aes(dissolved.ch4)) + geom_histogram()
+ggplot(dg.sf,aes(dissolved.ch4)) + geom_histogram() + scale_x_log10()
+hscat(log10(dissolved.ch4)~1, dg_sp, c(0, 50000, 100000, 200000, 400000, 800000, 1500000))
+
+hscat(dissolved.ch4~1, dg_sp, c(0, 50000, 100000, 200000, 400000, 800000, 1500000))
+
+hscat(log10(dissolved.ch4)~1, dg_sp, c(0, 10000, 25000, 50000, 100000, 200000, 300000, 400000))
+
+ggplot(dg.sf,aes(dissolved.co2)) + geom_histogram()
+ggplot(dg.sf,aes(dissolved.co2)) + geom_histogram() + scale_x_log10()
+
+hscat(log10(dissolved.co2)~1, dg_sp, c(0, 50000, 100000, 200000, 400000, 800000, 1500000))
+
+hscat(dissolved.co2~1, dg_sp, c(0, 50000, 100000, 200000, 400000, 800000, 1500000))
+
+hscat(log10(dissolved.co2)~1, dg_sp, c(0, 10000, 25000, 50000, 100000, 200000, 300000, 400000))
+
+ggplot(dg.sf,aes(dissolved.n2o)) + geom_histogram()
+ggplot(dg.sf,aes(dissolved.n2o)) + geom_histogram() + scale_x_log10()
+
+hscat(log10(dissolved.n2o)~1, dg_sp, c(0, 50000, 100000, 200000, 400000, 800000, 1500000))
+
+hscat(dissolved.n2o~1, dg_sp, c(0, 50000, 100000, 200000, 400000, 800000, 1500000))
+
+hscat(log10(dissolved.n2o)~1, dg_sp, c(0, 10000, 25000, 50000, 100000, 200000, 300000, 400000))
+
+````
