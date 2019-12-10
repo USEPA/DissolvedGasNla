@@ -6,22 +6,32 @@ output:
   html_document:
     df_print: paged
     toc: true
-    toc_float: false
+    toc_float: true
     fig_caption: yes
     depth: 2
     number_sections: true
+    code_folding:  hide
 editor_options: 
   chunk_output_type: console
 ---
 
 ```{r results='hide', message=FALSE, warning=FALSE}
 # load libraries
-library(rgdal) # spatial data
 library(sf) # spatial data
-library(gstat) # lagged scatterplot
-library(spdplyr) # apply dplyr verbs to sp objects
-library(rmarkdown)
-library(tidyverse)
+library(gstat) # lagged scatterplot, variogram
+#library(spdplyr) # apply dplyr verbs to sp objects.  gstat functions require sp objects
+library(tidyverse) # dplyr, ggplot
+
+# Identify local path for each user
+localPath <- Sys.getenv("USERPROFILE")
+
+# Define helper functions
+# standardized formatting for column names
+toEPA <- function(X1){
+  names(X1) = tolower(names(X1))
+  names(X1) = gsub(pattern = c("\\(| |#|)|/|-|\\+|:|_"), replacement = ".", x = names(X1))
+  X1
+}
 ```
 
 
@@ -31,23 +41,33 @@ During the 2017 National Lakes Assesment, duplicate dissolved gas samples were c
 
 # Data
 
+
 The dissolved gas data were currated the 'NLA' dissolved gas project in RStudio.  The code can be found at a private github repository (https://github.com/USEPA/NLA).  After aggregating across duplicate samples, the data were written to nla17gasDataAggregated_2019-10-25.txt.  A copy of this data file is stored in documents library associated with the 'ORD NLA17 Dissolved Gas' Private Group on SharePoint (https://usepa.sharepoint.com/sites/ORD_NLA17_Dissolved_Gas).  When synced to a local computer, the documents library can be read directly with R, after identifying the local directory path.
 ## Getting data and filtering
+
+The dissolved gas data were currated in the 'NLA' dissolved gas project in RStudio.  The code can be found at a private github repository (https://github.com/USEPA/NLA).  After aggregating across duplicate samples, the data were written to nla17gasDataAggregated_2019-10-25.txt.  A copy of this data file is stored in the documents library associated with the 'ORD NLA17 Dissolved Gas' Private Group on SharePoint (https://usepa.sharepoint.com/sites/ORD_NLA17_Dissolved_Gas).  When synced to a local computer, the documents library can be read directly with R.
+
+
 ```{r}
-# Identify local path for each user
-localPath <- Sys.getenv("USERPROFILE")
-
-
 # Read data file
 dg <- read.table(file = paste0(localPath, 
                                "/Environmental Protection Agency (EPA)/",
                                "ORD NLA17 Dissolved Gas - Documents/",
-                               "inputData/nla17gasDataAggregated_2019-11-12.txt"), 
-                 header = TRUE, sep = "\t", as.is = TRUE)
+                           "inputData/nla17gasDataAggregated_2019-11-12.txt"), 
+                 header = TRUE, sep = "\t", as.is = TRUE) %>%
+  # unit conversion
+  mutate(dissolved.ch4 = dissolved.ch4 * 1000000, # mol/L -> umol/L
+         dissolved.co2 = dissolved.co2 * 1000000, # mol/L -> umol/L,
+         dissolved.n20 = dissolved.n2o * 1000000000, # mol/L -> nmol/L
+         # add source/sink column
+         co2.src.snk = ifelse(co2.sat.ratio > 1, "source", "sink"),
+         ch4.src.snk = ifelse(ch4.sat.ratio > 1, "source", "sink"),
+         n2o.src.snk = ifelse(n2o.sat.ratio > 1, "source", "sink"))
+
 ```
 Concentrations of CO~2~, CH~4~, and N~2~O in ambient air over the waterbodies were measured and used in the dissolved gas concentrations.  These data are not needed in subsequent analysis and will be removed from the dataframe.
 ```{r}
-dg <- dg %>% filter(sample.source == "DG") # filter out dissolved gas 'DG' samples
+dg <- dg %>% filter(sample.source == "DG") # select dissolved gas 'DG' samples
 ```
 The dataframe also contains observations from site in Alaska.  These sites were not an official part of the NLA and will not be included in this analysis.
 ```{r}
@@ -56,7 +76,7 @@ dg <- dg %>% filter(!(grepl("AK", site.id))) # exlclude alaska
 
 
 
-The data file contains `r dg %>% distinct(site.id, visit.no) %>% summarize(n = n()) %>% pull()` unique sampling trips defined by unique combinations of 'site.id' and 'visit.no'.  There were `r dg %>% distinct(site.id) %>% summarize(n = n()) %>% pull()` waterbodies sampled, `r dg %>% filter(visit.no == 2) %>% summarize(n = n()) %>% pull()` of which were sampled twice. The primary response variables are the concentrations of CO~2~, CH~4~, and N~2~O dissolved in the surface water of each waterbody.  Concentration is expressed as both mol/L (dissolved.co2, dissolved.ch4, dissolved.n2o) and as a saturation ratio (co2.sat.ratio, ch4.sat.ratio, n2o.sat.ratio).  Saturation ratio is defined as the ratio of the measured concentration to that expected if the waterbody were in equilibrium with the atmosphere.  A value of 1 indicates equilibrium, values < 1 indicate undersaturation and values > 1 indicate supersaturation.  Undersaturated waterbodies function as a sink for the atmospheric gas whereas supersaturated waterbodies function as a source.
+The data file contains `r dg %>% distinct(site.id, visit.no) %>% summarize(n = n()) %>% pull()` unique sampling trips defined by unique combinations of 'site.id' and 'visit.no'.  There were `r dg %>% distinct(site.id) %>% summarize(n = n()) %>% pull()` waterbodies sampled, `r dg %>% filter(visit.no == 2) %>% summarize(n = n()) %>% pull()` of which were sampled twice. The primary response variables are the concentrations of CO~2~, CH~4~, and N~2~O dissolved in the surface water of each waterbody.  Concentration is expressed in both mass based units (umol/L, nmol/L: dissolved.co2, dissolved.ch4, dissolved.n2o) and as a saturation ratio (co2.sat.ratio, ch4.sat.ratio, n2o.sat.ratio).  Saturation ratio is defined as the ratio of the measured concentration to that expected if the waterbody were in equilibrium with the atmosphere.  A value of 1 indicates equilibrium, values < 1 indicate undersaturation and values > 1 indicate supersaturation.  Undersaturated waterbodies function as a sink for the atmospheric gas whereas supersaturated waterbodies function as a source.
 
 
 ```{r}
@@ -65,21 +85,82 @@ dg %>% select(dissolved.co2, dissolved.ch4, dissolved.n2o, co2.sat.ratio, ch4.sa
   {summary(.)}
 ```
 
-To enable spatial analysis of the data, the dataframe will be converted to a 'simple features' (sf) object.
+
+#  Exploratory spatial analysis
+## Population estimates by ecoregion
+The survey design allows for population estimates of central tendency and variance by ecoregion (and other subpopulations), which can provide insight into spatial patterning.  There is broad overlap in mean +/- 95% CI estimates for dissolved CH4 concentation.  The Northern Plains, Temperate Plains, and Western Mountains have low dissolved CO2 concentration.  
+
+```{r, fig.cap= "Fig. caption: Mean +/- 95% CI for the dissolved gas concentration indicator"}
+# Read population estimates provided by Steve Paulsen (11/7/2019)
+pop <- read.csv(file = paste0(localPath, 
+                              "/Environmental Protection Agency (EPA)/",
+                              "ORD NLA17 Dissolved Gas - Documents/",
+                              "inputData/populationEstimates/",
+                              "NLA_2017_Percentile_Estimates_20191107.csv"),
+                as.is = TRUE) %>%
+  toEPA()  # enforce formatting convention
+
+# Convert units for dissolved gas concentration indicator
+pop <- pop %>%
+  mutate(estimate = ifelse(grepl("dissolved.c", indicator, ignore.case = TRUE), # dissolved.co2 or dissolved.ch4
+                            estimate * 1000000, # mol/L -> umol/L for co2 and ch4
+                           ifelse(grepl("dissolved.n", indicator, ignore.case = TRUE), # dissolved.n2o
+                            estimate * 1000000000, # mol/L -> nmol/L for n2o
+                            estimate)), # all others
+         lcb95pct = ifelse(grepl("dissolved.c", indicator, ignore.case = TRUE), # dissolved.co2 or dissolved.ch4
+                            lcb95pct * 1000000, # mol/L -> umol/L for co2 and ch4
+                           ifelse(grepl("dissolved.n", indicator, ignore.case = TRUE), # dissolved.n2o
+                            lcb95pct * 1000000000, # mol/L -> nmol/L for n2o
+                            lcb95pct)), # all others
+         ucb95pct = ifelse(grepl("dissolved.c", indicator, ignore.case = TRUE), # dissolved.co2 or dissolved.ch4
+                            ucb95pct * 1000000, # mol/L -> umol/L for co2 and ch4
+                           ifelse(grepl("dissolved.n", indicator, ignore.case = TRUE), # dissolved.n2o
+                            ucb95pct * 1000000000, # mol/L -> nmol/L for n2o
+                            ucb95pct))) # all others
+
+
+# extract population estimates for ecoregion and nation
+pop.eco <- pop %>% 
+  filter(type %in% c("AG_ECO9_NM", "National"), # extract estimates for ecoregion and nation
+         statistic == "50Pct") # extract mean estimate
+
+# extract dissolved gas indicator, order by dissolved CH4
+pop.eco.diss <- pop.eco %>%
+  filter(grepl("dissolved", indicator, ignore.case = TRUE)) %>%
+  mutate(subpopulation = factor(subpopulation, 
+                             levels = filter(pop.eco, indicator == "DISSOLVED_CH4", subpopulation != "National") %>%
+                               arrange(estimate) %>%
+                               select(subpopulation) %>%
+                               pull() %>%
+                               c("National", .)))
+  
+# look at dissolved concentration indicator
+ggplot(pop.eco.diss, aes(estimate, subpopulation)) +
+  geom_point() +
+  geom_errorbarh(aes(xmax = ucb95pct, xmin = lcb95pct)) +
+  facet_wrap(~indicator, scales = "free_x") +
+  theme(axis.title = element_blank())
+
+  
+```
+
+
+
+## Bubble plots
+Bubble plots can be used to visualize patterns in geospatial data.  In the plots below, bubble size reflects the gas concentration and color reflects saturation status (i.e. source or sink).  The code immediately below converts the dataframe to a spatial object and reads in the ecoregion ploygons.  The first bubble plot below is of dissolved CO2 which seems to show a pattern of higher concentrations along the eastern seaboard. 
+
+
 ```{r}
+# To enable spatial analysis of the data, the dataframe will be converted to a 'simple features' (sf) object.
 # Define coordinates
 coords <- data.frame(longitude = dg$map.lon.dd, latitude = dg$map.lat.dd)
 
 dg.sf <- st_as_sf(dg, coords = c("map.lon.dd", "map.lat.dd"), 
                   crs = 4269) %>% # standard for lat/lon
   st_transform(5070) # project to CONUS ALBERS for plotting
-```
 
-#  Exploratory spatial analysis
 
-Bubble plots offer a simple method for visualizing spatial patterns in the data.  For some reason, this isn't working.  WTF....
 
-```{r}
 # read in ecoregion polygons
 ecoR <- st_read(dsn = paste0(localPath, 
                              "/Environmental Protection Agency (EPA)/",
@@ -100,25 +181,75 @@ ecoR <- ecoR %>%
 st_crs(ecoR) # no EPSG code
 ecoR <- st_transform(ecoR, 5070) # convert to CONUS Albers
 st_crs(ecoR) # 5070
-
-# head(ecoR, 9) throws Error: C stack usage  30746119 is too close to the limit
-# eventuall get the head output
-# Bubble plots
-ggplot() +
-  geom_sf(data = ecoR, color = NA, aes(fill = WSA9_NAME)) +
-  geom_sf(data = dg.sf, aes(size = dissolved.co2)) +
-  ggtitle("Dissolved CO2")
-
-ggplot() +
-  geom_sf(data = ecoR, color = NA, aes(fill = WSA9_NAME)) +
-  geom_sf(data = dg.sf, aes(size = dissolved.ch4)) +
-  ggtitle("Dissolved CH4")
-
-ggplot() +
-  geom_sf(data = ecoR, color = NA, aes(fill = WSA9_NAME)) +
-  geom_sf(data = dg.sf, aes(size = dissolved.n2o)) +
-  ggtitle("Dissolved N2O")
 ```
+
+
+# Bubble plots
+
+```{r}
+# CO2 Bubble plots
+
+ggplot() +
+  geom_sf(data = ecoR, color = NA, aes(fill = WSA9_NAME)) +
+  geom_sf(data = dg.sf, aes(size = dissolved.co2, color = co2.src.snk), 
+          show.legend = "point") + # improve legend
+  ggtitle("Dissolved CO2 (uM)") +
+  scale_color_manual(values = c("white", "black"), name = "source/sink") +
+  scale_size(name = "dissolved CO2 (uM)",
+             range = c(0.1, 5), # custom size range
+             breaks = c(10, 100, 300, 600)) # custom breaks
+```
+
+Spatial patterns in dissolved CH4 are not apparent, although all but two sites are supersaturated. 
+
+```{r}
+ggplot() +
+  geom_sf(data = ecoR, color = NA, aes(fill = WSA9_NAME)) +
+  geom_sf(data = dg.sf, aes(size = dissolved.ch4, color = ch4.src.snk), 
+          show.legend = "point") +
+  ggtitle("Dissolved CH4 (uM)") +
+  scale_color_manual(values = c("white", "black"), name = "source/sink") +
+  scale_size(name = "dissolved CH4 (uM)",
+             range = c(0.1, 10), # custom size range
+             breaks = c(0.1, 1, 10, 50, 100)) # custom breaks
+```
+
+The prevalance of undersaturated dissolved N2O concentrations is an important finding.  The IPCC assumes surface waters are an important source of N2O to the atmosphere.   Webb et al. recently published a paper in PNAS reporting that 70 out of 101 reservoirs sampled in Saskatchewan were N2O sinks.  This paper made quite a splash.  In our study, `r sum(dg$n2o.src.snk == "sink")` out of `r sum(!is.na(dg$dissolved.n2o))` sampled waterbodies were an N2O sink. It is somewhat interesting to note that the some of the highest concentrations were observed in Indiana/Ohio, where I conducted much of my dissertation research on aquatic N2O emissions.
+
+```{r}
+ggplot() +
+  geom_sf(data = ecoR, color = NA, aes(fill = WSA9_NAME)) +
+  geom_sf(data = dg.sf, aes(size = dissolved.n2o, color = n2o.src.snk),
+          show.legend = "point") +
+  ggtitle("Dissolved N2O (nM)") +
+  scale_color_manual(values = c("white", "black"), name = "source/sink") +
+  scale_size(name = "dissolved N2O (nM)",
+             range = c(0.1, 10), # custom size range
+             breaks = c(1, 10, 25, 50, 100)) # custom breaks
+```
+
+We can also look at population estimates of N2O saturation ratio by ecoregion.  Wow, the mean N2O saturation is less than one for all ecoregions and the nation!  95% CI overlap one in only 3 levels of the stratification.  This is pretty big news. 
+```{r}
+
+# extract saturation indicator, order by n2o
+pop.eco.sat <- pop.eco %>%
+  filter(grepl("sat", indicator, ignore.case = TRUE)) %>%
+  mutate(subpopulation = factor(subpopulation, 
+                             levels = filter(pop.eco, indicator == "N2O_SAT_RATIO", subpopulation != "National") %>%
+                               arrange(estimate) %>%
+                               select(subpopulation) %>%
+                               pull() %>%
+                               c("National", .)))
+  
+# look at dissolved concentration indicator
+ggplot(pop.eco.sat, aes(estimate, subpopulation)) +
+  geom_point() +
+  geom_errorbarh(aes(xmax = ucb95pct, xmin = lcb95pct)) +
+  facet_wrap(~indicator, scales = "free_x") +
+  theme(axis.title = element_blank())
+
+```
+
 
 ## Summarizing distances
 Getting distances between sites overall and by ecoregion to help set distances for lagged scatterplots.  First, Worked out steps on a sample of NLA sites.  Could only get parts of Anna Springsteen's code to work.
@@ -519,3 +650,46 @@ hscat(dissolved.n2o~1, dg_sp, c(0, 50000, 100000, 200000, 400000, 800000, 150000
 hscat(log10(dissolved.n2o)~1, dg_sp, c(0, 10000, 25000, 50000, 100000, 200000, 300000, 400000))
 
 ````
+
+## Lagged scatterplots
+Mike, can you integrate scatterplot code here?
+
+## Semivariograms
+Variograms display the variability among pairs of points at various separation distances.  I was unable to fit a model to the dissolved gas concentration variograms using the default fitting parameters in gstat.  The variograms suggest a lack of spatial structure, but I suspect the model parameterization can be improved.
+
+```{r, warning=FALSE, message=FALSE}
+# Variogram function requires sp object
+dg.sp <- as(dg.sf, Class = "Spatial")
+
+# CO2 variogram
+co2.v <- variogram(dissolved.co2~1, dg.sp)
+co2.v.fit <- fit.variogram(co2.v, vgm(c("Exp", "Mat", "Sph"))) # allow to choose best model.  Not sure which model warnings are associated with.
+# co2.v.fit # chose sperical
+co2.v.fit <- fit.variogram(co2.v, vgm("Sph")) # refit spherical, several warnings (?)
+
+# CH4 variogram
+ch4.v <- variogram(dissolved.ch4~1, dg.sp)
+ch4.v.fit <- fit.variogram(ch4.v, vgm(c("Exp", "Mat", "Sph"))) # allow to choose best model.  Not sure which model warnings are associated with.
+# ch4.v.fit # chose exp
+ch4.v.fit <- fit.variogram(ch4.v, vgm("Exp")) # refit exponential, no convergence
+
+# N2O variogram
+n2o.v <- variogram(dissolved.n2o~1, dg.sp)
+n2o.v.fit <- fit.variogram(n2o.v, vgm(c("Exp", "Mat", "Sph"))) # allow to choose best model.  Not sure which model warnings are associated with.
+# n2o.v.fit # chose exp
+n2o.v.fit <- fit.variogram(n2o.v, vgm("Exp")) # refit exponential, no convergence
+
+
+# Plot variograms and models (if fit)
+plot(co2.v, model = co2.v.fit, main = "CO2 semivariogram")
+plot(ch4.v, main = "CH4 semivariogram")
+plot(n2o.v, main = "N2O semivariogram")
+
+```
+
+
+
+
+
+
+
