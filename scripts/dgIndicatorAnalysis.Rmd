@@ -40,35 +40,16 @@ During the 2017 National Lakes Assesment, duplicate dissolved gas samples were c
 
 
 ## Getting data and filtering
-The dissolved gas data were currated the 'NLA' dissolved gas project in RStudio.  The code can be found at a private github repository (https://github.com/USEPA/NLA).  After aggregating across duplicate samples, the data were written to nla17gasDataAggregated_2019-10-25.txt.  A copy of this data file is stored in documents library associated with the 'ORD NLA17 Dissolved Gas' Private Group on SharePoint (https://usepa.sharepoint.com/sites/ORD_NLA17_Dissolved_Gas).  When synced to a local computer, the documents library can be read directly with R, after identifying the local directory path.
+The dissolved gas data were currated the 'NLA' dissolved gas project in RStudio.  The code can be found at a private github repository (https://github.com/USEPA/NLA).  After aggregating across duplicate samples, the data were written to nla17gasDataAggregated_2019-10-25.txt.  A copy of this data file is stored in documents library associated with the 'ORD NLA17 Dissolved Gas' Private Group on SharePoint (https://usepa.sharepoint.com/sites/ORD_NLA17_Dissolved_Gas).  This file was futher manipulated in "C:\Users\JBEAULIE\OneDrive - Environmental Protection Agency (EPA)\gitRepository\DissolvedGasNla\scripts\dataMunge.Rmd" and written out as an .RData object which is imported below.
 
 
 ```{r}
 # Read data file
-dg <- read.table(file = paste0(localPath, 
-                               "/Environmental Protection Agency (EPA)/",
-                               "ORD NLA17 Dissolved Gas - Documents/",
-                               "inputData/nla17gasDataAggregated_2019-11-12.txt"),
-                 header = TRUE, sep = "\t", as.is = TRUE) %>%
-  # unit conversion
-  mutate(dissolved.ch4 = dissolved.ch4 * 1000000, # mol/L -> umol/L
-         dissolved.co2 = dissolved.co2 * 1000000, # mol/L -> umol/L,
-         dissolved.n2o = dissolved.n2o * 1000000000, # mol/L -> nmol/L
-         # add source/sink column
-         co2.src.snk = ifelse(co2.sat.ratio > 1, "source", "sink"),
-         ch4.src.snk = ifelse(ch4.sat.ratio > 1, "source", "sink"),
-         n2o.src.snk = ifelse(n2o.sat.ratio > 1, "source", "sink"),
-         # add state
-         state = substr(site.id, 7, 8))
+load(paste0(localPath, 
+            "/Environmental Protection Agency (EPA)/",
+            "ORD NLA17 Dissolved Gas - Documents/",
+            "inputData/dg.RData"))
 
-```
-Concentrations of CO~2~, CH~4~, and N~2~O in ambient air over the waterbodies were measured and used in the dissolved gas concentrations.  These data are not needed in subsequent analysis and will be removed from the dataframe.
-```{r}
-dg <- dg %>% filter(sample.source == "DG") # select dissolved gas 'DG' samples
-```
-The dataframe also contains observations from site in Alaska.  These sites were not an official part of the NLA and will not be included in this analysis.
-```{r}
-dg <- dg %>% filter(!(grepl("AK", site.id))) # exlclude alaska
 ```
 
 
