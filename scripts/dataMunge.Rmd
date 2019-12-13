@@ -52,25 +52,12 @@ dg <- dg %>%
   mutate(
     # add state
     state = substr(site.id, 7, 8),
-    AREA_HA = AREASQKM / 100, # 100Ha in 1 km2 
-    size_cat = ifelse(AREA_HA <= 4,
-                      "LE4",
-                      ifelse(AREA_HA > 4 & AREA_HA <= 10,
-                             "G4_LE10",
-                             ifelse(AREA_HA > 10 & AREA_HA <= 20,
-                                    "G10_LE20",
-                                    ifelse(AREA_HA > 20 & AREA_HA <= 50,
-                                           "G20_LE50",
-                                           ifelse(AREA_HA > 50,
-                                                  "G50",
-                                                  NA))))))
+    AREA_HA = AREASQKM * 100, # 100Ha in 1 km2 
+    size_cat = factor( cut( AREASQKM,
+                            breaks = c( -Inf, 0.04, 0.1, 0.2, 0.5, Inf ),
+                            labels = c( "min_4", "4_10", "10_20", "20_50", "50_max") ) )
+    )
 
-```
-
-
-Concentrations of CO~2~, CH~4~, and N~2~O in ambient air over the waterbodies were measured and used to calculate the equilibrium dissolved gas concentration (variables sat.co2, sat.ch4, and sat.n2o).  These data are not needed in subsequent analysis and will be removed from the dataframe.
-```{r}
-dg <- dg %>% filter(sample.source == "DG") # select dissolved gas 'DG' samples
 ```
 
 The dataframe also contains observations from site in Alaska.  These sites were not an official part of the NLA and will not be included in this analysis.
