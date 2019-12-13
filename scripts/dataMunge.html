@@ -1,17 +1,16 @@
 <!DOCTYPE html>
 
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html>
 
 <head>
 
 <meta charset="utf-8" />
-<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 <meta name="generator" content="pandoc" />
 <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
 
 
-<meta name="date" content="2019-12-12" />
+<meta name="date" content="2019-12-13" />
 
 <title>Data Munging</title>
 
@@ -2676,6 +2675,7 @@ summary {
   border: none;
   display: inline-block;
   border-radius: 4px;
+  background-color: transparent;
 }
 
 .tabset-dropdown > .nav-tabs.nav-tabs-open > li {
@@ -2704,6 +2704,12 @@ summary {
 }
 }
 
+@media print {
+.toc-content {
+  /* see https://github.com/w3c/csswg-drafts/issues/4434 */
+  float: right;
+}
+}
 
 .toc-content {
   padding-left: 30px;
@@ -2775,7 +2781,7 @@ div.tocify {
 
 
 <h1 class="title toc-ignore">Data Munging</h1>
-<h4 class="date">2019-12-12</h4>
+<h4 class="date">2019-12-13</h4>
 
 </div>
 
@@ -2804,20 +2810,11 @@ dg &lt;- read.table(file = paste0(localPath,
   mutate(
     # add state
     state = substr(site.id, 7, 8),
-    AREA_HA = AREASQKM / 100, # 100Ha in 1 km2 
-    size_cat = ifelse(AREA_HA &lt;= 4,
-                      &quot;LE4&quot;,
-                      ifelse(AREA_HA &gt; 4 &amp; AREA_HA &lt;= 10,
-                             &quot;G4_LE10&quot;,
-                             ifelse(AREA_HA &gt; 10 &amp; AREA_HA &lt;= 20,
-                                    &quot;G10_LE20&quot;,
-                                    ifelse(AREA_HA &gt; 20 &amp; AREA_HA &lt;= 50,
-                                           &quot;G20_LE50&quot;,
-                                           ifelse(AREA_HA &gt; 50,
-                                                  &quot;G50&quot;,
-                                                  NA))))))</code></pre>
-<p>Concentrations of CO<sub>2</sub>, CH<sub>4</sub>, and N<sub>2</sub>O in ambient air over the waterbodies were measured and used to calculate the equilibrium dissolved gas concentration (variables sat.co2, sat.ch4, and sat.n2o). These data are not needed in subsequent analysis and will be removed from the dataframe.</p>
-<pre class="r"><code>dg &lt;- dg %&gt;% filter(sample.source == &quot;DG&quot;) # select dissolved gas &#39;DG&#39; samples</code></pre>
+    AREA_HA = AREASQKM * 100, # 100Ha in 1 km2 
+    size_cat = factor( cut( AREASQKM,
+                            breaks = c( -Inf, 0.04, 0.1, 0.2, 0.5, Inf ),
+                            labels = c( &quot;min_4&quot;, &quot;4_10&quot;, &quot;10_20&quot;, &quot;20_50&quot;, &quot;50_max&quot;) ) )
+    )</code></pre>
 <p>The dataframe also contains observations from site in Alaska. These sites were not an official part of the NLA and will not be included in this analysis.</p>
 <pre class="r"><code>dg &lt;- dg %&gt;% filter(!(grepl(&quot;AK&quot;, site.id))) # exlclude alaska</code></pre>
 <p>Write out final .RData object.</p>
