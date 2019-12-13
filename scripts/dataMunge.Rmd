@@ -16,6 +16,7 @@ editor_options:
 ```{r results='hide', message=FALSE, warning=FALSE, echo=FALSE}
 # load libraries
 library(tidyverse) # dplyr, ggplot
+library(forcats) # fct_explicit_na()
 
 # Identify local path for each user
 localPath <- Sys.getenv("USERPROFILE")
@@ -25,17 +26,78 @@ localPath <- Sys.getenv("USERPROFILE")
 # Purpose
 The purpose of this .rmd is to prepare the data set for subsequent modeling.  The data will be written as .RData object and stored at the shared documents library associated with this project: https://usepa.sharepoint.com/sites/ORD_NLA17_Dissolved_Gas
 
-The dissolved gas data were currated in the 'NLA' dissolved gas project in RStudio.  The code can be found at a private github repository (https://github.com/USEPA/NLA).  After aggregating across duplicate samples, the data were written to nla17gasDataAggregated_2019-11-12.txt.  A copy of this data file is stored in documents library associated with the 'ORD NLA17 Dissolved Gas' Private Group on SharePoint (https://usepa.sharepoint.com/sites/ORD_NLA17_Dissolved_Gas).  When synced to a local computer, the documents library can be read directly with R, after identifying the local directory path.
+The dissolved gas data were currated in the 'NLA' dissolved gas project in RStudio.  The code can be found at a private github repository (https://github.com/USEPA/NLA).  After aggregating across duplicate samples, the data were written to nla17gasDataAggregated_2019-11-12.txt.  Data on waterbody surface area and design weights were provided by Karen Blocksom on 12/13/2019.  These data files are stored in the documents library associated with the 'ORD NLA17 Dissolved Gas' Private Group on SharePoint (https://usepa.sharepoint.com/sites/ORD_NLA17_Dissolved_Gas).  When synced to a local computer, the documents library can be read directly with R, after identifying the local directory path.
 
-Below we read in the .txt file, perform a few manipulations, then write out a .Rdata object.
+# Data
+## Read and merge
+Below we read in the data files.  
 
 ```{r}
-# Read data file
+# Read dissolved gas data file
 dg <- read.table(file = paste0(localPath, 
                                "/Environmental Protection Agency (EPA)/",
                                "ORD NLA17 Dissolved Gas - Documents/",
                                "inputData/nla17gasDataAggregated_2019-11-12.txt"),
-                 header = TRUE, sep = "\t", as.is = TRUE) %>%
+                 header = TRUE, sep = "\t", as.is = TRUE) 
+
+wt.area <- read.csv(file = paste0(localPath, 
+                               "/Environmental Protection Agency (EPA)/",
+                               "ORD NLA17 Dissolved Gas - Documents/",
+                               "inputData/NLA17_SiteWeights_Areas.csv"),
+                    as.is = TRUE)
+```
+
+Unique waterbodies are identified by 'site id'.  Some waterbodies were visited twice, therefore each unique sampling trip is identified by a combination of 'site id' and visit number.  
+
+``` {r}
+dg %>% distinct(site.id, visit.no)
+```
+
+Survey weights and lake area are invariant across site visits, therefore the weights + lake area file does not contain a visit number field:
+``` {r}
+# no visit number in this file
+names(wt.area)
+```
+
+
+The two data sets will be merged on the 'site id' fields.  The dissolved gas file contains data from sites in Alaska that are not present in the weights + lake area file.  Alaska sites are not an offical component of the NLA and will removed from this analysis.
+``` {r}
+# Will merge datasets on SITE_ID field.  Are all site.id values in dg present in wt.area?
+dg %>% filter(!(site.id %in% wt.area$SITE_ID)) %>% distinct(site.id) # no.
+
+# Remove AK sites
+dg <- dg %>% filter(!(grepl("AK", site.id))) # exlclude alaska
+```
+
+
+This leaves one site in WI that is in the dissolved gas file, but not in the weights + lake area file.  I have the Chain of Custody form for this site and will forward to Karen Blocksom for clarification.  
+``` {r}
+# Will merge datasets on SITE_ID field.  Are all site.id values in dg present in wt.area?
+dg %>% filter(!(site.id %in% wt.area$SITE_ID)) %>% distinct(site.id) # Just a single WI site
+```
+
+
+There are 23 observations in the weights + lake area file that are absent from the dissolved gas file.  One observation is from Arizona.  This corresponds to notes in the chain of custody form indicating the vials arrived unlabeled and were not run.  The remaining sites are from OR. I can't find any record of these samples in chain of custody form.  I'll check with Karen Blocksom regarding these samples.
+
+``` {r}
+# Any site id values in wt.area, but not present in dg?
+wt.area %>% filter(!(SITE_ID %in% dg$site.id)) %>% select(SITE_ID, EVAL_CAT, SITETYPE) # hmm, 23 sites w/out dissolved gas data?  One from AZ, the rest from OR.
+```
+
+Finally, lets merge these two files in site id.  Use left_join to retain all dissolved gas data, including the WI site that doesn't have a matching record in the weights + lake area file.
+``` {r}
+dim(dg) # 2369, 364
+
+dg <- left_join(dg, wt.area, by = c("site.id" = "SITE_ID"))
+
+dim(dg) # 2369, 369;  good retained all DG observations, added a few columns.
+```
+
+
+## Manipulate
+Impliment unit conversion and create source/sink column:
+``` {r}
+dg <- dg %>%
   # unit conversion
   mutate(dissolved.ch4 = dissolved.ch4 * 1000000, # mol/L -> umol/L
          dissolved.co2 = dissolved.co2 * 1000000, # mol/L -> umol/L,
@@ -46,23 +108,32 @@ dg <- read.table(file = paste0(localPath,
          n2o.src.snk = ifelse(n2o.sat.ratio > 1, "source", "sink"))
 ```
 
-The survey design is stratified by State.  Within each state, an unequal probability category based on 5 lake size classes is used.  As of 12/12/2019, NLA has not provided data on waterbody size.  Size was estimated by doing a spatial overlay of the waterbody lat/lon with NHDPlusV2.  Surface area (AREASQKM) was then extracted from NHDPlusV2.  The data currently contains `r dg %>% as.data.frame() %>% filter(is.na(AREASQKM)) %>% {nrow(.)}` missing waterbody size values.  For now, we'll use these data to add the size categories to the data file.
+The survey design is stratified by State.  Within each state, an unequal probability category based on 5 lake size classes is used.  Use lake area data provided by Karen to define lake area categories.
 ```{r}
 dg <- dg %>%
   mutate(
     # add state
     state = substr(site.id, 7, 8),
-    AREA_HA = AREASQKM * 100, # 100Ha in 1 km2 
-    size_cat = factor( cut( AREASQKM,
-                            breaks = c( -Inf, 0.04, 0.1, 0.2, 0.5, Inf ),
+    size_cat = factor( cut( AREA_HA,
+                            breaks = c( -Inf, 4, 10, 20, 50, Inf ),
                             labels = c( "min_4", "4_10", "10_20", "20_50", "50_max") ) )
     )
 
 ```
+NLA17_WI-10018 does not have a AREA_HA value, therefore does not have size_cat value.
 
-The dataframe also contains observations from site in Alaska.  These sites were not an official part of the NLA and will not be included in this analysis.
-```{r}
-dg <- dg %>% filter(!(grepl("AK", site.id))) # exlclude alaska
+``` {r}
+dg %>% filter(is.na(size_cat)) %>% distinct(site.id)
+```
+We do have an area estimate of 2.6 Ha derived from NHDPlusV2, however.  For now, lets use the NHD value to assign a size_cat value. 
+
+``` {r}
+dg %>% filter(site.id == "NLA17_WI-10018") %>% distinct(AREASQKM)
+
+dg <- dg %>%
+  mutate(size_cat = fct_explicit_na(size_cat, "min_4")) # < 4HA, therefore belongs to "min_4" category.
+
+table(dg$size_cat, useNA = "ifany")
 ```
 
 
@@ -71,7 +142,7 @@ Write out final .RData object.
 save(dg, file = paste0(localPath, 
                        "/Environmental Protection Agency (EPA)/",
                        "ORD NLA17 Dissolved Gas - Documents/",
-                       "inputData/dg.RData"))
+                       "inputData/dg.", Sys.Date(), ".RData"))
 ```
 
 
