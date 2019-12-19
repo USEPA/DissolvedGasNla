@@ -15,8 +15,10 @@ editor_options:
 ---
 ```{r results='hide', message=FALSE, warning=FALSE, echo=FALSE}
 # load libraries
+library(plyr) # for ddply, load before tidyverse
 library(tidyverse) # dplyr, ggplot
 library(forcats) # fct_explicit_na()
+library(rLakeAnalyzer) # for buoyancy frequency
 
 # Identify local path for each user
 localPath <- Sys.getenv("USERPROFILE")
@@ -29,7 +31,7 @@ The purpose of this .rmd is to prepare the data set for subsequent modeling.  Th
 The dissolved gas data were currated in the 'NLA' dissolved gas project in RStudio.  The code can be found at a private github repository (https://github.com/USEPA/NLA).  After aggregating across duplicate samples, the data were written to nla17gasDataAggregated_2019-11-12.txt.  Data on waterbody surface area and design weights were provided by Karen Blocksom on 12/13/2019.  These data files are stored in the documents library associated with the 'ORD NLA17 Dissolved Gas' Private Group on SharePoint (https://usepa.sharepoint.com/sites/ORD_NLA17_Dissolved_Gas).  When synced to a local computer, the documents library can be read directly with R, after identifying the local directory path.
 
 # Data
-## Read and merge
+## Read data
 Below we read in the data files.  
 
 ```{r}
@@ -40,13 +42,22 @@ dg <- read.table(file = paste0(localPath,
                                "inputData/nla17gasDataAggregated_2019-11-12.txt"),
                  header = TRUE, sep = "\t", as.is = TRUE) 
 
+# Read site weights and waterbody area data
 wt.area <- read.csv(file = paste0(localPath, 
                                "/Environmental Protection Agency (EPA)/",
                                "ORD NLA17 Dissolved Gas - Documents/",
                                "inputData/NLA17_SiteWeights_Areas.csv"),
                     as.is = TRUE)
+
+# Read in temp profile data
+temp <- read.csv(file = paste0(localPath, 
+                               "/Environmental Protection Agency (EPA)/",
+                               "ORD NLA17 Dissolved Gas - Documents/",
+                               "inputData/NLA17_Profile_Data.csv"),
+                    as.is = TRUE)
 ```
 
+## Merge dissolved gas with survey weights + area
 Unique waterbodies are identified by 'site id'.  Some waterbodies were visited twice, therefore each unique sampling trip is identified by a combination of 'site id' and visit number.  
 
 ``` {r}
@@ -70,21 +81,25 @@ dg <- dg %>% filter(!(grepl("AK", site.id))) # exlclude alaska
 ```
 
 
-This leaves one site in WI that is in the dissolved gas file, but not in the weights + lake area file.  I have the Chain of Custody form for this site and will forward to Karen Blocksom for clarification.  
+This leaves one site in WI that is in the dissolved gas file, but not in the weights + lake area file.  The Chain of Custody form verifies receipt of this sample.  Per Karen Blocksom, this should be SITE)ID NLA17_WI-10008, visit 1.  
 ``` {r}
 # Will merge datasets on SITE_ID field.  Are all site.id values in dg present in wt.area?
-dg %>% filter(!(site.id %in% wt.area$SITE_ID)) %>% distinct(site.id) # Just a single WI site
+dg %>% filter(!(site.id %in% wt.area$SITE_ID)) %>% distinct(site.id, visit.no) # Just a single WI site
+
+# Correct site code
+dg <- dg %>%
+  mutate(site.id = replace(site.id, site.id == "NLA17_WI-10018" & visit.no == 1, "NLA17_WI-10008"))
 ```
 
 
-There are 23 observations in the weights + lake area file that are absent from the dissolved gas file.  One observation is from Arizona.  This corresponds to notes in the chain of custody form indicating the vials arrived unlabeled and were not run.  The remaining sites are from OR. I can't find any record of these samples in chain of custody form.  I'll check with Karen Blocksom regarding these samples.
+There are 23 observations in the weights + lake area file that are absent from the dissolved gas file.  One observation is from Arizona.  This corresponds to notes in the chain of custody form indicating the vials arrived unlabeled and were not run.  The remaining sites are from OR. Karen Blocksom confirmed that these sites were part of the OR state survey, but collected 'most' of the NLA measurements.  They were included in the final NLA dataset for 'the purpose of adjusting weights'.  They did not collect gas samples and can be disregarded for this analysis.
 
 ``` {r}
 # Any site id values in wt.area, but not present in dg?
-wt.area %>% filter(!(SITE_ID %in% dg$site.id)) %>% select(SITE_ID, EVAL_CAT, SITETYPE) # hmm, 23 sites w/out dissolved gas data?  One from AZ, the rest from OR.
+wt.area %>% filter(!(SITE_ID %in% dg$site.id)) %>% select(SITE_ID, EVAL_CAT, SITETYPE) # h23 sites w/out dissolved gas data
 ```
 
-Finally, lets merge these two files in site id.  Use left_join to retain all dissolved gas data, including the WI site that doesn't have a matching record in the weights + lake area file.
+Finally, lets merge these two files on site id.  Use left_join to retain all dissolved gas data, but disregard OR and AZ sites where we don't have gas data.
 ``` {r}
 dim(dg) # 2369, 364
 
@@ -120,21 +135,154 @@ dg <- dg %>%
     )
 
 ```
-NLA17_WI-10018 does not have a AREA_HA value, therefore does not have size_cat value.
+All observations have a value for the size_cat design variable.
 
 ``` {r}
-dg %>% filter(is.na(size_cat)) %>% distinct(site.id)
-```
-We do have an area estimate of 2.6 Ha derived from NHDPlusV2, however.  For now, lets use the NHD value to assign a size_cat value. 
-
-``` {r}
-dg %>% filter(site.id == "NLA17_WI-10018") %>% distinct(AREASQKM)
-
-dg <- dg %>%
-  mutate(size_cat = fct_explicit_na(size_cat, "min_4")) # < 4HA, therefore belongs to "min_4" category.
-
 table(dg$size_cat, useNA = "ifany")
 ```
+
+
+## Calculate stratification indices from temperature profile data
+Water temperature profiles were measured at the index site in each waterbody.  A variety of metrics describing the degree of thermal stratification can be extracted from these data.  Webb et al. used the Brunt–Väisälä buoyancy frequency as an indicator of thermal stratification strength.  We will do the same here.
+
+Three unique site visits contain only NA for temperature.  Two of the incidents include notes that sonde was forgotten or malfunctioning. Two of the three sites were revisited later in the study and temperature data were collected.  Lets assign data from the second site visit to the first visit when no temperature data were collected.  This leaves only NLA17_CA-10082, visit 1, without temperature data.
+
+```{r}
+# Sites that only contain NAs.
+missingTemp <- temp %>% group_by(SITE_ID, VISIT_NO) %>% 
+  summarise(all.na = all(is.na(TEMPERATURE))) %>% 
+  filter(all.na == TRUE) %>%
+  select(SITE_ID, VISIT_NO)
+
+# View sites with missing temp.
+missingTemp
+
+# Two of the sites have data from second site visit
+temp %>% filter(SITE_ID %in% missingTemp$SITE_ID) %>%
+  select(SITE_ID, VISIT_NO, TEMPERATURE) 
+
+# Extract data from second visit to assign to first visit
+replacementData <- temp %>% filter(SITE_ID %in% missingTemp$SITE_ID, VISIT_NO == 2) %>%
+  select(SITE_ID, VISIT_NO, DEPTH, TEMPERATURE) %>%
+  mutate(VISIT_NO = 1) # change visit no to one for join
+
+# Join the data
+temp1 <- full_join(temp, replacementData)
+
+# Inspect results of join.  Looks good.  Only one site missing temperature data.
+temp1 %>% filter(SITE_ID %in% missingTemp$SITE_ID) %>%
+  select(SITE_ID, VISIT_NO, DEPTH, TEMPERATURE) %>% 
+  arrange(SITE_ID, VISIT_NO, DEPTH, TEMPERATURE)
+
+```
+
+The field crews measured temperature starting near the water surface, then at increasing depths.  A second measurement was made at the water surface before the sonde was removed from the water, therefore the file contains duplicate measurements at the shallowest depths. Duplicate measurements corrupt the buoyancy frequency function and will therefore be aggregated. 
+``` {r}
+# Aggregate across SITE_ID, VISIT_NO, and DEPTH.  I don't like the dplyr solution for this (group_map) and I'm not familiar with the purr::map_ functions.  I'm going old-school and busting out the trusty plyr::ddply.
+temp2 <- temp1 %>% select(SITE_ID, VISIT_NO, DEPTH, TEMPERATURE) %>%
+  # exclude NA, NaN, Inf...
+  filter(is.finite(TEMPERATURE)) %>% # This completely removes the CA site with only NA for temp data.
+  plyr::ddply(., .(SITE_ID, VISIT_NO, DEPTH), summarize, 
+              TEMPERATURE.M = mean(TEMPERATURE, na.rm = TRUE))
+dim(temp1) # 11003
+dim(temp2) # 10071, nearly 1000 observations aggregated or stripped out due to NA
+```
+
+Finally, calculate the buoyancy frequency depth profile for each waterbody and print to buoyancyFrequency.pdf for inspection.  
+
+``` {r}
+# The buoyancy frequency is calculated at multiple depths, but at fewer depths than the where 
+# temperature was measured.  The output of the buoyancy frequency function is shorter 
+# than the input, which is incompatible with dplyr mutate and summarize.  The dplyr alternative
+# is group_map which produces a list, but the grouping variables are stripped from the list
+# elements.  I really don't like this.  I think this can be addressed by combining group_map
+# with purr::map_ functions, but I'm not familiar with purr.  Rather, I'll use the old school
+# split -lapply - do(rbind) approach.
+bf <- temp2 %>%
+  group_split(SITE_ID, VISIT_NO) %>% # split into list of df
+  lapply(function(x) {
+    data.frame(BF = buoyancy.freq(wtr = x$TEMPERATURE.M, depths = x$DEPTH), # calculate buoyance frequency
+               SITE_ID = unique(x$SITE_ID), # add site ID
+               VISIT_NO = unique(x$VISIT_NO), # add visit no
+               stringsAsFactors = FALSE)}) %>% 
+  lapply(function(x) x %>% mutate(DEPTHS.BF = attr(BF, "depths"))) %>% # depths stored as attribute, assign to column
+  do.call("rbind", .) # collapse to df
+
+# there are three non-finite bf values, lets have a look
+bf.na <- bf %>% filter(!is.finite(BF)) %>%
+  select(SITE_ID, VISIT_NO)
+
+bf.na
+
+# ONe of the three values comes from a site with other non-zero measurements.  Probably OK.
+# two sites have only a single NA for BF becasue they only have a single temp measurement, 
+# presumably these are shallow sites, therefore unlikely to be stratified.  Assign a bf
+# very close to 0.
+bf %>% filter(SITE_ID %in% bf.na$SITE_ID) 
+temp2 %>% filter(SITE_ID %in% bf.na$SITE_ID)
+
+# plot buoyancy frequency depth profile
+# (http://stackoverflow.com/questions/8018961/connect-points-in-qplot-by-adjacent-y-value-not-x-value)
+# https://stackoverflow.com/questions/29034863/apply-a-ggplot-function-per-group-with-dplyr-and-set-title-per-group
+bf.plot <- bf %>%
+  group_by(SITE_ID, VISIT_NO) %>%
+  do(plots = ggplot(data = .) +
+       aes(DEPTHS.BF, BF) +
+    geom_point() +
+    geom_line() +
+    scale_x_reverse() +
+    coord_flip() +
+    ggtitle(paste(unique(.$SITE_ID), "VISIT_NO = ", unique(.$VISIT_NO))))
+
+
+# pdf("output/figures/buoyancyFrequency.pdf", onefile = TRUE)
+# bf.plot$plots
+# dev.off()
+```
+
+Webb et al. used the maximum buoyancy frequency value as an index of thermal stratification.  The maximum value should occur near the thermocline.  Here is an example of a classical pattern:
+```{r}
+bf.plot$plots[92]
+```
+
+Extract the max buoyancy frequency value for each waterbody. 
+``` {r}
+# Finally, extract max buoyancy for each SITE_ID x VISIT_NO
+bf.max <- bf %>% group_by(SITE_ID, VISIT_NO) %>%
+  summarise(MAX.BF = max(BF, na.rm = TRUE)) %>%
+  ungroup()
+```
+
+`r bf.max %>% summarize(n.na = sum(is.na(bf.max$MAX.BF))) %>% pull()` of the profiles do not have a maximum buoyancy frequency value.  Very good.  
+
+Finally, merge buoyancy frequency data with dg.  The buoyancy frequency data contains information from the extra Oregon sites (see above) and the AZ site where the gas samples were unlabeled and not analyzed.  This is as expected.
+The buoyancy frequency data do not contain observations for the California site (CA-10082) where the sonde was reported missing/malfunctioning.
+```{r}
+# are all SITE_ID values in buoyancy frequency also present in dg?
+bf.max %>% filter(!(SITE_ID %in% dg$site.id)) %>% # no, OR and AZ-10007
+print(n= Inf)
+
+
+# are all site.id values in dg also present in bf.max?
+# Just CA site, as expected.
+dg %>% filter(!(site.id %in% bf.max$SITE_ID)) %>% # no
+  select(site.id, visit.no)
+
+
+# dim(bf.max) # 1209, 3
+# dim(dg) # 2369, 374
+
+# Left join: retain all dg values, exclude non-matching bf values (i.e. OR and AZ)
+dg <- left_join(dg, bf.max, by = c("site.id" = "SITE_ID", "visit.no" = "VISIT_NO"))  
+# dim(dg) # 2369, 375, good!
+```
+
+The California site with the broken sonde has no bf data.  Nothing we can do about it.
+```{r}
+dg %>% filter(is.na(MAX.BF)) %>%
+  select(site.id, visit.no)
+```
+
 
 
 Write out final .RData object.
