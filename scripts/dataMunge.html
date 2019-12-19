@@ -11,7 +11,7 @@
 
 
 
-<meta name="date" content="2019-12-13" />
+<meta name="date" content="2019-12-19" />
 
 <title>Data Munging</title>
 
@@ -2775,7 +2775,7 @@ div.tocify {
 
 
 <h1 class="title toc-ignore">Data Munging</h1>
-<h4 class="date">2019-12-13</h4>
+<h4 class="date">2019-12-19</h4>
 
 </div>
 
@@ -2787,8 +2787,8 @@ div.tocify {
 </div>
 <div id="data" class="section level1">
 <h1><span class="header-section-number">2</span> Data</h1>
-<div id="read-and-merge" class="section level2">
-<h2><span class="header-section-number">2.1</span> Read and merge</h2>
+<div id="read-data" class="section level2">
+<h2><span class="header-section-number">2.1</span> Read data</h2>
 <p>Below we read in the data files.</p>
 <pre class="r"><code># Read dissolved gas data file
 dg &lt;- read.table(file = paste0(localPath, 
@@ -2797,11 +2797,22 @@ dg &lt;- read.table(file = paste0(localPath,
                                &quot;inputData/nla17gasDataAggregated_2019-11-12.txt&quot;),
                  header = TRUE, sep = &quot;\t&quot;, as.is = TRUE) 
 
+# Read site weights and waterbody area data
 wt.area &lt;- read.csv(file = paste0(localPath, 
                                &quot;/Environmental Protection Agency (EPA)/&quot;,
                                &quot;ORD NLA17 Dissolved Gas - Documents/&quot;,
                                &quot;inputData/NLA17_SiteWeights_Areas.csv&quot;),
+                    as.is = TRUE)
+
+# Read in temp profile data
+temp &lt;- read.csv(file = paste0(localPath, 
+                               &quot;/Environmental Protection Agency (EPA)/&quot;,
+                               &quot;ORD NLA17 Dissolved Gas - Documents/&quot;,
+                               &quot;inputData/NLA17_Profile_Data.csv&quot;),
                     as.is = TRUE)</code></pre>
+</div>
+<div id="merge-dissolved-gas-with-survey-weights-area" class="section level2">
+<h2><span class="header-section-number">2.2</span> Merge dissolved gas with survey weights + area</h2>
 <p>Unique waterbodies are identified by ‘site id’. Some waterbodies were visited twice, therefore each unique sampling trip is identified by a combination of ‘site id’ and visit number.</p>
 <pre class="r"><code>dg %&gt;% distinct(site.id, visit.no)</code></pre>
 <div data-pagedtable="false">
@@ -2823,23 +2834,26 @@ dg %&gt;% filter(!(site.id %in% wt.area$SITE_ID)) %&gt;% distinct(site.id) # no.
 </div>
 <pre class="r"><code># Remove AK sites
 dg &lt;- dg %&gt;% filter(!(grepl(&quot;AK&quot;, site.id))) # exlclude alaska</code></pre>
-<p>This leaves one site in WI that is in the dissolved gas file, but not in the weights + lake area file. I have the Chain of Custody form for this site and will forward to Karen Blocksom for clarification.</p>
+<p>This leaves one site in WI that is in the dissolved gas file, but not in the weights + lake area file. The Chain of Custody form verifies receipt of this sample. Per Karen Blocksom, this should be SITE)ID NLA17_WI-10008, visit 1.</p>
 <pre class="r"><code># Will merge datasets on SITE_ID field.  Are all site.id values in dg present in wt.area?
-dg %&gt;% filter(!(site.id %in% wt.area$SITE_ID)) %&gt;% distinct(site.id) # Just a single WI site</code></pre>
+dg %&gt;% filter(!(site.id %in% wt.area$SITE_ID)) %&gt;% distinct(site.id, visit.no) # Just a single WI site</code></pre>
 <div data-pagedtable="false">
 <script data-pagedtable-source type="application/json">
-{"columns":[{"label":["site.id"],"name":[1],"type":["chr"],"align":["left"]}],"data":[{"1":"NLA17_WI-10018"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+{"columns":[{"label":["site.id"],"name":[1],"type":["chr"],"align":["left"]},{"label":["visit.no"],"name":[2],"type":["int"],"align":["right"]}],"data":[{"1":"NLA17_WI-10018","2":"1"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
   </script>
 </div>
-<p>There are 23 observations in the weights + lake area file that are absent from the dissolved gas file. One observation is from Arizona. This corresponds to notes in the chain of custody form indicating the vials arrived unlabeled and were not run. The remaining sites are from OR. I can’t find any record of these samples in chain of custody form. I’ll check with Karen Blocksom regarding these samples.</p>
+<pre class="r"><code># Correct site code
+dg &lt;- dg %&gt;%
+  mutate(site.id = replace(site.id, site.id == &quot;NLA17_WI-10018&quot; &amp; visit.no == 1, &quot;NLA17_WI-10008&quot;))</code></pre>
+<p>There are 23 observations in the weights + lake area file that are absent from the dissolved gas file. One observation is from Arizona. This corresponds to notes in the chain of custody form indicating the vials arrived unlabeled and were not run. The remaining sites are from OR. Karen Blocksom confirmed that these sites were part of the OR state survey, but collected ‘most’ of the NLA measurements. They were included in the final NLA dataset for ‘the purpose of adjusting weights’. They did not collect gas samples and can be disregarded for this analysis.</p>
 <pre class="r"><code># Any site id values in wt.area, but not present in dg?
-wt.area %&gt;% filter(!(SITE_ID %in% dg$site.id)) %&gt;% select(SITE_ID, EVAL_CAT, SITETYPE) # hmm, 23 sites w/out dissolved gas data?  One from AZ, the rest from OR.</code></pre>
+wt.area %&gt;% filter(!(SITE_ID %in% dg$site.id)) %&gt;% select(SITE_ID, EVAL_CAT, SITETYPE) # h23 sites w/out dissolved gas data</code></pre>
 <div data-pagedtable="false">
 <script data-pagedtable-source type="application/json">
 {"columns":[{"label":["SITE_ID"],"name":[1],"type":["chr"],"align":["left"]},{"label":["EVAL_CAT"],"name":[2],"type":["chr"],"align":["left"]},{"label":["SITETYPE"],"name":[3],"type":["chr"],"align":["left"]}],"data":[{"1":"NLA17_AZ-10007","2":"Target_Sampled","3":"PROB"},{"1":"NLA17_OR-10108","2":"Target_Sampled","3":"PROB"},{"1":"NLA17_OR-10109","2":"Target_Sampled","3":"PROB"},{"1":"NLA17_OR-10111","2":"Target_Sampled","3":"PROB"},{"1":"NLA17_OR-10118","2":"Target_Sampled","3":"PROB"},{"1":"NLA17_OR-10123","2":"Target_Sampled","3":"PROB"},{"1":"NLA17_OR-10125","2":"Target_Sampled","3":"PROB"},{"1":"NLA17_OR-10127","2":"Target_Sampled","3":"PROB"},{"1":"NLA17_OR-10128","2":"Target_Sampled","3":"PROB"},{"1":"NLA17_OR-10132","2":"Target_Sampled","3":"PROB"},{"1":"NLA17_OR-10134","2":"Target_Sampled","3":"PROB"},{"1":"NLA17_OR-10143","2":"Target_Sampled","3":"PROB"},{"1":"NLA17_OR-10150","2":"Target_Sampled","3":"PROB"},{"1":"NLA17_OR-10151","2":"Target_Sampled","3":"PROB"},{"1":"NLA17_OR-10153","2":"Target_Sampled","3":"PROB"},{"1":"NLA17_OR-10154","2":"Target_Sampled","3":"PROB"},{"1":"NLA17_OR-10166","2":"Target_Sampled","3":"PROB"},{"1":"NLA17_OR-10167","2":"Target_Sampled","3":"PROB"},{"1":"NLA17_OR-10168","2":"Target_Sampled","3":"PROB"},{"1":"NLA17_OR-10173","2":"Target_Sampled","3":"PROB"},{"1":"NLA17_OR-10180","2":"Target_Sampled","3":"PROB"},{"1":"NLA17_OR-HP10200","2":"Target_Sampled","3":"HAND"},{"1":"NLA17_OR-HP10201","2":"Target_Sampled","3":"HAND"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
   </script>
 </div>
-<p>Finally, lets merge these two files in site id. Use left_join to retain all dissolved gas data, including the WI site that doesn’t have a matching record in the weights + lake area file.</p>
+<p>Finally, lets merge these two files on site id. Use left_join to retain all dissolved gas data, but disregard OR and AZ sites where we don’t have gas data.</p>
 <pre class="r"><code>dim(dg) # 2369, 364</code></pre>
 <pre><code>## [1] 2369  364</code></pre>
 <pre class="r"><code>dg &lt;- left_join(dg, wt.area, by = c(&quot;site.id&quot; = &quot;SITE_ID&quot;))
@@ -2848,7 +2862,7 @@ dim(dg) # 2369, 369;  good retained all DG observations, added a few columns.</c
 <pre><code>## [1] 2369  369</code></pre>
 </div>
 <div id="manipulate" class="section level2">
-<h2><span class="header-section-number">2.2</span> Manipulate</h2>
+<h2><span class="header-section-number">2.3</span> Manipulate</h2>
 <p>Impliment unit conversion and create source/sink column:</p>
 <pre class="r"><code>dg &lt;- dg %&gt;%
   # unit conversion
@@ -2868,27 +2882,215 @@ dim(dg) # 2369, 369;  good retained all DG observations, added a few columns.</c
                             breaks = c( -Inf, 4, 10, 20, 50, Inf ),
                             labels = c( &quot;min_4&quot;, &quot;4_10&quot;, &quot;10_20&quot;, &quot;20_50&quot;, &quot;50_max&quot;) ) )
     )</code></pre>
-<p>NLA17_WI-10018 does not have a AREA_HA value, therefore does not have size_cat value.</p>
-<pre class="r"><code>dg %&gt;% filter(is.na(size_cat)) %&gt;% distinct(site.id)</code></pre>
-<div data-pagedtable="false">
-<script data-pagedtable-source type="application/json">
-{"columns":[{"label":["site.id"],"name":[1],"type":["chr"],"align":["left"]}],"data":[{"1":"NLA17_WI-10018"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
-  </script>
-</div>
-<p>We do have an area estimate of 2.6 Ha derived from NHDPlusV2, however. For now, lets use the NHD value to assign a size_cat value.</p>
-<pre class="r"><code>dg %&gt;% filter(site.id == &quot;NLA17_WI-10018&quot;) %&gt;% distinct(AREASQKM)</code></pre>
-<div data-pagedtable="false">
-<script data-pagedtable-source type="application/json">
-{"columns":[{"label":["AREASQKM"],"name":[1],"type":["dbl"],"align":["right"]}],"data":[{"1":"0.026"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
-  </script>
-</div>
-<pre class="r"><code>dg &lt;- dg %&gt;%
-  mutate(size_cat = fct_explicit_na(size_cat, &quot;min_4&quot;)) # &lt; 4HA, therefore belongs to &quot;min_4&quot; category.
-
-table(dg$size_cat, useNA = &quot;ifany&quot;)</code></pre>
+<p>All observations have a value for the size_cat design variable.</p>
+<pre class="r"><code>table(dg$size_cat, useNA = &quot;ifany&quot;)</code></pre>
 <pre><code>## 
 ##  min_4   4_10  10_20  20_50 50_max 
-##    422    364    411    466    706</code></pre>
+##    420    364    411    468    706</code></pre>
+</div>
+<div id="calculate-stratification-indices-from-temperature-profile-data" class="section level2">
+<h2><span class="header-section-number">2.4</span> Calculate stratification indices from temperature profile data</h2>
+<p>Water temperature profiles were measured at the index site in each waterbody. A variety of metrics describing the degree of thermal stratification can be extracted from these data. Webb et al. used the Brunt–Väisälä buoyancy frequency as an indicator of thermal stratification strength. We will do the same here.</p>
+<p>Three unique site visits contain only NA for temperature. Two of the incidents include notes that sonde was forgotten or malfunctioning. Two of the three sites were revisited later in the study and temperature data were collected. Lets assign data from the second site visit to the first visit when no temperature data were collected. This leaves only NLA17_CA-10082, visit 1, without temperature data.</p>
+<pre class="r"><code># Sites that only contain NAs.
+missingTemp &lt;- temp %&gt;% group_by(SITE_ID, VISIT_NO) %&gt;% 
+  summarise(all.na = all(is.na(TEMPERATURE))) %&gt;% 
+  filter(all.na == TRUE) %&gt;%
+  select(SITE_ID, VISIT_NO)
+
+# View sites with missing temp.
+missingTemp</code></pre>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":["SITE_ID"],"name":[1],"type":["chr"],"align":["left"]},{"label":["VISIT_NO"],"name":[2],"type":["int"],"align":["right"]}],"data":[{"1":"NLA17_AR-10003","2":"1"},{"1":"NLA17_AZ-10006","2":"1"},{"1":"NLA17_CA-10082","2":"1"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+<pre class="r"><code># Two of the sites have data from second site visit
+temp %&gt;% filter(SITE_ID %in% missingTemp$SITE_ID) %&gt;%
+  select(SITE_ID, VISIT_NO, TEMPERATURE) </code></pre>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":["SITE_ID"],"name":[1],"type":["chr"],"align":["left"]},{"label":["VISIT_NO"],"name":[2],"type":["int"],"align":["right"]},{"label":["TEMPERATURE"],"name":[3],"type":["dbl"],"align":["right"]}],"data":[{"1":"NLA17_CA-10082","2":"1","3":"NA"},{"1":"NLA17_AR-10003","2":"1","3":"NA"},{"1":"NLA17_AZ-10006","2":"2","3":"20.20"},{"1":"NLA17_AZ-10006","2":"2","3":"20.20"},{"1":"NLA17_AZ-10006","2":"2","3":"20.20"},{"1":"NLA17_AZ-10006","2":"2","3":"20.20"},{"1":"NLA17_AZ-10006","2":"2","3":"20.20"},{"1":"NLA17_AZ-10006","2":"2","3":"20.20"},{"1":"NLA17_AZ-10006","2":"2","3":"20.20"},{"1":"NLA17_AZ-10006","2":"2","3":"19.90"},{"1":"NLA17_AZ-10006","2":"2","3":"20.10"},{"1":"NLA17_AR-10003","2":"2","3":"24.12"},{"1":"NLA17_AR-10003","2":"2","3":"24.06"},{"1":"NLA17_AR-10003","2":"2","3":"24.09"},{"1":"NLA17_AR-10003","2":"2","3":"23.04"},{"1":"NLA17_AR-10003","2":"2","3":"22.29"},{"1":"NLA17_AZ-10006","2":"1","3":"NA"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+<pre class="r"><code># Extract data from second visit to assign to first visit
+replacementData &lt;- temp %&gt;% filter(SITE_ID %in% missingTemp$SITE_ID, VISIT_NO == 2) %&gt;%
+  select(SITE_ID, VISIT_NO, DEPTH, TEMPERATURE) %&gt;%
+  mutate(VISIT_NO = 1) # change visit no to one for join
+
+# Join the data
+temp1 &lt;- full_join(temp, replacementData)</code></pre>
+<pre><code>## Joining, by = c(&quot;SITE_ID&quot;, &quot;VISIT_NO&quot;, &quot;DEPTH&quot;, &quot;TEMPERATURE&quot;)</code></pre>
+<pre class="r"><code># Inspect results of join.  Looks good.  Only one site missing temperature data.
+temp1 %&gt;% filter(SITE_ID %in% missingTemp$SITE_ID) %&gt;%
+  select(SITE_ID, VISIT_NO, DEPTH, TEMPERATURE) %&gt;% 
+  arrange(SITE_ID, VISIT_NO, DEPTH, TEMPERATURE)</code></pre>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":["SITE_ID"],"name":[1],"type":["chr"],"align":["left"]},{"label":["VISIT_NO"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["DEPTH"],"name":[3],"type":["dbl"],"align":["right"]},{"label":["TEMPERATURE"],"name":[4],"type":["dbl"],"align":["right"]}],"data":[{"1":"NLA17_AR-10003","2":"1","3":"0.0","4":"24.06"},{"1":"NLA17_AR-10003","2":"1","3":"0.0","4":"24.12"},{"1":"NLA17_AR-10003","2":"1","3":"1.0","4":"24.09"},{"1":"NLA17_AR-10003","2":"1","3":"2.0","4":"23.04"},{"1":"NLA17_AR-10003","2":"1","3":"2.6","4":"22.29"},{"1":"NLA17_AR-10003","2":"1","3":"NA","4":"NA"},{"1":"NLA17_AR-10003","2":"2","3":"0.0","4":"24.06"},{"1":"NLA17_AR-10003","2":"2","3":"0.0","4":"24.12"},{"1":"NLA17_AR-10003","2":"2","3":"1.0","4":"24.09"},{"1":"NLA17_AR-10003","2":"2","3":"2.0","4":"23.04"},{"1":"NLA17_AR-10003","2":"2","3":"2.6","4":"22.29"},{"1":"NLA17_AZ-10006","2":"1","3":"0.1","4":"20.20"},{"1":"NLA17_AZ-10006","2":"1","3":"0.1","4":"20.20"},{"1":"NLA17_AZ-10006","2":"1","3":"0.5","4":"20.20"},{"1":"NLA17_AZ-10006","2":"1","3":"1.0","4":"20.20"},{"1":"NLA17_AZ-10006","2":"1","3":"1.5","4":"20.20"},{"1":"NLA17_AZ-10006","2":"1","3":"2.0","4":"20.20"},{"1":"NLA17_AZ-10006","2":"1","3":"2.5","4":"20.20"},{"1":"NLA17_AZ-10006","2":"1","3":"2.6","4":"20.10"},{"1":"NLA17_AZ-10006","2":"1","3":"3.0","4":"19.90"},{"1":"NLA17_AZ-10006","2":"1","3":"NA","4":"NA"},{"1":"NLA17_AZ-10006","2":"2","3":"0.1","4":"20.20"},{"1":"NLA17_AZ-10006","2":"2","3":"0.1","4":"20.20"},{"1":"NLA17_AZ-10006","2":"2","3":"0.5","4":"20.20"},{"1":"NLA17_AZ-10006","2":"2","3":"1.0","4":"20.20"},{"1":"NLA17_AZ-10006","2":"2","3":"1.5","4":"20.20"},{"1":"NLA17_AZ-10006","2":"2","3":"2.0","4":"20.20"},{"1":"NLA17_AZ-10006","2":"2","3":"2.5","4":"20.20"},{"1":"NLA17_AZ-10006","2":"2","3":"2.6","4":"20.10"},{"1":"NLA17_AZ-10006","2":"2","3":"3.0","4":"19.90"},{"1":"NLA17_CA-10082","2":"1","3":"NA","4":"NA"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+<p>The field crews measured temperature starting near the water surface, then at increasing depths. A second measurement was made at the water surface before the sonde was removed from the water, therefore the file contains duplicate measurements at the shallowest depths. Duplicate measurements corrupt the buoyancy frequency function and will therefore be aggregated.</p>
+<pre class="r"><code># Aggregate across SITE_ID, VISIT_NO, and DEPTH.  I don&#39;t like the dplyr solution for this (group_map) and I&#39;m not familiar with the purr::map_ functions.  I&#39;m going old-school and busting out the trusty plyr::ddply.
+temp2 &lt;- temp1 %&gt;% select(SITE_ID, VISIT_NO, DEPTH, TEMPERATURE) %&gt;%
+  # exclude NA, NaN, Inf...
+  filter(is.finite(TEMPERATURE)) %&gt;% # This completely removes the CA site with only NA for temp data.
+  plyr::ddply(., .(SITE_ID, VISIT_NO, DEPTH), summarize, 
+              TEMPERATURE.M = mean(TEMPERATURE, na.rm = TRUE))
+dim(temp1) # 11003</code></pre>
+<pre><code>## [1] 11003    10</code></pre>
+<pre class="r"><code>dim(temp2) # 10071, nearly 1000 observations aggregated or stripped out due to NA</code></pre>
+<pre><code>## [1] 10071     4</code></pre>
+<p>Finally, calculate the buoyancy frequency depth profile for each waterbody and print to buoyancyFrequency.pdf for inspection.</p>
+<pre class="r"><code># The buoyancy frequency is calculated at multiple depths, but at fewer depths than the where 
+# temperature was measured.  The output of the buoyancy frequency function is shorter 
+# than the input, which is incompatible with dplyr mutate and summarize.  The dplyr alternative
+# is group_map which produces a list, but the grouping variables are stripped from the list
+# elements.  I really don&#39;t like this.  I think this can be addressed by combining group_map
+# with purr::map_ functions, but I&#39;m not familiar with purr.  Rather, I&#39;ll use the old school
+# split -lapply - do(rbind) approach.
+bf &lt;- temp2 %&gt;%
+  group_split(SITE_ID, VISIT_NO) %&gt;% # split into list of df
+  lapply(function(x) {
+    data.frame(BF = buoyancy.freq(wtr = x$TEMPERATURE.M, depths = x$DEPTH), # calculate buoyance frequency
+               SITE_ID = unique(x$SITE_ID), # add site ID
+               VISIT_NO = unique(x$VISIT_NO), # add visit no
+               stringsAsFactors = FALSE)}) %&gt;% 
+  lapply(function(x) x %&gt;% mutate(DEPTHS.BF = attr(BF, &quot;depths&quot;))) %&gt;% # depths stored as attribute, assign to column
+  do.call(&quot;rbind&quot;, .) # collapse to df
+
+# there are three non-finite bf values, lets have a look
+bf.na &lt;- bf %&gt;% filter(!is.finite(BF)) %&gt;%
+  select(SITE_ID, VISIT_NO) %&gt;%
+  mutate(SITE.VISIT = paste0(SITE_ID, VISIT_NO))
+
+bf.na</code></pre>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":["SITE_ID"],"name":[1],"type":["chr"],"align":["left"]},{"label":["VISIT_NO"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["SITE.VISIT"],"name":[3],"type":["chr"],"align":["left"]}],"data":[{"1":"NLA17_ID-10001","2":"1","3":"NLA17_ID-100011"},{"1":"NLA17_MD-10004","2":"1","3":"NLA17_MD-100041"},{"1":"NLA17_ND-10189","2":"1","3":"NLA17_ND-101891"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+<pre class="r"><code># These site have a single temp measurement made at shallow depths (&lt;1m).  Presumably these are 
+# shallow sites, therefore unlikely to be stratified.  Assign a bf very close to 0.
+bf %&gt;% filter(paste0(SITE_ID, VISIT_NO) %in% bf.na$SITE.VISIT) </code></pre>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":["BF"],"name":[1],"type":["dbl"],"align":["right"]},{"label":["SITE_ID"],"name":[2],"type":["chr"],"align":["left"]},{"label":["VISIT_NO"],"name":[3],"type":["dbl"],"align":["right"]},{"label":["DEPTHS.BF"],"name":[4],"type":["dbl"],"align":["right"]}],"data":[{"1":"NA","2":"NLA17_ID-10001","3":"1","4":"NA"},{"1":"NA","2":"NLA17_MD-10004","3":"1","4":"NA"},{"1":"NA","2":"NLA17_ND-10189","3":"1","4":"NA"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+<pre class="r"><code>temp2 %&gt;% filter(paste0(SITE_ID, VISIT_NO) %in% bf.na$SITE.VISIT)</code></pre>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":["SITE_ID"],"name":[1],"type":["chr"],"align":["left"]},{"label":["VISIT_NO"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["DEPTH"],"name":[3],"type":["dbl"],"align":["right"]},{"label":["TEMPERATURE.M"],"name":[4],"type":["dbl"],"align":["right"]}],"data":[{"1":"NLA17_ID-10001","2":"1","3":"0.0","4":"20.33"},{"1":"NLA17_MD-10004","2":"1","3":"0.3","4":"24.90"},{"1":"NLA17_ND-10189","2":"1","3":"1.0","4":"10.60"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+<pre class="r"><code># plot buoyancy frequency depth profile
+# (http://stackoverflow.com/questions/8018961/connect-points-in-qplot-by-adjacent-y-value-not-x-value)
+# https://stackoverflow.com/questions/29034863/apply-a-ggplot-function-per-group-with-dplyr-and-set-title-per-group
+bf.plot &lt;- bf %&gt;%
+  group_by(SITE_ID, VISIT_NO) %&gt;%
+  do(plots = ggplot(data = .) +
+       aes(DEPTHS.BF, BF) +
+    geom_point() +
+    geom_line() +
+    scale_x_reverse() +
+    coord_flip() +
+    ggtitle(paste(unique(.$SITE_ID), &quot;VISIT_NO = &quot;, unique(.$VISIT_NO))))
+
+
+# pdf(&quot;output/figures/buoyancyFrequency.pdf&quot;, onefile = TRUE)
+# bf.plot$plots
+# dev.off()</code></pre>
+<p>Webb et al. used the maximum buoyancy frequency value as an index of thermal stratification. The maximum value should occur near the thermocline. Here is an example of a classical pattern:</p>
+<pre class="r"><code>bf.plot$plots[92]</code></pre>
+<pre><code>## [[1]]</code></pre>
+<p><img src="data:image/png;base64,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" width="672" /></p>
+<p>Extract the max buoyancy frequency value for each waterbody after converting negative BF values to 0, per Webb.</p>
+<pre class="r"><code># Finally, extract max buoyancy for each SITE_ID x VISIT_NO
+bf.max &lt;- bf %&gt;% 
+  mutate(BF = ifelse(BF &lt; 0,
+                     0,
+                     BF)) %&gt;%
+  group_by(SITE_ID, VISIT_NO) %&gt;%
+  summarise(MAX.BF = max(BF, na.rm = TRUE)) %&gt;%
+  ungroup()</code></pre>
+<p>3 of the site have a non-finite value for maximum buoyancy frequency value. These are the three shallow sites with only a single temperature measurement. Assign these the minimum bf.max value.</p>
+<pre class="r"><code>bf.max %&gt;% filter(!is.finite(MAX.BF))</code></pre>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":["SITE_ID"],"name":[1],"type":["chr"],"align":["left"]},{"label":["VISIT_NO"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["MAX.BF"],"name":[3],"type":["dbl"],"align":["right"]}],"data":[{"1":"NLA17_ID-10001","2":"1","3":"-Inf"},{"1":"NLA17_MD-10004","2":"1","3":"-Inf"},{"1":"NLA17_ND-10189","2":"1","3":"-Inf"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+<pre class="r"><code>min.max.bf &lt;- bf.max %&gt;% 
+  filter(is.finite(MAX.BF)) %&gt;%
+  summarize(min.max.bf = min(MAX.BF))
+
+bf.max &lt;- bf.max %&gt;%
+  mutate(MAX.BF = replace(MAX.BF, 
+                          !is.finite(MAX.BF), # if not finite
+                          min.max.bf$min.max.bf)) # then min
+
+# that took care of it
+bf.max %&gt;% filter(!is.finite(MAX.BF))</code></pre>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":["SITE_ID"],"name":[1],"type":["chr"],"align":["left"]},{"label":["VISIT_NO"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["MAX.BF"],"name":[3],"type":["dbl"],"align":["right"]}],"data":[],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+<p>Finally, merge buoyancy frequency data with dg. The buoyancy frequency data contains information from the extra Oregon sites (see above) and the AZ site where the gas samples were unlabeled and not analyzed. This is as expected. The buoyancy frequency data do not contain observations for the California site (CA-10082) where the sonde was reported missing/malfunctioning.</p>
+<pre class="r"><code># are all SITE_ID values in buoyancy frequency also present in dg?
+bf.max %&gt;% filter(!(SITE_ID %in% dg$site.id)) %&gt;% # no, OR and AZ-10007
+print(n= Inf)</code></pre>
+<pre><code>## # A tibble: 24 x 3
+##    SITE_ID          VISIT_NO   MAX.BF
+##    &lt;chr&gt;               &lt;dbl&gt;    &lt;dbl&gt;
+##  1 NLA17_AZ-10007          1 0.00354 
+##  2 NLA17_OR-10108          1 0.00303 
+##  3 NLA17_OR-10109          1 0.000418
+##  4 NLA17_OR-10111          1 0.00456 
+##  5 NLA17_OR-10118          1 0.00139 
+##  6 NLA17_OR-10123          1 0.00535 
+##  7 NLA17_OR-10125          1 0.00991 
+##  8 NLA17_OR-10127          1 0       
+##  9 NLA17_OR-10128          1 0.00942 
+## 10 NLA17_OR-10128          2 0.000697
+## 11 NLA17_OR-10132          1 0.00824 
+## 12 NLA17_OR-10134          1 0.000654
+## 13 NLA17_OR-10143          1 0.00189 
+## 14 NLA17_OR-10150          1 0.000328
+## 15 NLA17_OR-10151          1 0.00815 
+## 16 NLA17_OR-10153          1 0.000628
+## 17 NLA17_OR-10154          1 0.00942 
+## 18 NLA17_OR-10166          1 0.00474 
+## 19 NLA17_OR-10167          1 0.000201
+## 20 NLA17_OR-10168          1 0.00354 
+## 21 NLA17_OR-10173          1 0.00388 
+## 22 NLA17_OR-10180          1 0.00608 
+## 23 NLA17_OR-HP10200        1 0.00393 
+## 24 NLA17_OR-HP10201        1 0</code></pre>
+<pre class="r"><code># are all site.id values in dg also present in bf.max?
+# Just CA site, as expected.
+dg %&gt;% filter(!(site.id %in% bf.max$SITE_ID)) %&gt;% # no
+  select(site.id, visit.no)</code></pre>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":["site.id"],"name":[1],"type":["chr"],"align":["left"]},{"label":["visit.no"],"name":[2],"type":["int"],"align":["right"]}],"data":[{"1":"NLA17_CA-10082","2":"1"},{"1":"NLA17_CA-10082","2":"1"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+<pre class="r"><code># dim(bf.max) # 1209, 3
+# dim(dg) # 2369, 374
+
+# Left join: retain all dg values, exclude non-matching bf values (i.e. OR and AZ)
+dg &lt;- left_join(dg, bf.max, by = c(&quot;site.id&quot; = &quot;SITE_ID&quot;, &quot;visit.no&quot; = &quot;VISIT_NO&quot;))  
+# dim(dg) # 2369, 375, good!</code></pre>
+<p>The California site with the broken sonde has no bf data. Nothing we can do about it.</p>
+<pre class="r"><code>dg %&gt;% filter(is.na(MAX.BF)) %&gt;%
+  select(site.id, visit.no)</code></pre>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":["site.id"],"name":[1],"type":["chr"],"align":["left"]},{"label":["visit.no"],"name":[2],"type":["dbl"],"align":["right"]}],"data":[{"1":"NLA17_CA-10082","2":"1"},{"1":"NLA17_CA-10082","2":"1"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
 <p>Write out final .RData object.</p>
 <pre class="r"><code>save(dg, file = paste0(localPath, 
                        &quot;/Environmental Protection Agency (EPA)/&quot;,

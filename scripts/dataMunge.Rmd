@@ -210,16 +210,15 @@ bf <- temp2 %>%
 
 # there are three non-finite bf values, lets have a look
 bf.na <- bf %>% filter(!is.finite(BF)) %>%
-  select(SITE_ID, VISIT_NO)
+  select(SITE_ID, VISIT_NO) %>%
+  mutate(SITE.VISIT = paste0(SITE_ID, VISIT_NO))
 
 bf.na
 
-# ONe of the three values comes from a site with other non-zero measurements.  Probably OK.
-# two sites have only a single NA for BF becasue they only have a single temp measurement, 
-# presumably these are shallow sites, therefore unlikely to be stratified.  Assign a bf
-# very close to 0.
-bf %>% filter(SITE_ID %in% bf.na$SITE_ID) 
-temp2 %>% filter(SITE_ID %in% bf.na$SITE_ID)
+# These site have a single temp measurement made at shallow depths (<1m).  Presumably these are 
+# shallow sites, therefore unlikely to be stratified.  Assign a bf very close to 0.
+bf %>% filter(paste0(SITE_ID, VISIT_NO) %in% bf.na$SITE.VISIT) 
+temp2 %>% filter(paste0(SITE_ID, VISIT_NO) %in% bf.na$SITE.VISIT)
 
 # plot buoyancy frequency depth profile
 # (http://stackoverflow.com/questions/8018961/connect-points-in-qplot-by-adjacent-y-value-not-x-value)
@@ -245,15 +244,35 @@ Webb et al. used the maximum buoyancy frequency value as an index of thermal str
 bf.plot$plots[92]
 ```
 
-Extract the max buoyancy frequency value for each waterbody. 
+Extract the max buoyancy frequency value for each waterbody after converting negative BF values to 0, per Webb.
 ``` {r}
 # Finally, extract max buoyancy for each SITE_ID x VISIT_NO
-bf.max <- bf %>% group_by(SITE_ID, VISIT_NO) %>%
+bf.max <- bf %>% 
+  mutate(BF = ifelse(BF < 0,
+                     0,
+                     BF)) %>%
+  group_by(SITE_ID, VISIT_NO) %>%
   summarise(MAX.BF = max(BF, na.rm = TRUE)) %>%
   ungroup()
 ```
 
-`r bf.max %>% summarize(n.na = sum(is.na(bf.max$MAX.BF))) %>% pull()` of the profiles do not have a maximum buoyancy frequency value.  Very good.  
+`r bf.max %>% summarize(n.na = sum(!is.finite(bf.max$MAX.BF))) %>% pull()` of the site have a non-finite value for maximum buoyancy frequency value.  These are the three shallow sites with only a single temperature measurement.  Assign these the minimum bf.max value.
+``` {r}
+bf.max %>% filter(!is.finite(MAX.BF))
+
+min.max.bf <- bf.max %>% 
+  filter(is.finite(MAX.BF)) %>%
+  summarize(min.max.bf = min(MAX.BF))
+
+bf.max <- bf.max %>%
+  mutate(MAX.BF = replace(MAX.BF, 
+                          !is.finite(MAX.BF), # if not finite
+                          min.max.bf$min.max.bf)) # then min
+
+# that took care of it
+bf.max %>% filter(!is.finite(MAX.BF))
+```
+
 
 Finally, merge buoyancy frequency data with dg.  The buoyancy frequency data contains information from the extra Oregon sites (see above) and the AZ site where the gas samples were unlabeled and not analyzed.  This is as expected.
 The buoyancy frequency data do not contain observations for the California site (CA-10082) where the sonde was reported missing/malfunctioning.
