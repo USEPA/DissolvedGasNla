@@ -226,6 +226,54 @@ ggplot(pop.eco.sat, aes(estimate, subpopulation)) +
 
 ```
 
+## Geopackage
+Create a simple feature on entire dg data frame, then split out a simple feature, df_sf2, by filtering sample_source = DG.  The geodatabase will contain two simple features, the dissolved gas sampled points/lakes and the nine aggregated ecoregions.
+```{r, geopackage}
+library(janitor) # clean_names function
+names(dg)
+
+dg_1 <- select(dg,site.id:map.lon.dd, dissolved.co2, dissolved.ch4, dissolved.n2o, WSA9, WSA9_NAME)
+names(dg_1)
+dg_1 <- clean_names(dg_1) # underscores are "safer" names used in GIS
+names(dg_1)
+# To enable spatial analysis of the data, the dataframe will be converted to a 'simple features' (sf) object.
+# Define coordinates
+coords <- data.frame(longitude = dg_1$map_lon_dd, latitude = dg_1$map_lat_dd)
+
+dg_sf1 <- st_as_sf(dg_1, coords = c("map_lon_dd", "map_lat_dd"), 
+                  crs = 4269) %>% # standard for lat/lon
+  st_transform(4326) # 4326 is just the EPSG identifier of WGS84. WGS84 comprises a standard coordinate frame for the Earth, a datum/reference ellipsoid for raw altitude data, and a gravitational equipotential surface (the geoid) that defines the nominal sea level.
+st_crs(dg_sf1)
+
+dg_sf1 <- filter(dg_sf1, sample_source == "DG") # now 1185 obs.
+st_crs(dg_sf1)
+
+# Bryan suggested EPSG 4326
+# Bryan Chastain as GeoServices suggested reducing the number of fields, and I tried that but was still unable to open the geodatabase in ArcMap 
+# Based on gis stackexchange I think the "." in variable names is causing the problem
+# https://gis.stackexchange.com/questions/319611/arcgis-geopackage-arcmap-drawing-error?noredirect=1
+# Even with change to _ still get error message about invalid coordinate system when st_transform(5070) used
+
+# Check CRS
+st_crs(ecoR)
+names(ecoR)
+
+ecoR1 <- st_transform(ecoR, 4326)
+st_crs(ecoR1)
+
+# write out dg.sf and ecoR as two layers in geopackage, gpkg, geodatabase
+# 74. Creating a geopackage geodatabase, then adding more layers
+# https://github.com/r-spatial/sf/issues/392
+st_write(dg_sf1, dsn = file.path(getwd(), "nladg_v1.gpkg"), layer = "dg_sf1", driver = "GPKG", quiet = FALSE)
+st_layers("nladg_v1.gpkg")
+
+# https://gis.stackexchange.com/questions/223240/writing-multiple-layers-to-geopackage-using-writeogr-in-r
+st_write(ecoR1, dsn = file.path(getwd(), "nladg_v1.gpkg"), layer = "ecoR1", driver = "GPKG", update = TRUE, quiet = FALSE)
+st_layers("nladg_v1.gpkg")
+
+names(dg_sf1)
+summary(dg_sf1$dissolved_n2o) # matches Roy's stats
+```
 
 ## Summarizing distances
 Getting distances between sites overall and by ecoregion to help set distances for lagged scatterplots.  First, Worked out steps on a sample of NLA sites.  Could only get parts of Anna Springsteen's code to work.
