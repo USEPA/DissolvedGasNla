@@ -21,6 +21,8 @@ library(sf) # spatial data
 library(gstat) # lagged scatterplot, variogram
 #library(spdplyr) # apply dplyr verbs to sp objects.  gstat functions require sp objects
 library(tidyverse) # dplyr, ggplot
+library(janitor) # clean names
+library(spdep) # k-NN and Moran plot
 
 # Identify local path for each user
 localPath <- Sys.getenv("USERPROFILE")
@@ -676,6 +678,354 @@ hscat(log10(dissolved.n2o)~1, dg_sp, c(0, 10000, 25000, 50000, 100000, 200000, 3
 
 ```
 
+## k-NN = 1 and Moran plots
+As with the lagged scatter plots, I had to take a simple feature object and convert it to a spatial object so I could use the nearest-neighbor and Moran scatter plot functions from the spdep package.  A Moran plot is based on plotting the N~2~O variable, dissolved.n2o, of a focal point on the x-axis and the average dissolved.n2o of the neighboring points on the y-axis.  Moran scatter plots were made for each of the 9 ecoregions and 1 for all of the NLA sites.  For each plot, a neighborhood of points was defined by the maximum distance to first nearest neighbor.  A distance-based spatial relationship was used because many of the ecoregions have several non-contiguous polygons or areas, which prevents a contiguity-based spatial relationship from being used.  The slope of the line through the scatter plot of points measures spatial autocorrelation, with a positive slope indicating positive spatial autocorrelation.
+
+The code below is to be run separately for each ecoregion.  The CPL, TPL, and UMW ecoregions show strong positive spatial autocorrelation.  Negative spatial autocorrelation occurs in the NPL ecoregion because of the maximum outlier at a South Dakota site.  The SPL and XER ecoregions show no evidence of spatial autocorrelation.  Interestingly, it appears that the ecoregions with the highest dissolved.n2o concentrations, CPL, TPL, and UMW, drive the national pattern.
+```{r, knn_moran}
+names(dg)
+# also includ WSA9, WSA9_NAME feature
+dg_1 <- select(dg,site.id:dissolved.n2o, WSA9, WSA9_NAME)
+names(dg_1)
+dg_1 <- clean_names(dg_1)
+names(dg_1)
+distinct(dg_1, wsa9)
+# To enable spatial analysis of the data, the dataframe will be converted to a 'simple features' (sf) object.
+# Define coordinates
+coords <- data.frame(longitude = dg_1$map_lon_dd, latitude = dg_1$map_lat_dd)
+
+dg_sf1 <- st_as_sf(dg_1, coords = c("map_lon_dd", "map_lat_dd"),crs = 4269) %>% # standard for lat/lon
+  st_transform(5070) # project to CONUS ALBERS for plotting 
+
+st_crs(dg_sf1)
+glimpse(dg_sf1)
+# Get ecoregion-specific NLA sites
+## CPL
+cpl <- dg_sf1 %>% filter(wsa9 == "CPL" & visit_no == 1 & sample_source == "DG")
+
+cpl_sp <- as(cpl, "Spatial")
+class(cpl_sp)
+
+ds1coords <- coordinates(cpl_sp)
+ds1nb1 <- knn2nb(knearneigh(ds1coords, k=1), row.names = cpl_sp$site_id)
+# using the k=1 object to find the minimum distance at which all sites have a distance-based neighbor
+dsnb1_dist <- unlist(nbdists(ds1nb1,ds1coords))
+summary(dsnb1_dist)# use max distance from summary to assign distance to create neighbors
+
+dsnb1 <- dnearneigh(ds1coords, d1=0, d2=134761, row.names=cpl_sp$site_id, longlat=FALSE)
+summary(dsnb1)
+
+plot(cpl_sp)
+plot(ds1nb1, ds1coords, labels = cpl_sp$site_id, add = TRUE)
+
+dsnb1.listw <- nb2listw(dsnb1, style = "W")
+summary(dsnb1.listw)
+
+class(cpl)
+# cpl_df <- st_drop_geometry(cpl)
+# names(cpl_df)
+summary(cpl$dissolved_n2o)
+
+moran.plot(log(cpl$dissolved_n2o), listw = dsnb1.listw, labels = cpl$site_id)
+rm(ds1coords, ds1nb1, dsnb1, dsnb1.listw, dsnb1_dist)
+
+## NAP
+nap <- dg_sf1 %>% filter(wsa9 == "NAP" & visit_no == 1 & sample_source == "DG")
+
+nap_sp <- as(nap, "Spatial")
+class(nap_sp)
+
+ds1coords <- coordinates(nap_sp)
+ds1nb1 <- knn2nb(knearneigh(ds1coords, k=1), row.names = nap_sp$site_id)
+# using the k=1 object to find the minimum distance at which all sites have a distance-based neighbor
+dsnb1_dist <- unlist(nbdists(ds1nb1,ds1coords))
+summary(dsnb1_dist)# use max distance from summary to assign distance to create neighbors
+
+dsnb1 <- dnearneigh(ds1coords, d1=0, d2=112630, row.names=nap_sp$site_id, longlat=FALSE)
+summary(dsnb1)
+
+plot(nap_sp)
+plot(ds1nb1, ds1coords, labels = nap_sp$site_id, add = TRUE)
+
+dsnb1.listw <- nb2listw(dsnb1, style = "W")
+summary(dsnb1.listw)
+
+class(nap)
+# nap_df <- st_drop_geometry(nap)
+# names(nap_df)
+summary(nap$dissolved_n2o)
+
+moran.plot(log(nap$dissolved_n2o), listw = dsnb1.listw, labels = nap$site_id)
+rm(ds1coords, ds1nb1, dsnb1, dsnb1.listw, dsnb1_dist)
+
+## NPL
+npl <- dg_sf1 %>% filter(wsa9 == "NPL" & visit_no == 1 & sample_source == "DG")
+
+npl_sp <- as(npl, "Spatial")
+class(npl_sp)
+
+ds1coords <- coordinates(npl_sp)
+ds1nb1 <- knn2nb(knearneigh(ds1coords, k=1), row.names = npl_sp$site_id)
+# using the k=1 object to find the minimum distance at which all sites have a distance-based neighbor
+dsnb1_dist <- unlist(nbdists(ds1nb1,ds1coords))
+summary(dsnb1_dist)# use max distance from summary to assign distance to create neighbors
+
+dsnb1 <- dnearneigh(ds1coords, d1=0, d2=215395, row.names=npl_sp$site_id, longlat=FALSE)
+summary(dsnb1)
+
+plot(npl_sp)
+plot(ds1nb1, ds1coords, labels = npl_sp$site_id, add = TRUE)
+
+dsnb1.listw <- nb2listw(dsnb1, style = "W")
+summary(dsnb1.listw)
+
+class(npl)
+# npl_df <- st_drop_geometry(npl)
+# names(npl_df)
+summary(npl$dissolved_n2o)
+
+moran.plot(log(npl$dissolved_n2o), listw = dsnb1.listw, labels = npl$site_id)
+rm(ds1coords, ds1nb1, dsnb1, dsnb1.listw, dsnb1_dist)
+
+## SAP
+sap <- dg_sf1 %>% filter(wsa9 == "SAP" & visit_no == 1 & sample_source == "DG")
+
+sap_sp <- as(sap, "Spatial")
+class(sap_sp)
+
+ds1coords <- coordinates(sap_sp)
+ds1nb1 <- knn2nb(knearneigh(ds1coords, k=1), row.names = sap_sp$site_id)
+# using the k=1 object to find the minimum distance at which all sites have a distance-based neighbor
+dsnb1_dist <- unlist(nbdists(ds1nb1,ds1coords))
+summary(dsnb1_dist)# use max distance from summary to assign distance to create neighbors
+
+dsnb1 <- dnearneigh(ds1coords, d1=0, d2=128285, row.names=sap_sp$site_id, longlat=FALSE)
+summary(dsnb1)
+
+plot(sap_sp)
+plot(ds1nb1, ds1coords, labels = sap_sp$site_id, add = TRUE)
+
+dsnb1.listw <- nb2listw(dsnb1, style = "W")
+summary(dsnb1.listw)
+
+class(sap)
+# sap_df <- st_drop_geometry(sap)
+# names(sap_df)
+summary(sap$dissolved_n2o)
+
+moran.plot(log(sap$dissolved_n2o), listw = dsnb1.listw, labels = sap$site_id)
+rm(ds1coords, ds1nb1, dsnb1, dsnb1.listw, dsnb1_dist)
+
+## SPL
+spl <- dg_sf1 %>% filter(wsa9 == "SPL" & visit_no == 1 & sample_source == "DG")
+
+spl_sp <- as(spl, "Spatial")
+class(spl_sp)
+
+ds1coords <- coordinates(spl_sp)
+ds1nb1 <- knn2nb(knearneigh(ds1coords, k=1), row.names = spl_sp$site_id)
+# using the k=1 object to find the minimum distance at which all sites have a distance-based neighbor
+dsnb1_dist <- unlist(nbdists(ds1nb1,ds1coords))
+summary(dsnb1_dist)# use max distance from summary to assign distance to create neighbors
+
+dsnb1 <- dnearneigh(ds1coords, d1=0, d2=173395, row.names=spl_sp$site_id, longlat=FALSE)
+summary(dsnb1)
+
+plot(spl_sp)
+plot(ds1nb1, ds1coords, labels = spl_sp$site_id, add = TRUE)
+
+dsnb1.listw <- nb2listw(dsnb1, style = "W")
+summary(dsnb1.listw)
+
+class(spl)
+# spl_df <- st_drop_geometry(spl)
+# names(spl_df)
+summary(spl$dissolved_n2o)
+
+moran.plot(log(spl$dissolved_n2o), listw = dsnb1.listw, labels = spl$site_id)
+rm(ds1coords, ds1nb1, dsnb1, dsnb1.listw, dsnb1_dist)
+
+## TPL
+tpl <- dg_sf1 %>% filter(wsa9 == "TPL" & visit_no == 1 & sample_source == "DG")
+
+tpl_sp <- as(tpl, "Spatial")
+class(tpl_sp)
+nrow(zerodist(tpl_sp)) # indicates 1 pair of identical coordinates
+
+(zerodist(tpl_sp)) # this gives the row numbers of the pair 30 & 36
+View(tpl) # to view rows 30, site_id NLA17_IN-10002, & 36, NLA17_IN-10047
+
+# Warning message from code below:
+# In knearneigh(ds1coords, k = 1) : knearneigh: identical points found
+
+ds1coords <- coordinates(tpl_sp)
+ds1nb1 <- knn2nb(knearneigh(ds1coords, k=1), row.names = tpl_sp$site_id)
+# using the k=1 object to find the minimum distance at which all sites have a distance-based neighbor
+dsnb1_dist <- unlist(nbdists(ds1nb1,ds1coords))
+summary(dsnb1_dist)# use max distance from summary to assign distance to create neighbors
+
+dsnb1 <- dnearneigh(ds1coords, d1=0, d2=223893, row.names=tpl_sp$site_id, longlat=FALSE)
+summary(dsnb1)
+
+plot(tpl_sp)
+plot(ds1nb1, ds1coords, labels = tpl_sp$site_id, add = TRUE)
+
+dsnb1.listw <- nb2listw(dsnb1, style = "W")
+summary(dsnb1.listw)
+
+class(tpl)
+# tpl_df <- st_drop_geometry(tpl)
+# names(tpl_df)
+summary(tpl$dissolved_n2o)
+
+moran.plot(log(tpl$dissolved_n2o), listw = dsnb1.listw, labels = tpl$site_id)
+rm(ds1coords, ds1nb1, dsnb1, dsnb1.listw, dsnb1_dist)
+
+## UMW
+umw <- dg_sf1 %>% filter(wsa9 == "UMW" & visit_no == 1 & sample_source == "DG")
+
+umw_sp <- as(umw, "Spatial")
+class(umw_sp)
+nrow(zerodist(umw_sp)) # indicates 1 pair of identical coordinates
+
+(zerodist(umw_sp)) # this gives the row numbers of the pair 136 & 158
+View(umw) # to view rows 136, site_id NLA17_WI-10027, & 158, NLA17_WI-10127
+
+# Warning message from code below:
+# In knearneigh(ds1coords, k = 1) : knearneigh: identical points found
+
+ds1coords <- coordinates(umw_sp)
+ds1nb1 <- knn2nb(knearneigh(ds1coords, k=1), row.names = umw_sp$site_id)
+# using the k=1 object to find the minimum distance at which all sites have a distance-based neighbor
+dsnb1_dist <- unlist(nbdists(ds1nb1,ds1coords))
+summary(dsnb1_dist)# use max distance from summary to assign distance to create neighbors
+
+dsnb1 <- dnearneigh(ds1coords, d1=0, d2=99590, row.names=umw_sp$site_id, longlat=FALSE)
+summary(dsnb1)
+
+plot(umw_sp)
+plot(ds1nb1, ds1coords, labels = umw_sp$site_id, add = TRUE)
+
+dsnb1.listw <- nb2listw(dsnb1, style = "W")
+summary(dsnb1.listw)
+
+class(umw)
+# umw_df <- st_drop_geometry(umw)
+# names(umw_df)
+summary(umw$dissolved_n2o)
+
+moran.plot(log(umw$dissolved_n2o), listw = dsnb1.listw, labels = umw$site_id)
+rm(ds1coords, ds1nb1, dsnb1, dsnb1.listw, dsnb1_dist)
+
+## WMT
+wmt <- dg_sf1 %>% filter(wsa9 == "WMT" & visit_no == 1 & sample_source == "DG")
+
+wmt_sp <- as(wmt, "Spatial")
+class(wmt_sp)
+
+# nrow(zerodist(wmt_sp)) # indicates 1 pair of identical coordinates
+# (zerodist(wmt_sp)) # this gives the row numbers of the pair 136 & 158
+# View(wmt) # to view rows 136, site_id NLA17_WI-10027, & 158, NLA17_WI-10127
+
+# Warning message from code below:
+# In knearneigh(ds1coords, k = 1) : knearneigh: identical points found
+
+ds1coords <- coordinates(wmt_sp)
+ds1nb1 <- knn2nb(knearneigh(ds1coords, k=1), row.names = wmt_sp$site_id)
+# using the k=1 object to find the minimum distance at which all sites have a distance-based neighbor
+dsnb1_dist <- unlist(nbdists(ds1nb1,ds1coords))
+summary(dsnb1_dist)# use max distance from summary to assign distance to create neighbors
+
+dsnb1 <- dnearneigh(ds1coords, d1=0, d2=295987, row.names=wmt_sp$site_id, longlat=FALSE)
+summary(dsnb1)
+
+plot(wmt_sp)
+plot(ds1nb1, ds1coords, labels = wmt_sp$site_id, add = TRUE)
+
+dsnb1.listw <- nb2listw(dsnb1, style = "W")
+summary(dsnb1.listw)
+
+class(wmt)
+# wmt_df <- st_drop_geometry(wmt)
+# names(wmt_df)
+summary(wmt$dissolved_n2o)
+
+moran.plot(log(wmt$dissolved_n2o), listw = dsnb1.listw, labels = wmt$site_id)
+rm(ds1coords, ds1nb1, dsnb1, dsnb1.listw, dsnb1_dist)
+
+## XER
+xer <- dg_sf1 %>% filter(wsa9 == "XER" & visit_no == 1 & sample_source == "DG")
+
+xer_sp <- as(xer, "Spatial")
+class(xer_sp)
+
+# nrow(zerodist(xer_sp)) # indicates 1 pair of identical coordinates
+# (zerodist(xer_sp)) # this gives the row numbers of the pair 136 & 158
+# View(xer) # to view rows 136, site_id NLA17_WI-10027, & 158, NLA17_WI-10127
+
+# Warning message from code below:
+# In knearneigh(ds1coords, k = 1) : knearneigh: identical points found
+
+ds1coords <- coordinates(xer_sp)
+ds1nb1 <- knn2nb(knearneigh(ds1coords, k=1), row.names = xer_sp$site_id)
+# using the k=1 object to find the minimum distance at which all sites have a distance-based neighbor
+dsnb1_dist <- unlist(nbdists(ds1nb1,ds1coords))
+summary(dsnb1_dist)# use max distance from summary to assign distance to create neighbors
+
+dsnb1 <- dnearneigh(ds1coords, d1=0, d2=259280, row.names=xer_sp$site_id, longlat=FALSE)
+summary(dsnb1)
+
+plot(xer_sp)
+plot(ds1nb1, ds1coords, labels = xer_sp$site_id, add = TRUE)
+
+
+dsnb1.listw <- nb2listw(dsnb1, style = "W")
+summary(dsnb1.listw)
+
+class(xer)
+# xer_df <- st_drop_geometry(xer)
+# names(xer_df)
+summary(xer$dissolved_n2o)
+
+moran.plot(log(xer$dissolved_n2o), listw = dsnb1.listw, labels = xer$site_id)
+rm(ds1coords, ds1nb1, dsnb1, dsnb1.listw, dsnb1_dist)
+
+## NLA
+nla <- dg_sf1 %>% filter(visit_no == 1 & sample_source == "DG")
+
+nla_sp <- as(nla, "Spatial")
+class(nla_sp)
+
+nrow(zerodist(nla_sp)) # indicates 2 pairs of identical coordinates
+(zerodist(nla_sp)) # this gives the row numbers of the pair (192 & 210:  NLA17_IN-10002 & NLA17_IN-10047) and the pair (1028 & 1054:  NLA17_WI-10027, & 158, NLA17_WI-10127)
+# View(nla) 
+
+# Warning message from code below:
+# In knearneigh(ds1coords, k = 1) : knearneigh: identical points found
+
+ds1coords <- coordinates(nla_sp)
+ds1nb1 <- knn2nb(knearneigh(ds1coords, k=1), row.names = nla_sp$site_id)
+# using the k=1 object to find the minimum distance at which all sites have a distance-based neighbor
+dsnb1_dist <- unlist(nbdists(ds1nb1,ds1coords))
+summary(dsnb1_dist)# use max distance from summary to assign distance to create neighbors
+
+dsnb1 <- dnearneigh(ds1coords, d1=0, d2=259280, row.names=nla_sp$site_id, longlat=FALSE)
+summary(dsnb1)
+
+plot(nla_sp)
+plot(ds1nb1, ds1coords, labels = nla_sp$site_id, add = TRUE)
+
+dsnb1.listw <- nb2listw(dsnb1, style = "W")
+summary(dsnb1.listw)
+
+class(nla)
+# nla_df <- st_drop_geometry(nla)
+# names(nla_df)
+summary(nla$dissolved_n2o)
+
+moran.plot(log(nla$dissolved_n2o), listw = dsnb1.listw, labels = nla$site_id)
+rm(ds1coords, ds1nb1, dsnb1, dsnb1.listw, dsnb1_dist)
+```
 
 ## Semivariograms
 Variograms display the variability among pairs of points at various separation distances.  I was unable to fit a model to the dissolved gas concentration variograms using the default fitting parameters in gstat.  The variograms suggest a lack of spatial structure, but I suspect the model parameterization can be improved.
