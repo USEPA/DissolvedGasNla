@@ -131,7 +131,7 @@ table(dg$size_cat, useNA = "ifany")
 ```
 
 
-## Calculate dissolved oxygen and stratification indices from profile data
+## Calculate buoyancy frequency
 Water temperature and dissolved oxygen profiles were measured at the index site in each waterbody.  A variety of metrics describing the degree of thermal stratification can be extracted from these data.  Webb et al. used the Brunt–Väisälä buoyancy frequency as an indicator of thermal stratification strength.  We will do the same here.
 
 Three site visits contain only NA for temperature.  Four site visits contain only NA for do.  Two of the incidents include notes that sonde was forgotten or malfunctioning. Two of the three sites were revisited later in the study and temperature data were collected.  Lets assign data from the second site visit to the first visit when no temperature data were collected.  This leaves only NLA17_CA-10082, visit 1, without temperature data.  NLA17_ID-10084 has no DO data and was not resampled.  Data sheet comment "Probe not measuring LDO for all depths".
@@ -300,6 +300,8 @@ dg %>% filter(is.na(MAX.BF)) %>%
   select(site.id, visit.no)
 ```
 
+
+## Calculate surface and bottom DO/temp
 Webb et al. used the 'surface' and 'bottom' water DO percent saturation and temperature as predictors, but didn't give more details on how these indices were calculated.  We will do something similar and define the 'shallowest' and 'deepest' measurements as 'surface' and 'bottom', respectively, but will use mg.l for dissolved oxygen.
 ```{r}
 # o2 surface (s) and bottom (b)
@@ -490,7 +492,36 @@ dg <- left_join(dg, o2.s.b, by = c("site.id" = "SITE_ID", "visit.no" = "VISIT_NO
 ```
 
 
+## Fix chemistry
+The file contains `r dg %>% dplyr::select(nitrate.n.result) %>% filter(is.na(nitrate.n.result)) %>% summarize(na.no3 = nrow(.)) %>% pull()` missing nitrate values.  Inspection of raw data sheet indicates that:
+* North Dakota reported NITRATE_NITRITE_N_RESULT rather than NITRATE.N.RESULT.  Most of the ND sites were 'non detect (ND)' with a detection limit of 0.03 mg /L.
+* WI sites were ND with a detection limit of 0.019.
 
+Will replace these values with NITRATE_NITRITE_N_RESULT when available, else 1/2 detection limit. 
+
+``` {r}
+dg <- dg %>% 
+  mutate(nitrate.n.result = replace(nitrate.n.result, 
+                                    grepl("WI", site.id) & is.na(nitrate.n.result), # WI na sites
+                                    0.019/2), #1/2 detection limit
+         # ND sites without nitrate.n and nitrate.nitrite
+         nitrate.n.result = replace(nitrate.n.result, 
+                                    grepl("ND", site.id) & 
+                                      is.na(nitrate.n.result) & 
+                                      is.na(nitrate.nitrite.n.result), 
+                                    0.03/2), # 1/2 detection limit
+# ND sites with a nitrate.nitrite.n.result
+         nitrate.n.result = replace(nitrate.n.result, 
+                                    grepl("ND", site.id) & 
+                                      is.na(nitrate.n.result) & 
+                                      !is.na(nitrate.nitrite.n.result), # ND na sites
+                                    0.03)) # two sites reporting 0.03 mg/L
+```
+
+The file contains `r dg %>% filter(is.na(chla.result.vol)) %>% summarize(na.chl = nrow(.)) %>% pull()` missing chlorophyll values.  Inspection reveals that these are all from North Dakota sites.  It looks like the lab failed to record the volume filtered, so we can't calculate ug/L chl from these sites.  These will remain missing.
+
+
+## Write out data
 Write out final .RData object.
 ```{r}
 save(dg, file = paste0(localPath, 

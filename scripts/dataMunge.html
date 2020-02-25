@@ -11,7 +11,7 @@
 
 
 
-<meta name="date" content="2020-02-24" />
+<meta name="date" content="2020-02-25" />
 
 <title>Data Munging</title>
 
@@ -2775,7 +2775,7 @@ div.tocify {
 
 
 <h1 class="title toc-ignore">Data Munging</h1>
-<h4 class="date">2020-02-24</h4>
+<h4 class="date">2020-02-25</h4>
 
 </div>
 
@@ -2877,8 +2877,8 @@ dim(dg) # 2369, 369;  good retained all DG observations, added a few columns.</c
 ##  min_4   4_10  10_20  20_50 50_max 
 ##    420    364    411    468    706</code></pre>
 </div>
-<div id="calculate-dissolved-oxygen-and-stratification-indices-from-profile-data" class="section level2">
-<h2><span class="header-section-number">2.4</span> Calculate dissolved oxygen and stratification indices from profile data</h2>
+<div id="calculate-buoyancy-frequency" class="section level2">
+<h2><span class="header-section-number">2.4</span> Calculate buoyancy frequency</h2>
 <p>Water temperature and dissolved oxygen profiles were measured at the index site in each waterbody. A variety of metrics describing the degree of thermal stratification can be extracted from these data. Webb et al. used the Brunt–Väisälä buoyancy frequency as an indicator of thermal stratification strength. We will do the same here.</p>
 <p>Three site visits contain only NA for temperature. Four site visits contain only NA for do. Two of the incidents include notes that sonde was forgotten or malfunctioning. Two of the three sites were revisited later in the study and temperature data were collected. Lets assign data from the second site visit to the first visit when no temperature data were collected. This leaves only NLA17_CA-10082, visit 1, without temperature data. NLA17_ID-10084 has no DO data and was not resampled. Data sheet comment “Probe not measuring LDO for all depths”.</p>
 <pre class="r"><code># Sites that only contain NAs.
@@ -3089,6 +3089,9 @@ dg &lt;- left_join(dg, bf.max, by = c(&quot;site.id&quot; = &quot;SITE_ID&quot;,
 {"columns":[{"label":["site.id"],"name":[1],"type":["chr"],"align":["left"]},{"label":["visit.no"],"name":[2],"type":["dbl"],"align":["right"]}],"data":[{"1":"NLA17_CA-10082","2":"1"},{"1":"NLA17_CA-10082","2":"1"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
   </script>
 </div>
+</div>
+<div id="calculate-surface-and-bottom-dotemp" class="section level2">
+<h2><span class="header-section-number">2.5</span> Calculate surface and bottom DO/temp</h2>
 <p>Webb et al. used the ‘surface’ and ‘bottom’ water DO percent saturation and temperature as predictors, but didn’t give more details on how these indices were calculated. We will do something similar and define the ‘shallowest’ and ‘deepest’ measurements as ‘surface’ and ‘bottom’, respectively, but will use mg.l for dissolved oxygen.</p>
 <pre class="r"><code># o2 surface (s) and bottom (b)
 o2.s.b &lt;- 
@@ -3304,6 +3307,31 @@ dg %&gt;% filter(!(site.id %in% o2.s.b$SITE_ID)) %&gt;% # no
 # Left join: retain all dg values, exclude non-matching bf values (i.e. OR and AZ)
 dg &lt;- left_join(dg, o2.s.b, by = c(&quot;site.id&quot; = &quot;SITE_ID&quot;, &quot;visit.no&quot; = &quot;VISIT_NO&quot;))  
 # dim(dg) # 2369, 379, good!</code></pre>
+</div>
+<div id="fix-chemistry" class="section level2">
+<h2><span class="header-section-number">2.6</span> Fix chemistry</h2>
+<p>The file contains 112 missing nitrate values. Inspection of raw data sheet indicates that: * North Dakota reported NITRATE_NITRITE_N_RESULT rather than NITRATE.N.RESULT. Most of the ND sites were ‘non detect (ND)’ with a detection limit of 0.03 mg /L. * WI sites were ND with a detection limit of 0.019.</p>
+<p>Will replace these values with NITRATE_NITRITE_N_RESULT when available, else 1/2 detection limit.</p>
+<pre class="r"><code>dg &lt;- dg %&gt;% 
+  mutate(nitrate.n.result = replace(nitrate.n.result, 
+                                    grepl(&quot;WI&quot;, site.id) &amp; is.na(nitrate.n.result), # WI na sites
+                                    0.019/2), #1/2 detection limit
+         # ND sites without nitrate.n and nitrate.nitrite
+         nitrate.n.result = replace(nitrate.n.result, 
+                                    grepl(&quot;ND&quot;, site.id) &amp; 
+                                      is.na(nitrate.n.result) &amp; 
+                                      is.na(nitrate.nitrite.n.result), 
+                                    0.03/2), # 1/2 detection limit
+# ND sites with a nitrate.nitrite.n.result
+         nitrate.n.result = replace(nitrate.n.result, 
+                                    grepl(&quot;ND&quot;, site.id) &amp; 
+                                      is.na(nitrate.n.result) &amp; 
+                                      !is.na(nitrate.nitrite.n.result), # ND na sites
+                                    0.03)) # two sites reporting 0.03 mg/L</code></pre>
+<p>The file contains 18 missing chlorophyll values. Inspection reveals that these are all from North Dakota sites. It looks like the lab failed to record the volume filtered, so we can’t calculate ug/L chl from these sites. These will remain missing.</p>
+</div>
+<div id="write-out-data" class="section level2">
+<h2><span class="header-section-number">2.7</span> Write out data</h2>
 <p>Write out final .RData object.</p>
 <pre class="r"><code>save(dg, file = paste0(localPath, 
                        &quot;/Environmental Protection Agency (EPA)/&quot;,
