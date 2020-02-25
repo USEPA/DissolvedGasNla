@@ -19,7 +19,6 @@ editor_options:
 # load libraries
 library(sf) # spatial data
 library(gstat) # lagged scatterplot, variogram
-#library(spdplyr) # apply dplyr verbs to sp objects.  gstat functions require sp objects
 library(tidyverse) # dplyr, ggplot
 library(janitor) # clean names
 library(spdep) # k-NN and Moran plot
@@ -42,7 +41,7 @@ During the 2017 National Lakes Assesment, duplicate dissolved gas samples were c
 
 
 ## Getting data and filtering
-The dissolved gas data were currated the 'NLA' dissolved gas project in RStudio.  The code can be found at a private github repository (https://github.com/USEPA/NLA).  After aggregating across duplicate samples, the data were written to nla17gasDataAggregated_2019-10-25.txt.  A copy of this data file is stored in documents library associated with the 'ORD NLA17 Dissolved Gas' Private Group on SharePoint (https://usepa.sharepoint.com/sites/ORD_NLA17_Dissolved_Gas).  This file was futher manipulated in "C:\Users\JBEAULIE\OneDrive - Environmental Protection Agency (EPA)\gitRepository\DissolvedGasNla\scripts\dataMunge.Rmd" and written out as an .RData object which is imported below.
+The dissolved gas data were currated the 'NLA' dissolved gas project in RStudio.  The code can be found at a private github repository (https://github.com/USEPA/NLA).  After aggregating across duplicate samples, the data were written to nla17gasDataAggregated_2020-02-24.txt.  A copy of this data file is stored in documents library associated with the 'ORD NLA17 Dissolved Gas' Private Group on SharePoint (https://usepa.sharepoint.com/sites/ORD_NLA17_Dissolved_Gas).  This file was futher manipulated in "C://Users//JBEAULIE//OneDrive-Environmental Protection Agency (EPA)//gitRepository//DissolvedGasNla//scripts//dataMunge.Rmd" and written out as an .RData object, which is imported below.
 
 
 ```{r}
@@ -50,7 +49,10 @@ The dissolved gas data were currated the 'NLA' dissolved gas project in RStudio.
 load(paste0(localPath, 
             "/Environmental Protection Agency (EPA)/",
             "ORD NLA17 Dissolved Gas - Documents/",
-            "inputData/dg.RData"))
+            "inputData/dg.2020-02-24.RData"))
+
+# Strip out air samples
+dg <- dg %>% filter(sample.source == "DG")
 
 ```
 
@@ -61,7 +63,8 @@ The data file contains `r dg %>% distinct(site.id, visit.no) %>% summarize(n = n
 
 ```{r}
 # These are the main response variables.
-dg %>% select(dissolved.co2, dissolved.ch4, dissolved.n2o, co2.sat.ratio, ch4.sat.ratio, n2o.sat.ratio) %>%
+dg %>% 
+  select(dissolved.co2, dissolved.ch4, dissolved.n2o, co2.sat.ratio, ch4.sat.ratio, n2o.sat.ratio) %>%
   {summary(.)}
 ```
 
@@ -102,7 +105,7 @@ pop <- pop %>%
 # extract population estimates for ecoregion and nation
 pop.eco <- pop %>% 
   filter(type %in% c("AG_ECO9_NM", "National"), # extract estimates for ecoregion and nation
-         statistic == "50Pct") # extract mean estimate
+         statistic == "Mean") # extract mean estimate
 
 # extract dissolved gas indicator, order by dissolved CH4
 pop.eco.diss <- pop.eco %>%
@@ -144,7 +147,7 @@ dg.sf <- st_as_sf(dg, coords = c("map.lon.dd", "map.lat.dd"),
 ecoR <- st_read(dsn = paste0(localPath, 
                              "/Environmental Protection Agency (EPA)/",
                              "ORD NLA17 Dissolved Gas - Documents/inputData"),
-                layer = "Aggr_Ecoregions9_2015")
+                layer = "aggr_ecoregions_simple")
 
 
 
@@ -157,7 +160,7 @@ ecoR <- ecoR %>%
          WSA9_NAME = as.factor(WSA9_NAME)) # back to factor
 
 # Check CRS
-st_crs(ecoR) # no EPSG code
+st_crs(ecoR) # 3857
 ecoR <- st_transform(ecoR, 5070) # convert to CONUS Albers
 st_crs(ecoR) # 5070
 ```
@@ -206,7 +209,7 @@ ggplot() +
              breaks = c(1, 10, 25, 50, 100)) # custom breaks
 ```
 
-We can also look at population estimates of N2O saturation ratio by ecoregion.  Wow, the mean N2O saturation is less than one for all ecoregions and the nation!  95% CI overlap one in only 3 levels of the stratification.  This is pretty big news. 
+We can also look at population estimates of N2O saturation ratio by ecoregion.  Wow, despite the prevalance of N2O undersaturated waterbodies, the 95% CI for the mean N2O saturation ratio encompasses 1 in all ecoregions except the Northern Plains and Northern Appalachians. 
 ```{r}
 
 # extract saturation indicator, order by n2o
@@ -230,7 +233,7 @@ ggplot(pop.eco.sat, aes(estimate, subpopulation)) +
 
 ## Geopackage
 Create a simple feature on entire dg data frame, then split out a simple feature, df_sf2, by filtering sample_source = DG.  The geodatabase will contain two simple features, the dissolved gas sampled points/lakes and the nine aggregated ecoregions.
-```{r, geopackage}
+```{r, geopackage, eval=FALSE, echo=FALSE,}
 library(janitor) # clean_names function
 names(dg)
 
@@ -260,7 +263,8 @@ st_crs(dg_sf1)
 st_crs(ecoR)
 names(ecoR)
 
-ecoR1 <- st_transform(ecoR, 4326)
+ecoR1 <- st_transform(ecoR, 4326) %>% 
+  select(OBJECTID, WSA9, WSA9_NAME) # Grab variables of interest
 st_crs(ecoR1)
 
 # write out dg.sf and ecoR as two layers in geopackage, gpkg, geodatabase

@@ -28,7 +28,7 @@ localPath <- Sys.getenv("USERPROFILE")
 # Purpose
 The purpose of this .rmd is to prepare the data set for subsequent modeling.  The data will be written as .RData object and stored at the shared documents library associated with this project: https://usepa.sharepoint.com/sites/ORD_NLA17_Dissolved_Gas
 
-The dissolved gas data were currated in the 'NLA' dissolved gas project in RStudio.  The code can be found at a private github repository (https://github.com/USEPA/NLA).  After aggregating across duplicate samples, the data were written to nla17gasDataAggregated_2019-11-12.txt.  Data on waterbody surface area and design weights were provided by Karen Blocksom on 12/13/2019.  These data files are stored in the documents library associated with the 'ORD NLA17 Dissolved Gas' Private Group on SharePoint (https://usepa.sharepoint.com/sites/ORD_NLA17_Dissolved_Gas).  When synced to a local computer, the documents library can be read directly with R, after identifying the local directory path.
+The dissolved gas data were currated in the 'NLA' dissolved gas project in RStudio.  The code can be found at a private github repository (https://github.com/USEPA/NLA).  After aggregating across duplicate samples, the data were written to nla17gasDataAggregated_2020-02-24.txt.  Data on waterbody surface area and design weights were provided by Karen Blocksom on 12/13/2019.  These data files are stored in the documents library associated with the 'ORD NLA17 Dissolved Gas' Private Group on SharePoint (https://usepa.sharepoint.com/sites/ORD_NLA17_Dissolved_Gas).  When synced to a local computer, the documents library can be read directly with R, after identifying the local directory path.
 
 # Data
 ## Read data
@@ -39,7 +39,7 @@ Below we read in the data files.
 dg <- read.table(file = paste0(localPath, 
                                "/Environmental Protection Agency (EPA)/",
                                "ORD NLA17 Dissolved Gas - Documents/",
-                               "inputData/nla17gasDataAggregated_2019-11-12.txt"),
+                               "inputData/nla17gasDataAggregated_2020-02-24.txt"),
                  header = TRUE, sep = "\t", as.is = TRUE) 
 
 # Read site weights and waterbody area data
@@ -50,10 +50,10 @@ wt.area <- read.csv(file = paste0(localPath,
                     as.is = TRUE)
 
 # Read in temp profile data
-temp <- read.csv(file = paste0(localPath, 
+temp.o2 <- read.csv(file = paste0(localPath, 
                                "/Environmental Protection Agency (EPA)/",
                                "ORD NLA17 Dissolved Gas - Documents/",
-                               "inputData/NLA17_Profile_Data.csv"),
+                               "inputData/NLA17_Profile_Data_Updated_11Feb2020.csv"),
                     as.is = TRUE)
 ```
 
@@ -81,22 +81,11 @@ dg <- dg %>% filter(!(grepl("AK", site.id))) # exlclude alaska
 ```
 
 
-This leaves one site in WI that is in the dissolved gas file, but not in the weights + lake area file.  The Chain of Custody form verifies receipt of this sample.  Per Karen Blocksom, this should be SITE)ID NLA17_WI-10008, visit 1.  
-``` {r}
-# Will merge datasets on SITE_ID field.  Are all site.id values in dg present in wt.area?
-dg %>% filter(!(site.id %in% wt.area$SITE_ID)) %>% distinct(site.id, visit.no) # Just a single WI site
-
-# Correct site code
-dg <- dg %>%
-  mutate(site.id = replace(site.id, site.id == "NLA17_WI-10018" & visit.no == 1, "NLA17_WI-10008"))
-```
-
-
 There are 23 observations in the weights + lake area file that are absent from the dissolved gas file.  One observation is from Arizona.  This corresponds to notes in the chain of custody form indicating the vials arrived unlabeled and were not run.  The remaining sites are from OR. Karen Blocksom confirmed that these sites were part of the OR state survey, but collected 'most' of the NLA measurements.  They were included in the final NLA dataset for 'the purpose of adjusting weights'.  They did not collect gas samples and can be disregarded for this analysis.
 
 ``` {r}
 # Any site id values in wt.area, but not present in dg?
-wt.area %>% filter(!(SITE_ID %in% dg$site.id)) %>% select(SITE_ID, EVAL_CAT, SITETYPE) # h23 sites w/out dissolved gas data
+wt.area %>% filter(!(SITE_ID %in% dg$site.id)) %>% select(SITE_ID, EVAL_CAT, SITETYPE) # 23 sites w/out dissolved gas data
 ```
 
 Finally, lets merge these two files on site id.  Use left_join to retain all dissolved gas data, but disregard OR and AZ sites where we don't have gas data.
@@ -142,50 +131,54 @@ table(dg$size_cat, useNA = "ifany")
 ```
 
 
-## Calculate stratification indices from temperature profile data
-Water temperature profiles were measured at the index site in each waterbody.  A variety of metrics describing the degree of thermal stratification can be extracted from these data.  Webb et al. used the Brunt–Väisälä buoyancy frequency as an indicator of thermal stratification strength.  We will do the same here.
+## Calculate dissolved oxygen and stratification indices from profile data
+Water temperature and dissolved oxygen profiles were measured at the index site in each waterbody.  A variety of metrics describing the degree of thermal stratification can be extracted from these data.  Webb et al. used the Brunt–Väisälä buoyancy frequency as an indicator of thermal stratification strength.  We will do the same here.
 
-Three unique site visits contain only NA for temperature.  Two of the incidents include notes that sonde was forgotten or malfunctioning. Two of the three sites were revisited later in the study and temperature data were collected.  Lets assign data from the second site visit to the first visit when no temperature data were collected.  This leaves only NLA17_CA-10082, visit 1, without temperature data.
+Three site visits contain only NA for temperature.  Four site visits contain only NA for do.  Two of the incidents include notes that sonde was forgotten or malfunctioning. Two of the three sites were revisited later in the study and temperature data were collected.  Lets assign data from the second site visit to the first visit when no temperature data were collected.  This leaves only NLA17_CA-10082, visit 1, without temperature data.  NLA17_ID-10084 has no DO data and was not resampled.  Data sheet comment "Probe not measuring LDO for all depths".
 
 ```{r}
 # Sites that only contain NAs.
-missingTemp <- temp %>% group_by(SITE_ID, VISIT_NO) %>% 
-  summarise(all.na = all(is.na(TEMPERATURE))) %>% 
-  filter(all.na == TRUE) %>%
-  select(SITE_ID, VISIT_NO)
+missing <- temp.o2 %>% group_by(SITE_ID, VISIT_NO) %>% 
+  summarise(all.temp = all(is.na(TEMPERATURE)),
+            all.do = all(is.na(OXYGEN))) %>% 
+  filter(all.temp == TRUE | all.do == TRUE) %>%
+  select(SITE_ID, VISIT_NO, all.temp, all.do)
 
-# View sites with missing temp.
-missingTemp
+# View sites with missing temp/do
+missing
 
 # Two of the sites have data from second site visit
-temp %>% filter(SITE_ID %in% missingTemp$SITE_ID) %>%
-  select(SITE_ID, VISIT_NO, TEMPERATURE) 
+temp.o2 %>% filter(SITE_ID %in% missing$SITE_ID) %>%
+  select(SITE_ID, VISIT_NO, TEMPERATURE, OXYGEN) 
 
 # Extract data from second visit to assign to first visit
-replacementData <- temp %>% filter(SITE_ID %in% missingTemp$SITE_ID, VISIT_NO == 2) %>%
-  select(SITE_ID, VISIT_NO, DEPTH, TEMPERATURE) %>%
+replacementData <- temp.o2 %>% filter(SITE_ID %in% missing$SITE_ID, VISIT_NO == 2) %>%
+  select(SITE_ID, VISIT_NO, DEPTH, TEMPERATURE, OXYGEN) %>%
   mutate(VISIT_NO = 1) # change visit no to one for join
 
 # Join the data
-temp1 <- full_join(temp, replacementData)
+temp.o21 <- full_join(temp.o2, replacementData)
 
-# Inspect results of join.  Looks good.  Only one site missing temperature data.
-temp1 %>% filter(SITE_ID %in% missingTemp$SITE_ID) %>%
-  select(SITE_ID, VISIT_NO, DEPTH, TEMPERATURE) %>% 
-  arrange(SITE_ID, VISIT_NO, DEPTH, TEMPERATURE)
+# Inspect results of join.  Looks good.  
+# Only one site missing temperature and DO data. (NLA17_CA-10082)
+# One site missing all DO data (NLA17_ID-10084)
+temp.o21 %>% filter(SITE_ID %in% missing$SITE_ID) %>%
+  select(SITE_ID, VISIT_NO, DEPTH, TEMPERATURE, OXYGEN) %>% 
+  arrange(SITE_ID, VISIT_NO, DEPTH, TEMPERATURE, OXYGEN)
 
 ```
 
-The field crews measured temperature starting near the water surface, then at increasing depths.  A second measurement was made at the water surface before the sonde was removed from the water, therefore the file contains duplicate measurements at the shallowest depths. Duplicate measurements corrupt the buoyancy frequency function and will therefore be aggregated. 
+The field crews measured temperature/DO starting near the water surface, then at increasing depths.  A second measurement was made at the water surface before the sonde was removed from the water, therefore the file contains duplicate measurements at the shallowest depths. Duplicate measurements corrupt the buoyancy frequency function and will therefore be aggregated. 
 ``` {r}
 # Aggregate across SITE_ID, VISIT_NO, and DEPTH.  I don't like the dplyr solution for this (group_map) and I'm not familiar with the purr::map_ functions.  I'm going old-school and busting out the trusty plyr::ddply.
-temp2 <- temp1 %>% select(SITE_ID, VISIT_NO, DEPTH, TEMPERATURE) %>%
-  # exclude NA, NaN, Inf...
-  filter(is.finite(TEMPERATURE)) %>% # This completely removes the CA site with only NA for temp data.
+temp.o2.2 <- temp.o21 %>% select(SITE_ID, VISIT_NO, DEPTH, TEMPERATURE, OXYGEN) %>%
   plyr::ddply(., .(SITE_ID, VISIT_NO, DEPTH), summarize, 
-              TEMPERATURE.M = mean(TEMPERATURE, na.rm = TRUE))
-dim(temp1) # 11003
-dim(temp2) # 10071, nearly 1000 observations aggregated or stripped out due to NA
+              TEMPERATURE.M = mean(TEMPERATURE, na.rm = TRUE),
+              OXYGEN.M = mean(OXYGEN, na.rm = TRUE))
+
+
+dim(temp.o21) # 11003
+dim(temp.o2.2) # 10133, 870 observations aggregated
 ```
 
 Finally, calculate the buoyancy frequency depth profile for each waterbody and print to buoyancyFrequency.pdf for inspection.  
@@ -198,7 +191,12 @@ Finally, calculate the buoyancy frequency depth profile for each waterbody and p
 # elements.  I really don't like this.  I think this can be addressed by combining group_map
 # with purr::map_ functions, but I'm not familiar with purr.  Rather, I'll use the old school
 # split -lapply - do(rbind) approach.
-bf <- temp2 %>%
+
+# First, strip out any NA, NaN, Inf...etc
+
+
+bf <- temp.o2.2 %>%
+  filter(is.finite(TEMPERATURE.M)) %>% # This completely removes the CA site with only NA for temp data.
   group_split(SITE_ID, VISIT_NO) %>% # split into list of df
   lapply(function(x) {
     data.frame(BF = buoyancy.freq(wtr = x$TEMPERATURE.M, depths = x$DEPTH), # calculate buoyance frequency
@@ -216,9 +214,9 @@ bf.na <- bf %>% filter(!is.finite(BF)) %>%
 bf.na
 
 # These site have a single temp measurement made at shallow depths (<1m).  Presumably these are 
-# shallow sites, therefore unlikely to be stratified.  Assign a bf very close to 0.
+# shallow sites, therefore unlikely to be stratified.  Assign a bf very close to 0 (see below)
 bf %>% filter(paste0(SITE_ID, VISIT_NO) %in% bf.na$SITE.VISIT) 
-temp2 %>% filter(paste0(SITE_ID, VISIT_NO) %in% bf.na$SITE.VISIT)
+temp.o2.2 %>% filter(paste0(SITE_ID, VISIT_NO) %in% bf.na$SITE.VISIT)
 
 # plot buoyancy frequency depth profile
 # (http://stackoverflow.com/questions/8018961/connect-points-in-qplot-by-adjacent-y-value-not-x-value)
@@ -300,6 +298,195 @@ The California site with the broken sonde has no bf data.  Nothing we can do abo
 ```{r}
 dg %>% filter(is.na(MAX.BF)) %>%
   select(site.id, visit.no)
+```
+
+Webb et al. used the 'surface' and 'bottom' water DO percent saturation and temperature as predictors, but didn't give more details on how these indices were calculated.  We will do something similar and define the 'shallowest' and 'deepest' measurements as 'surface' and 'bottom', respectively, but will use mg.l for dissolved oxygen.
+```{r}
+# o2 surface (s) and bottom (b)
+o2.s.b <- 
+temp.o2.2 %>% 
+  group_by(SITE_ID, VISIT_NO) %>%
+  slice(c(which.min(DEPTH), which.max(DEPTH))) %>% # min and max depth by group
+  arrange(SITE_ID, VISIT_NO, DEPTH) %>%
+    mutate(DEPTH = ifelse(row_number() == 1,
+                        "surface",
+                        "bottom")) %>%
+  pivot_wider(id_cols = c(SITE_ID, VISIT_NO), 
+              names_from = DEPTH, 
+              values_from = c(TEMPERATURE.M, OXYGEN.M)) %>%
+  rename(temp.surf = TEMPERATURE.M_surface,
+         temp.bottom = TEMPERATURE.M_bottom,
+         o2.surf = OXYGEN.M_surface,
+         o2.bottom = OXYGEN.M_bottom)
+
+o2.s.b
+
+```
+
+These calculations produced 8 site visits with at least one NA for surface/bottom temp/DO.  
+
+```{r}
+o2.s.b %>% filter(is.na(temp.surf) | is.na(temp.bottom) | is.na(o2.surf) | is.na(temp.bottom))
+```
+
+o2.surf at NLA17_FL-10029 is a case with no DO at shallowest depth, but good measurements below.  Replace with next shallowest value.
+``` {r}
+# Inspect raw data
+temp.o2.2 %>% filter(SITE_ID == "NLA17_FL-10029", VISIT_NO == 1)
+
+# update data
+o2.s.b <- o2.s.b %>%
+  mutate(o2.surf = replace(o2.surf, 
+                           SITE_ID == "NLA17_FL-10029" & VISIT_NO == 1,
+                           temp.o2 %>% filter(SITE_ID=="NLA17_FL-10029",
+                                              VISIT_NO == 1,
+                                              DEPTH == 1) %>%
+                             select(OXYGEN) %>% pull()))
+
+```
+No bottom water DO or temp at NLA17_ID-10001, visit 1 due to probe malfunction.
+
+```{r}
+temp.o2.2 %>% filter(SITE_ID == "NLA17_ID-10001", VISIT_NO == 1)
+```
+
+No DO NLA17_ID-10084, visit 1 due to probe malfunction.
+
+```{r}
+temp.o2.2 %>% filter(SITE_ID == "NLA17_ID-10084", VISIT_NO == 1)
+```
+
+No deep DO or temp at NLA17_MI-10073, visit 1 becuase no measurement taken at deepst recorded depth.  Replace with next shallowest measurement. 
+
+```{r}
+# look at raw data
+temp.o2.2 %>% filter(SITE_ID == "NLA17_MI-10073", VISIT_NO == 1)
+
+# update aggregated data
+o2.s.b <- o2.s.b %>%
+  mutate(o2.bottom = replace(o2.bottom, 
+                           SITE_ID == "NLA17_MI-10073" & VISIT_NO == 1,
+                           temp.o2.2 %>% filter(SITE_ID=="NLA17_MI-10073",
+                                              VISIT_NO == 1,
+                                              DEPTH == 1.3) %>%
+                             select(OXYGEN.M) %>% pull()),
+         temp.bottom = replace(temp.bottom, 
+                           SITE_ID == "NLA17_MI-10073" & VISIT_NO == 1,
+                           temp.o2.2 %>% filter(SITE_ID=="NLA17_MI-10073",
+                                              VISIT_NO == 1,
+                                              DEPTH == 1.3) %>%
+                             select(TEMPERATURE.M) %>% pull()))
+```
+
+No surface temp at NLA17_NE-10060, visit 1 becuase no measurement taken at shallowest depth (0m). Replace with next shallowest measurement (0.1m) 
+
+```{r}
+# look at raw data
+temp.o2.2 %>% filter(SITE_ID == "NLA17_NE-10060", VISIT_NO == 1)
+
+o2.s.b <- o2.s.b %>%
+  mutate(temp.surf = replace(temp.surf, 
+                           SITE_ID == "NLA17_NE-10060" & VISIT_NO == 1,
+                           temp.o2.2 %>% filter(SITE_ID=="NLA17_NE-10060",
+                                              VISIT_NO == 1,
+                                              DEPTH == 0.1) %>%
+                             select(TEMPERATURE.M) %>% pull()))
+```
+
+
+No bottom temp or O2 at NLA17_NH-10063, visit 1 becuase no measurement taken at greatest depth (8m). Replace with next deeptest measurement (7.5m) 
+
+```{r}
+# look at raw data
+temp.o2.2 %>% filter(SITE_ID == "NLA17_NH-10063", VISIT_NO == 1)
+
+o2.s.b <- o2.s.b %>%
+  mutate(temp.bottom = replace(temp.bottom, 
+                           SITE_ID == "NLA17_NH-10063" & VISIT_NO == 1,
+                           temp.o2.2 %>% filter(SITE_ID=="NLA17_NH-10063",
+                                              VISIT_NO == 1,
+                                              DEPTH == 7.5) %>%
+                             select(TEMPERATURE.M) %>% pull()),
+         o2.bottom = replace(o2.bottom, 
+                           SITE_ID == "NLA17_NH-10063" & VISIT_NO == 1,
+                           temp.o2.2 %>% filter(SITE_ID=="NLA17_NH-10063",
+                                              VISIT_NO == 1,
+                                              DEPTH == 7.5) %>%
+                             select(OXYGEN.M) %>% pull()))
+```
+
+
+No surface temp or O2 at NLA17_OR-10003, visit 1 becuase no measurement taken at shallowest depth (0m). Replace with next shallowest measurement (0.1m) 
+
+```{r}
+# look at raw data
+temp.o2.2 %>% filter(SITE_ID == "NLA17_OR-10003", VISIT_NO == 1)
+
+o2.s.b <- o2.s.b %>%
+  mutate(temp.surf = replace(temp.surf, 
+                           SITE_ID == "NLA17_OR-10003" & VISIT_NO == 1,
+                           temp.o2.2 %>% filter(SITE_ID=="NLA17_OR-10003",
+                                              VISIT_NO == 1,
+                                              DEPTH == 0.1) %>%
+                             select(TEMPERATURE.M) %>% pull()),
+         o2.surf = replace(o2.surf, 
+                           SITE_ID == "NLA17_OR-10003" & VISIT_NO == 1,
+                           temp.o2.2 %>% filter(SITE_ID=="NLA17_OR-10003",
+                                              VISIT_NO == 1,
+                                              DEPTH == 0.1) %>%
+                             select(OXYGEN.M) %>% pull()))
+```
+
+No bottom temp or O2 at NLA17_SD-10057, visit 1 becuase no measurement taken at deepest depth (4m). Replace with next deepest measurement (3m) 
+
+```{r}
+# look at raw data
+temp.o2.2 %>% filter(SITE_ID == "NLA17_SD-10057", VISIT_NO == 1)
+
+o2.s.b <- o2.s.b %>%
+  mutate(temp.bottom = replace(temp.bottom, 
+                           SITE_ID == "NLA17_SD-10057" & VISIT_NO == 1,
+                           temp.o2.2 %>% filter(SITE_ID=="NLA17_SD-10057",
+                                              VISIT_NO == 1,
+                                              DEPTH == 3) %>%
+                             select(TEMPERATURE.M) %>% pull()),
+         o2.bottom = replace(o2.bottom, 
+                           SITE_ID == "NLA17_SD-10057" & VISIT_NO == 1,
+                           temp.o2.2 %>% filter(SITE_ID=="NLA17_SD-10057",
+                                              VISIT_NO == 1,
+                                              DEPTH == 3) %>%
+                             select(OXYGEN.M) %>% pull()))
+```
+
+
+Only remainining missing values are observations where field crews noted sonde malfunctions.
+
+```{r}
+o2.s.b %>% filter(is.na(temp.surf) | is.na(temp.bottom) | is.na(o2.surf) | is.na(temp.bottom))
+```
+
+
+Merge bottom and surface DO and temperature with dg data.
+
+
+```{r}
+# are all SITE_ID values in o2 and temp data also present in dg?
+o2.s.b %>% filter(!(SITE_ID %in% dg$site.id)) %>% # no, OR and AZ-10007
+print(n= Inf)
+
+
+# are all site.id values in dg also present in o2 and temp data?
+# Just CA site, as expected.
+dg %>% filter(!(site.id %in% o2.s.b$SITE_ID)) %>% # no
+  select(site.id, visit.no)
+
+
+# dim(o2.s.b) # 1209, 6
+# dim(dg) # 2369, 375
+
+# Left join: retain all dg values, exclude non-matching bf values (i.e. OR and AZ)
+dg <- left_join(dg, o2.s.b, by = c("site.id" = "SITE_ID", "visit.no" = "VISIT_NO"))  
+# dim(dg) # 2369, 379, good!
 ```
 
 
