@@ -22,6 +22,7 @@ library(gstat) # lagged scatterplot, variogram
 library(tidyverse) # dplyr, ggplot
 library(janitor) # clean names
 library(spdep) # k-NN and Moran plot
+library(ncf) # ncf::correlogram
 
 # Identify local path for each user
 localPath <- Sys.getenv("USERPROFILE")
@@ -1030,6 +1031,348 @@ summary(nla$dissolved_n2o)
 
 moran.plot(log(nla$dissolved_n2o), listw = dsnb1.listw, labels = nla$site_id)
 rm(ds1coords, ds1nb1, dsnb1, dsnb1.listw, dsnb1_dist)
+```
+
+## Correlograms: ncf and pgmirness packages
+```{r, correlogram}
+
+# Much of code below is based on example comparing correlograms among packages ncf, pgmirness, and spdep described in this chapter
+# https://link.springer.com/chapter/10.1007/978-3-030-01989-1_5
+
+coords <- data.frame(longitude = dg_1$map_lon_dd, latitude = dg_1$map_lat_dd)
+
+dg_sf1 <- st_as_sf(dg_1, coords = c("map_lon_dd", "map_lat_dd"), 
+                  crs = 4269) %>% # standard for lat/lon
+  st_transform(5070) # project to CONUS ALBERS for plotting 
+
+st_crs(dg_sf1)
+names(dg_sf1)
+nap_visit1 <- dg_sf1 %>% filter(wsa9 == "NAP" & visit_no == 1)
+class(nap_visit1)
+st_crs(nap_visit1)
+
+nap_sp_visit1 <- as(nap_visit1, "Spatial")
+class(nap_sp_visit1)
+
+# trying ncf package which uses resampling to specify number of null permutations under the null to assess significance levels.  See if significance persist after increas resamp from 100 to 1000, which is the default.
+# The x-intercept in the results is the distance at which objects are no more similar than expected by chance alone across the region.
+# Run on CPL as that is giving correlation greater than 1, which according to Fletcher and Fortin might be due to small number of pairs of points used in that first distance bin or to outliers.  Perhaps, cluster of high Delaware sites (n visit 1 = 5) causes the correlation to be greater than 1.
+# Looks like 71 pairs of points being used.
+# With a lag, or bin distance, of 50 km only go out 10 bins, 500 km, and do a Bonferroni adjustment of 0.05/10 = 0.005
+names(dg_1)
+dg_cplvisit1 <- dg_1 %>% filter(wsa9 == "CPL" & visit_no == 1)
+# N.B. default is resamp = 1000 so that can take 10 minutes for n =1090 sites
+class(dg_cplvisit1)
+
+correlo_n2o_ncf <- ncf::correlog(x = dg_cplvisit1$map_lon_dd, y = dg_cplvisit1$map_lat_dd, z = dg_cplvisit1$log_n2o, increment = 50, resamp = 1000, latlon = TRUE)
+names(correlo_n2o_ncf)
+plot(correlo_n2o_ncf) # works when pgmiress commented out
+rm(dg_napvisit1, correlo_n2o_ncf)
+
+# B/c returns a list of list have to access with [[]]
+print(correlo_n2o_ncf[["n"]])
+print(correlo_n2o_ncf[["mean.of.class"]])
+print(correlo_n2o_ncf[["correlation"]])
+head(correlo_n2o_ncf[["mean.of.class"]])
+plot(correlo_n2o_ncf[["mean.of.class"]], correlo_n2o_ncf[["correlation"]])
+
+class(correlo_n2o_ncf)
+ncf::plot.correlog(correlo_n2o_ncf)
+
+# CPL outlier check by working through all 10 pairwise removal of cluster of 5 high Delaware sites
+out_cplvisit1 <- dg_1 %>% filter(wsa9 == "CPL" & visit_no == 1 & (site_id != "NLA17_DE-10003" & site_id != "NLA17_DE-10004"))
+
+out_cplcorrelo_n2o <- ncf::correlog(x = out_cplvisit1$map_lon_dd, y = out_cplvisit1$map_lat_dd, z = out_cplvisit1$log_n2o, increment = 50, resamp = 1000, latlon = TRUE)
+
+plot(out_cplcorrelo_n2o)
+rm(out_cplvisit1, out_cplcorrelo_n2o)
+
+# trying pgirmess package uses library spdep including moran.test and geary.test functions.  Distances are euclidean and in the same units as the spatial coordinates.  As run below, using geographical coordinates in decimal degrees so are distance classes retuned in decimal degrees?
+# what if run on a spatial points data frame?
+# Uses normality assumption, which is faster, to assess significance
+coords_nap <- cbind(dg_napvisit1$map_lon_dd, dg_napvisit1$map_lat_dd)
+correl_napn2o_pg <- pgirmess::correlog(coords_nap, dg_napvisit1$log_n2o, method = "Moran", nbclass = NULL, alternative = "two.sided")
+
+head(round(correl_napn2o_pg, 2))
+tail(round(correl_napn2o_pg, 2))
+plot(correl_napn2o_pg)
+
+# apply to SpatialPointsDataFrame that has projected coordinates and believe returning distance classes in meters
+coords_sp_nap <- coordinates(nap_sp_visit1)
+correl_spnapn2o_pg <- pgirmess::correlog(coords_sp_nap, nap_sp_visit1@data$log_n2o, method = "Moran", nbclass = 30, alternative = "two.sided")
+
+head(round(correl_spnapn2o_pg, 2), 30)
+tail(round(correl_spnapn2o_pg ,2))
+plot(correl_spnapn2o_pg)
+```
+
+## Correlograms by Ecoregions
+Doug Anderson wrote functions to deal with the list of list output from the correlog function in the ncf package.  He also wrote functions so that the correlogram of dissolved NO2 gas could be plotted by ecoregion using base plot, cowplot, or ggplot2 code.
+```{r, correlogram_ecoregions}
+# Original code from Doug Anderson at Neptune from file:  Neptune_correlogram_TDS05_Anderson.Rmd
+
+# set the theme of the ggplot
+theme_set(theme_bw()) # the theme I prefer is theme_bw()
+
+## Can define a new function to plot
+plot_correlog <- function(ncf_correlog, 
+                          # names of list components
+                          n_col = "n", 
+                          mean_col = "mean.of.class",
+                          cor_col = "correlation",
+                          xint_col = "x.intercept",
+                          pval_col = "p",
+                          name_col = NULL, #can change to column that has names of interest
+                          alpha = 0.05, # two sided significance level
+                          # plot labels and adjustments
+                          plot_title = "Correlogram", #can change to NULL
+                          plot_subtitle = waiver(),
+                          y_label = "Correlation",
+                          x_label = "Distance (mean-of-class)",
+                          pt_size = I(2), pt_color = "black",
+                          ln_size = I(0.5), ln_color = "black", 
+                          ln_type = "solid",
+                          title_size = 14, subtitle_size = 14, 
+                          axis_title_size = 14, axis_text_size = 14, 
+                          title_color = "black", 
+                          subtitle_color = "black",
+                          axis_title_color = "black", 
+                          axis_text_color = "black",
+                          title_bold = TRUE, axis_bold = FALSE,
+                          xaxis_color = "gray", xaxis_type = "solid",
+                          theme_style = theme_bw()){
+  # ncf_correlog is a list object exported from ncf::correlog() but can also be a dataframe with named columns
+  
+  # prepare a data set for plotting based on the list components or data frame columns
+  dat <- data.frame(
+    n = ncf_correlog[[n_col]],
+    mean = ncf_correlog[[mean_col]],
+    cor = ncf_correlog[[cor_col]],
+    # xint = ncf_correlog[[xint_col]],
+    pval = ncf_correlog[[pval_col]]
+  )
+  # create a variable to help plot the hollow and solid points
+  # If a permutation test was performed, values significant at a nominal (two-sided) 5%-level 
+  # will be represented by filled circles and non-significant values by open circles.
+  dat$sig <- ifelse(dat$pval * 2 < alpha, TRUE, FALSE)
+  
+  ## Start the plot
+  g <- ggplot(dat) +
+    theme_style +
+    geom_hline(yintercept = 0, color = xaxis_color, linetype = xaxis_type) +
+    # geom_point(aes(x=mean, y=cor, shape=sig), size=pt_size, color=pt_color) +
+    # geom_line(aes(x=mean, y=cor, group=1), size=ln_size, color=ln_color, linetype=ln_type) +
+    lemon::geom_pointline(aes(x=mean, y=cor, shape=sig, group=1),
+                          size = pt_size, color = pt_color, 
+                          linetype = ln_type, linesize = ln_size, 
+                          linecolor = ln_color) +
+    scale_shape_manual(values=c("TRUE"=19, "FALSE"=1),
+                       labels=c("TRUE"="Sig.", "FALSE"="Not Sig."),
+                       guide=FALSE) +
+    labs(x=x_label, y=y_label) 
+  
+  ## add a title
+  if(!is.null(name_col)){#include a title if column for name is provided or list object has a list item for name
+    if(!is.null(plot_title)){ #if plot_title is a string, separate the plot_title with the other name by a ':'
+      nm <- unique(as.character(ncf_correlog[[name_col]]))
+      g <- g + 
+        ggtitle(label = paste(plot_title, ": ", nm, sep=""), subtitle = plot_subtitle)
+    } else{ #if plot_title is null, only include the name
+      nm <- unique(as.character(ncf_correlog[[name_col]]))
+      g <- g + 
+        ggtitle(label = nm, subtitle = plot_subtitle)
+    }
+  } else{ # if there is no name column, only include the plot_title of interest (can be NULL)
+    g <- g + 
+      ggtitle(label = plot_title, subtitle = plot_subtitle) 
+  }
+  
+  ## modify theme
+  g <- g + 
+    theme(plot.title = element_text(size=title_size, 
+                                    hjust=0.5, #change to a value between 0 (left) and 1 (right)
+                                    face=ifelse(title_bold == TRUE, "bold", "plain"), 
+                                    color=title_color),
+          plot.subtitle = element_text(size=subtitle_size, 
+                                       hjust=0.5, 
+                                       color=subtitle_color),
+          axis.title = element_text(size=axis_title_size, 
+                                    face=ifelse(axis_bold == TRUE, "bold", "plain"), 
+                                    color=axis_title_color),
+          axis.text = element_text(size=axis_text_size, #?theme
+                                   color=axis_text_color), #?element_text
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank())
+  return(g)
+}
+
+dg_1 <- select(dg,site.id:map.lon.dd, dissolved.n2o, WSA9, WSA9_NAME, ONOFFNET, nitrate.n.result,chla.result.vol, MAX.BF, temp.surf, temp.bottom, o2.surf, o2.bottom, lake.orgn, state, size_cat)
+names(dg_1)
+dg_1 <- clean_names(dg_1)
+names(dg_1)
+dg_1 <- dg_1 %>% mutate(log_n2o = round(log(dissolved_n2o),3))
+## Subset dg_1 by visit_no == 1
+dg_visit1 <- dg_1 %>% dplyr::filter(visit_no == 1)
+
+## Perform the same test for each wsa9 using Z = "log_n2o"
+## Start by defining a function
+ncf_correlog <- function(dat, # data to send to ncf::correlog
+                         z_col, # name of the column in the dataset for water quality parameter
+                         i = 50, # increment to be used in ncf::correlog
+                         N = 1000, # number of resamples in ncf::correlog
+                         x_col = "map_lon_dd", # name of the column in the dataset for longitude
+                         y_col = "map_lat_dd", # name of the column in the dataset for latitude
+                         lat_lon = TRUE, # if the x and y coordinates for ncf::correlog are lat and lon
+                         rem_missing = FALSE, # argument of ncf::correlog
+                         run_quietly = FALSE){ # argument of ncf::correlog
+  library(ncf)
+  
+  X = dat[[x_col]] #grabs the x_col from data.frame
+  Y = dat[[y_col]] #grabs the y_col from data.frame
+  Z = dat[[z_col]] #grabs the z_col from data.frame
+  
+  ## Use ncf::correlog
+  crlg <- ncf::correlog(x = X, y = Y, z = Z, 
+                        increment = i, resamp = N, latlon = lat_lon, 
+                        na.rm = rem_missing, quiet = run_quietly)
+  return(crlg)
+} 
+
+## Split the dataframe by each wsa9: turns the data frame into a list 
+##   where each list item is a data frame filtered to that wsa9
+## lapply applies the function ncf_correlog on each list object (a data frame)
+## the final product is a list of correlog objects
+## this is similar to looping
+## setting seed so get same result from permutations ncf::correlog function
+set.seed(2035)
+log_n2o_correlog_list <- dg_visit1 %>%
+  split(.$wsa9) %>% # '.' means use the data frame that preceded this line
+  lapply(function(x) ncf_correlog(dat = x, z_col = "log_n2o")) 
+#ncf_correlog is the function name, 
+#dat is the paramater that takes a data.frame,
+#z_col is the parameter that takes a string name for a column of a water quality paramater
+
+## look at the structure: list of 9 items where each item is a 
+##   list containing 6 items: n, mean, correlation, x.int, p, call
+str(log_n2o_correlog_list)
+
+## Function to remove the list item 'call' which is of a different length 
+##   than the other items (n, mean, correlation, x.int, and p)
+## This function will also convert each list item to a dataframe
+crlg_to_dat <- function(ncf_correlog, # ncf_correlog is a list object that was output from ncf::correlog
+                        n_col = "n", 
+                        mean_col = "mean.of.class",
+                        cor_col = "correlation",
+                        xint_col = "x.intercept",
+                        pval_col = "p"){ 
+  dat <- data.frame(
+    n = ncf_correlog[[n_col]],
+    mean = ncf_correlog[[mean_col]],
+    cor = ncf_correlog[[cor_col]],
+    xint = ncf_correlog[[xint_col]],
+    pval = ncf_correlog[[pval_col]]
+  )
+  return(dat)
+}
+
+## log_n20_correlog_list is already a list so there is no need to split
+log_n2o_correlog_dats <- lapply(log_n2o_correlog_list, 
+                                function(x) crlg_to_dat(ncf_correlog = x))
+str(log_n2o_correlog_dats) # each item in the list is now a dataframe
+
+## combine into one dataframe to grab the wsa9 (notice the name no longer has an s at the end)
+
+log_n2o_correlog_dat <- log_n2o_correlog_dats %>%
+  dplyr::bind_rows(., .id = "wsa9")
+
+str(log_n2o_correlog_dat)
+head(log_n2o_correlog_dat)
+## Make individual plots, the following object is a list containing a ggplot for each
+log_n2o_correlog_plots <- log_n2o_correlog_dat %>%
+  split(.$wsa9) %>% # splits the data frame by wsa9, which creates a list with 9 data frames
+  lapply(function(x) plot_correlog(ncf_correlog = x, # use the data.frame for each wsa9 to make a plot
+                                   plot_title = NULL,
+                                   n_col = "n", 
+                                   mean_col = "mean",
+                                   cor_col = "cor",
+                                   xint_col = "xint",
+                                   pval_col = "pval",
+                                   name_col = "wsa9",
+                                   title_size = 14, 
+                                   subtitle_size = 14, 
+                                   axis_title_size = 14, 
+                                   axis_text_size = 14))
+## if hard to see writing run again but increase "title_size", "subtitle_size", "axis_title_size", "axis_text_size" as needed 
+
+## Look at each piece individually or scroll through
+length(log_n2o_correlog_plots) # shows 9 items
+# log_n20_correlog_plots
+log_n2o_correlog_plots$CPL #or log_n20_correlog_plots[["CPL"]] or log_n2o_correlog_plots[[1]]
+# log_n2o_correlog_plots$NAP
+# log_n2o_correlog_plots$NPL
+# log_n2o_correlog_plots$SAP
+# log_n2o_correlog_plots$SPL
+# log_n2o_correlog_plots$TPL
+# log_n2o_correlog_plots$UMW
+# log_n2o_correlog_plots$WMT
+# log_n2o_correlog_plots$XER
+
+## cowplot package (or other) can be used to group them into a matrix plot
+log_n2o_correlog_plotgrid <- 
+  cowplot::plot_grid(plotlist=log_n2o_correlog_plots, ncol=3)
+print(log_n2o_correlog_plotgrid) # click 'Zoom' in plots quadrant, takes a few seconds to render
+## can save the plot using 
+# cowplot::ggsave(filename = "FILENAME.png", #saves a png version of the figure to the working folder
+#                 plot = log_n20_correlog_plotgrid)
+## can change .png to other forms
+## can play with scale, width, and height to adjust the output of the figure saved to the png file
+
+## alternatively, can make a facet plot since log_n20_correlog_dat is a dataframe in the correct format
+names(log_n2o_correlog_dat) #"n"    "mean" "cor"  "xint" "pval" "wsa9"
+
+## create column to shape point, sig == TRUE means two-sided test < 0.05
+log_n2o_correlog_dat$sig <- ifelse(log_n2o_correlog_dat$pval * 2 < 0.05,
+                                   TRUE, FALSE) 
+head(log_n2o_correlog_dat)
+## can change wsa9 to a factor to arrange what order the plots are shown, otherwise default arranges them alphabetically
+# log_n20_correlog_dat$wsa9 <- factor(log_n20_correlog_dat, 
+#                                     levels = c("CPL", "NAP", "NPL", "SAP", "SPL", "TPL", "UMW", "WMT", "XER"))
+
+## make facet plot
+log_n2o_correlog_facetplot <- ggplot(log_n2o_correlog_dat) +
+  geom_hline(yintercept = 0, color = "gray", linetype = "solid") +
+  # geom_point(aes(x=mean, y=cor, shape=sig), size=I(2), color="black") +
+  # geom_line(aes(x=mean, y=cor, group=1), size=I(0.5), color="black", linetype="solid") +
+  lemon::geom_pointline(aes(x=mean, y=cor, shape=sig, group=1), 
+                        size=I(2), color = "black", 
+                        linetype = "solid", linesize = I(0.5), 
+                        linecolor = "black") +
+  scale_shape_manual(values=c("TRUE"=19, "FALSE"=1), 
+                     labels=c("TRUE"="Sig.", "FALSE"="Not Sig."),
+                     guide=FALSE) +
+  facet_wrap(~wsa9, ncol=3, scales="free") +
+  labs(x="Distance (mean-of-class)", y="Correlation") +
+  theme_bw() +
+  theme(plot.title = element_text(size=14, hjust=0.5, 
+                                  face="bold", color="black"),
+        plot.subtitle = element_text(size=14, hjust=0.5, color="black"),
+        axis.title = element_text(size=14, face="plain", color="black"),
+        axis.text = element_text(size=14, color="black"),
+        strip.text = element_text(size=14, color="black", face="bold"),
+        strip.background = element_rect(fill="gray", color="black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+print(log_n2o_correlog_facetplot)
+## can save the plot using 
+# cowplot::ggsave(filename = "FILENAME2.png", #saves a png version of the figure to the working folder
+#                 plot = log_n20_correlog_facetplot) 
+## can change .png to other forms
+## can play with scale, width, and height to adjust the output of the figure saved to the png file
+
+
+
+```
+
 ```
 
 ## Semivariograms
