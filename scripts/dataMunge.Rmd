@@ -71,7 +71,7 @@ names(wt.area)
 ```
 
 
-The two data sets will be merged on the 'site id' fields.  The dissolved gas file contains data from sites in Alaska that are not present in the weights + lake area file.  Alaska sites are not an offical component of the NLA and will removed from this analysis.
+The two data sets will be merged on the 'site id' fields.  The dissolved gas file contains data from sites in Alaska that are not present in the weights + lake area file.  Alaska sites are not an official component of the NLA and will removed from this analysis.
 ``` {r}
 # Will merge datasets on SITE_ID field.  Are all site.id values in dg present in wt.area?
 dg %>% filter(!(site.id %in% wt.area$SITE_ID)) %>% distinct(site.id) # no.
@@ -134,7 +134,7 @@ table(dg$size_cat, useNA = "ifany")
 ## Calculate buoyancy frequency
 Water temperature and dissolved oxygen profiles were measured at the index site in each waterbody.  A variety of metrics describing the degree of thermal stratification can be extracted from these data.  Webb et al. used the Brunt–Väisälä buoyancy frequency as an indicator of thermal stratification strength.  We will do the same here.
 
-Three site visits contain only NA for temperature.  Four site visits contain only NA for do.  Two of the incidents include notes that sonde was forgotten or malfunctioning. Two of the three sites were revisited later in the study and temperature data were collected.  Lets assign data from the second site visit to the first visit when no temperature data were collected.  This leaves only NLA17_CA-10082, visit 1, without temperature data.  NLA17_ID-10084 has no DO data and was not resampled.  Data sheet comment "Probe not measuring LDO for all depths".
+Three site visits contain only NA for temperature.  Four site visits contain only NA for DO.  Two of the incidents include notes that sonde was forgotten or malfunctioning. Two of the three sites were revisited later in the study and temperature data were collected.  Lets assign data from the second site visit to the first visit when no temperature data were collected.  This leaves only NLA17_CA-10082, visit 1, without temperature data.  NLA17_ID-10084 has no DO data and was not resampled.  Data sheet comment "Probe not measuring LDO for all depths".
 
 ```{r}
 # Sites that only contain NAs.
@@ -358,7 +358,7 @@ No DO NLA17_ID-10084, visit 1 due to probe malfunction.
 temp.o2.2 %>% filter(SITE_ID == "NLA17_ID-10084", VISIT_NO == 1)
 ```
 
-No deep DO or temp at NLA17_MI-10073, visit 1 becuase no measurement taken at deepst recorded depth.  Replace with next shallowest measurement. 
+No deep DO or temp at NLA17_MI-10073, visit 1 because no measurement taken at deepest recorded depth.  Replace with next shallowest measurement. 
 
 ```{r}
 # look at raw data
@@ -380,7 +380,7 @@ o2.s.b <- o2.s.b %>%
                              select(TEMPERATURE.M) %>% pull()))
 ```
 
-No surface temp at NLA17_NE-10060, visit 1 becuase no measurement taken at shallowest depth (0m). Replace with next shallowest measurement (0.1m) 
+No surface temp at NLA17_NE-10060, visit 1 because no measurement taken at shallowest depth (0m). Replace with next shallowest measurement (0.1m) 
 
 ```{r}
 # look at raw data
@@ -396,7 +396,7 @@ o2.s.b <- o2.s.b %>%
 ```
 
 
-No bottom temp or O2 at NLA17_NH-10063, visit 1 becuase no measurement taken at greatest depth (8m). Replace with next deeptest measurement (7.5m) 
+No bottom temp or O2 at NLA17_NH-10063, visit 1 because no measurement taken at greatest depth (8m). Replace with next deepest measurement (7.5m) 
 
 ```{r}
 # look at raw data
@@ -418,7 +418,7 @@ o2.s.b <- o2.s.b %>%
 ```
 
 
-No surface temp or O2 at NLA17_OR-10003, visit 1 becuase no measurement taken at shallowest depth (0m). Replace with next shallowest measurement (0.1m) 
+No surface temp or O2 at NLA17_OR-10003, visit 1 because no measurement taken at shallowest depth (0m). Replace with next shallowest measurement (0.1m) 
 
 ```{r}
 # look at raw data
@@ -439,7 +439,7 @@ o2.s.b <- o2.s.b %>%
                              select(OXYGEN.M) %>% pull()))
 ```
 
-No bottom temp or O2 at NLA17_SD-10057, visit 1 becuase no measurement taken at deepest depth (4m). Replace with next deepest measurement (3m) 
+No bottom temp or O2 at NLA17_SD-10057, visit 1 because no measurement taken at deepest depth (4m). Replace with next deepest measurement (3m) 
 
 ```{r}
 # look at raw data
@@ -461,7 +461,7 @@ o2.s.b <- o2.s.b %>%
 ```
 
 
-Only remainining missing values are observations where field crews noted sonde malfunctions.
+Only remaining missing values are observations where field crews noted sonde malfunctions.
 
 ```{r}
 o2.s.b %>% filter(is.na(temp.surf) | is.na(temp.bottom) | is.na(o2.surf) | is.na(temp.bottom))

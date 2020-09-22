@@ -49,7 +49,7 @@ The dissolved gas data were currated the 'NLA' dissolved gas project in RStudio.
 load(paste0(localPath, 
             "/Environmental Protection Agency (EPA)/",
             "ORD NLA17 Dissolved Gas - Documents/",
-            "inputData/dg.2020-02-24.RData"))
+            "inputData/dg.2020-02-25.RData"))
 
 # Strip out air samples
 dg <- dg %>% filter(sample.source == "DG")

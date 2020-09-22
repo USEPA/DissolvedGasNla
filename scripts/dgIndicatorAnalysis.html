@@ -11,7 +11,7 @@
 
 
 
-<meta name="date" content="2020-02-25" />
+<meta name="date" content="2020-02-26" />
 
 <title>Analysis of NLA17 Dissolved Gas Indicator</title>
 
@@ -2846,7 +2846,7 @@ div.tocify {
 
 
 <h1 class="title toc-ignore">Analysis of NLA17 Dissolved Gas Indicator</h1>
-<h4 class="date">2020-02-25</h4>
+<h4 class="date">2020-02-26</h4>
 
 </div>
 
@@ -2878,7 +2878,7 @@ toEPA &lt;- function(X1){
 load(paste0(localPath, 
             &quot;/Environmental Protection Agency (EPA)/&quot;,
             &quot;ORD NLA17 Dissolved Gas - Documents/&quot;,
-            &quot;inputData/dg.2020-02-24.RData&quot;))
+            &quot;inputData/dg.2020-02-25.RData&quot;))
 
 # Strip out air samples
 dg &lt;- dg %&gt;% filter(sample.source == &quot;DG&quot;)</code></pre>
@@ -4175,7 +4175,7 @@ dg %&gt;%
 ## Missing treated using: &#39;pairwise.complete.obs&#39;</code></pre>
 <div data-pagedtable="false">
 <script data-pagedtable-source type="application/json">
-{"columns":[{"label":["rowname"],"name":[1],"type":["chr"],"align":["left"]},{"label":["dissolved.n2o"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["MeanDUsed"],"name":[3],"type":["dbl"],"align":["right"]},{"label":["ph.result"],"name":[4],"type":["dbl"],"align":["right"]},{"label":["nitrate.n.result"],"name":[5],"type":["dbl"],"align":["right"]},{"label":["ntl.lab.result"],"name":[6],"type":["dbl"],"align":["right"]},{"label":["chla.result.vol"],"name":[7],"type":["dbl"],"align":["right"]},{"label":["ptl.lab.result"],"name":[8],"type":["dbl"],"align":["right"]},{"label":["surftemp"],"name":[9],"type":["dbl"],"align":["right"]}],"data":[{"1":"dissolved.n2o","2":"NA","3":"-0.18638910","4":"0.02254028","5":"0.263462238","6":"0.14770981","7":"0.021119122","8":"0.018514980","9":"-0.003198016"},{"1":"MeanDUsed","2":"-0.186389099","3":"NA","4":"-0.04576722","5":"-0.057896555","6":"-0.05040949","7":"-0.072397902","8":"-0.045683152","9":"-0.111573941"},{"1":"ph.result","2":"0.022540278","3":"-0.04576722","4":"NA","5":"0.050357881","6":"0.35082026","7":"0.130921384","8":"0.199329666","9":"0.036647812"},{"1":"nitrate.n.result","2":"0.263462238","3":"-0.05789656","4":"0.05035788","5":"NA","6":"0.63642389","7":"0.003491226","8":"0.008152604","9":"0.014157113"},{"1":"ntl.lab.result","2":"0.147709807","3":"-0.05040949","4":"0.35082026","5":"0.636423890","6":"NA","7":"0.455480363","8":"0.470472951","9":"0.039410391"},{"1":"chla.result.vol","2":"0.021119122","3":"-0.07239790","4":"0.13092138","5":"0.003491226","6":"0.45548036","7":"NA","8":"0.837262873","9":"0.079883430"},{"1":"ptl.lab.result","2":"0.018514980","3":"-0.04568315","4":"0.19932967","5":"0.008152604","6":"0.47047295","7":"0.837262873","8":"NA","9":"0.012976065"},{"1":"surftemp","2":"-0.003198016","3":"-0.11157394","4":"0.03664781","5":"0.014157113","6":"0.03941039","7":"0.079883430","8":"0.012976065","9":"NA"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+{"columns":[{"label":["rowname"],"name":[1],"type":["chr"],"align":["left"]},{"label":["dissolved.n2o"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["MeanDUsed"],"name":[3],"type":["dbl"],"align":["right"]},{"label":["ph.result"],"name":[4],"type":["dbl"],"align":["right"]},{"label":["nitrate.n.result"],"name":[5],"type":["dbl"],"align":["right"]},{"label":["ntl.lab.result"],"name":[6],"type":["dbl"],"align":["right"]},{"label":["chla.result.vol"],"name":[7],"type":["dbl"],"align":["right"]},{"label":["ptl.lab.result"],"name":[8],"type":["dbl"],"align":["right"]},{"label":["surftemp"],"name":[9],"type":["dbl"],"align":["right"]}],"data":[{"1":"dissolved.n2o","2":"NA","3":"-0.18638910","4":"0.02254028","5":"0.263884225","6":"0.14770981","7":"0.021119122","8":"0.018514980","9":"-0.003198016"},{"1":"MeanDUsed","2":"-0.186389099","3":"NA","4":"-0.04576722","5":"-0.058225621","6":"-0.05040949","7":"-0.072397902","8":"-0.045683152","9":"-0.111573941"},{"1":"ph.result","2":"0.022540278","3":"-0.04576722","4":"NA","5":"0.050590909","6":"0.35082026","7":"0.130921384","8":"0.199329666","9":"0.036647812"},{"1":"nitrate.n.result","2":"0.263884225","3":"-0.05822562","4":"0.05059091","5":"NA","6":"0.63642389","7":"0.002721961","8":"0.008152604","9":"0.015913505"},{"1":"ntl.lab.result","2":"0.147709807","3":"-0.05040949","4":"0.35082026","5":"0.636423890","6":"NA","7":"0.455480363","8":"0.470472951","9":"0.039410391"},{"1":"chla.result.vol","2":"0.021119122","3":"-0.07239790","4":"0.13092138","5":"0.002721961","6":"0.45548036","7":"NA","8":"0.837262873","9":"0.079883430"},{"1":"ptl.lab.result","2":"0.018514980","3":"-0.04568315","4":"0.19932967","5":"0.008152604","6":"0.47047295","7":"0.837262873","8":"NA","9":"0.012976065"},{"1":"surftemp","2":"-0.003198016","3":"-0.11157394","4":"0.03664781","5":"0.015913505","6":"0.03941039","7":"0.079883430","8":"0.012976065","9":"NA"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
   </script>
 </div>
 <p>Categorization and regression analysis (CART), which can accomodate non-linear and interactive relationships, also identified nitrate as the most important predictor variable. The CART analysis did not identify splits associated with ecoregion.</p>
