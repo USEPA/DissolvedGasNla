@@ -46,11 +46,11 @@ The dissolved gas data were currated the 'NLA' dissolved gas project in RStudio.
 
 
 ```{r}
-# Read data file
-load(paste0(localPath, 
-            "/Environmental Protection Agency (EPA)/",
-            "ORD NLA17 Dissolved Gas - Documents/",
-            "inputData/dg.2020-02-25.RData"))
+# Read data file commented out b/c dataMunge.Rmd creates dg assignment based on latest text file nla17gasDataAggregated_2020-10-08.txt
+ # load(paste0(localPath, 
+ #            "/Environmental Protection Agency (EPA)/",
+ #            "ORD NLA17 Dissolved Gas - Documents/",
+ #            "inputData/dg.2020-10-09.RData"))
 
 # Strip out air samples
 dg <- dg %>% filter(sample.source == "DG")
@@ -67,6 +67,16 @@ The data file contains `r dg %>% distinct(site.id, visit.no) %>% summarize(n = n
 dg %>% 
   select(dissolved.co2, dissolved.ch4, dissolved.n2o, co2.sat.ratio, ch4.sat.ratio, n2o.sat.ratio) %>%
   {summary(.)}
+
+dg %>% filter(WSA9 != "AK") %>%
+  select(dissolved.co2, dissolved.ch4, dissolved.n2o, co2.sat.ratio, ch4.sat.ratio, n2o.sat.ratio) %>%
+  {summary(.)}
+
+dg %>% filter(WSA9 != "AK") %>% 
+  ggplot(aes(as.factor(x = WSA9), y = log(dissolved.n2o))) + geom_boxplot()
+
+dg %>% filter(WSA9 != "AK") %>% 
+  ggplot(aes(as.factor(x = WSA9), y = (n2o.sat.ratio))) + geom_boxplot()
 ```
 
 
@@ -241,7 +251,7 @@ names(dg)
 
 dg_1 <- select(dg,site.id:map.lon.dd, dissolved.co2, dissolved.ch4, dissolved.n2o, WSA9, WSA9_NAME)
 names(dg_1)
-dg_1 <- clean_names(dg_1) # underscores are "safer" names used in GIS
+dg_1 <- clean_names(dg_1) %>% filter(wsa9 != "AK") # underscores are "safer" names used in GIS
 names(dg_1)
 # To enable spatial analysis of the data, the dataframe will be converted to a 'simple features' (sf) object.
 # Define coordinates
@@ -249,10 +259,10 @@ coords <- data.frame(longitude = dg_1$map_lon_dd, latitude = dg_1$map_lat_dd)
 
 dg_sf1 <- st_as_sf(dg_1, coords = c("map_lon_dd", "map_lat_dd"), 
                   crs = 4269) %>% # standard for lat/lon
-  st_transform(4326) # 4326 is just the EPSG identifier of WGS84. WGS84 comprises a standard coordinate frame for the Earth, a datum/reference ellipsoid for raw altitude data, and a gravitational equipotential surface (the geoid) that defines the nominal sea level.
+  st_transform(5070) # 4326 is just the EPSG identifier of WGS84. WGS84 comprises a standard coordinate frame for the Earth, a datum/reference ellipsoid for raw altitude data, and a gravitational equipotential surface (the geoid) that defines the nominal sea level.  5070 is for Albers equal Area.
 st_crs(dg_sf1)
 
-dg_sf1 <- filter(dg_sf1, sample_source == "DG") # now 1185 obs.
+dg_sf1 <- filter(dg_sf1, sample_source == "DG") # now 1219 obs vs. previously 1185 obs., why change in sample size
 st_crs(dg_sf1)
 
 # Bryan suggested EPSG 4326
@@ -264,20 +274,22 @@ st_crs(dg_sf1)
 # Check CRS
 st_crs(ecoR)
 names(ecoR)
-
-ecoR1 <- st_transform(ecoR, 4326) %>% 
+# changed from 4326 to 5070
+ecoR1 <- st_transform(ecoR, 5070) %>% 
   select(OBJECTID, WSA9, WSA9_NAME) # Grab variables of interest
 st_crs(ecoR1)
 
 # write out dg.sf and ecoR as two layers in geopackage, gpkg, geodatabase
 # 74. Creating a geopackage geodatabase, then adding more layers
 # https://github.com/r-spatial/sf/issues/392
+# creating a _v1.gpkg having large sample size and should be in Albers
 st_write(dg_sf1, dsn = file.path(getwd(), "nladg_v1.gpkg"), layer = "dg_sf1", driver = "GPKG", quiet = FALSE)
 st_layers("nladg_v1.gpkg")
 
 # https://gis.stackexchange.com/questions/223240/writing-multiple-layers-to-geopackage-using-writeogr-in-r
-st_write(ecoR1, dsn = file.path(getwd(), "nladg_v1.gpkg"), layer = "ecoR1", driver = "GPKG", update = TRUE, quiet = FALSE)
+st_write(ecoR1, dsn = file.path(getwd(), "nladg_v1.gpkg"), layer = "ecoR1", driver = "GPKG", append = TRUE, quiet = FALSE)
 st_layers("nladg_v1.gpkg")
+#CPL polygon not appearing in geopackage
 
 names(dg_sf1)
 summary(dg_sf1$dissolved_n2o) # matches Roy's stats
