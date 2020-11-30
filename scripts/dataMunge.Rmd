@@ -25,7 +25,7 @@ localPath <- Sys.getenv("USERPROFILE")
 # Purpose
 The purpose of this .rmd is to prepare the data set for subsequent modeling.  The data will be written as .RData object and stored at the shared documents library associated with this project: https://usepa.sharepoint.com/sites/ORD_NLA17_Dissolved_Gas
 
-The dissolved gas data were currated in the 'NLA' dissolved gas project in RStudio.  The code can be found at a private github repository (https://github.com/USEPA/NLA).  After aggregating across duplicate samples, the data were written to nla17gasDataAggregated_2020-10-07.txt in the documents library associated with the 'ORD NLA17 Dissolved Gas' Private Group on SharePoint (https://usepa.sharepoint.com/sites/ORD_NLA17_Dissolved_Gas).  When synced to a local computer, the documents library can be read directly with R, after identifying the local directory path.
+The dissolved gas data were curated in the 'NLA' dissolved gas project in RStudio.  The code can be found at a private github repository (https://github.com/USEPA/NLA).  After aggregating across duplicate samples, the data were written to nla17gasDataAggregated_2020-11-10.txt in the documents library associated with the 'ORD NLA17 Dissolved Gas' Private Group on SharePoint (https://usepa.sharepoint.com/sites/ORD_NLA17_Dissolved_Gas).  When synced to a local computer, the documents library can be read directly with R, after identifying the local directory path.
 
 # Data
 ## Read data
@@ -36,20 +36,22 @@ Below we read in the data files.
 dg <- read.table(file = paste0(localPath, 
                                "/Environmental Protection Agency (EPA)/",
                                "ORD NLA17 Dissolved Gas - Documents/",
-                               "inputData/nla17gasDataAggregated_2020-10-08.txt"),
-                 header = TRUE, sep = "\t", as.is = TRUE) 
+                               "inputData/nla17gasDataAggregated_2020-11-10.txt"),
+                 header = TRUE, sep = "\t", as.is = TRUE) %>%
+  filter(sample.source == "DG", # pull out dissolved gas and leave out gas samples
+         !grepl("AK", site.id)) # omit alaska sites
 ```
 
 
 
 ## Manipulate
-Implement unit conversion and create source/sink column:
+### Implement unit conversion and create source/sink column:
 ``` {r}
 dg <- dg %>%
   # unit conversion
-  mutate(dissolved.ch4 = dissolved.ch4 * 1000000, # mol/L -> umol/L
-         dissolved.co2 = dissolved.co2 * 1000000, # mol/L -> umol/L,
-         dissolved.n2o = dissolved.n2o * 1000000000, # mol/L -> nmol/L
+  mutate(dissolved.ch4.umol = dissolved.ch4 * 1000000, # mol/L -> umol/L
+         dissolved.co2.umol = dissolved.co2 * 1000000, # mol/L -> umol/L,
+         dissolved.n2o.nmol = dissolved.n2o * 1000000000, # mol/L -> nmol/L
          # add source/sink column
          co2.src.snk = ifelse(co2.sat.ratio > 1, "source", "sink"),
          ch4.src.snk = ifelse(ch4.sat.ratio > 1, "source", "sink"),
@@ -57,10 +59,105 @@ dg <- dg %>%
 ```
 
 
+### Calculate emission rate. 
+The emission rate is the mass flux of a gas into or out of a waterbody.  Emission rates are typically expressed as mass m^-2^ day^-1^.  The phrase 'emission rate' is used interchangeably with 'Flux rate' and is often reported in the literature as (F~gas~), where the subscript 'gas' refers to the gas of interest (i.e. N~2~O, CO~2~, CH~4~).  Emission rate can be  calculated as the product of gas^\*^ and the gas transfer velocity (k):
+
+F~gas~ = gas^\*^ * k
+
+where gas^\*^ is the difference between the observed (gas~obs~) and equilibrium (gas~eq~) dissolved gas concentration:
+
+gas^\*\ = (gas~obs~) - (gas~eq~)
+
+where a positive value indicates the waterbody is a source of the gas and a negative value indicates the waterbody is a sink.
+
+The gas transfer velocity (k; cm h^-1^) is a measure of the physical interaction between the waterbody and the atmosphere.  Wavy and turbulent waterbodies have high gas transfer velocities whereas calm waterbodies have low values.  k was not measured in the 2017 National Lakes Assessment, but was estimated from wind speed and lake area (Vachon, D., and Y. T. Prairie (2013), The ecosystem size and shape dependence of gas transfer velocity versus wind speed relationships in lakes, Can. J. Fish. Aquat. Sci., 70(12), 1757-1764, doi:10.1139/cjfas-2013-0241):
+
+k~600~ = 2.51 + 1.48 * U~10~ + 0.39 * U~10~ * log~10~Lake area
+
+where k~600~ is the gas transfer velocity normalized to CO~2~ at 20 ^o^C, U10 is wind speed 10m above the water surface.  Wind speed was obtained on a 7.5km grid from the ERA-5 Land database and overlaid on the NLA sampling points.  U~10~ was averaged between sunrise and sunset for each site, assuming that daytime wind conditions are best matched with the dissolved gas measurements which were conducted during the day.
+
+k~600~ is a standardized value that must be corrected for the differences in diffusivity among gases and water temperature at the sampling sites.  These corrections will be implemented at a later date and emission rates will be calculated using k600 for now.
+
+
+```{r}
+dg <- dg %>% 
+  mutate(
+    # f.ch4 umol CH4/m2/d 
+    f.ch4 = ((dissolved.ch4 - (sat.ch4 * 1000000))*1000) * # 1000000 mol -> umol.  1000 L to m3
+           (k600.day * (24/100)), # 24 hour to day.  100 cm to m
+    # f.co2 umol CO2/m2/d
+    f.co2 = ((dissolved.co2 - (sat.co2 * 1000000))*1000) * # 1000000 mol -> umol.  1000 L to m3
+           (k600.day * (24/100)), # 24 hour to day.  100 cm to m
+        # f.n2o nmol N2O/m2/d
+    f.n2o = ((dissolved.n2o - (sat.n2o * 1000000000))*1000) * # 1000000 mol -> nmol.  1000 L to m3
+           (k600.day * (24/100)), # 24 hour to day.  100 cm to m
+    # total flux of CH4 per day kmol CH4 day-1
+    f.ch4.d = f.ch4 * area.ha * 10000 * (1/10^9), # 1ha = 10,000 m2. 10^9 umol->mmol->mol->kmol
+    # total flux of CO2 per day kmol CO2 day-1
+    f.co2.d = f.co2 * area.ha * 10000 * (1/10^9), # 1ha = 10,000 m2. 10^9 umol->mmol->mol->kmol
+    # total flux of N2O per day mol N2O day-1
+    f.n2o.d = f.n2o * area.ha * 10000 * (1/10^9)) %>% # 1ha = 10,000 m2. 10^9 nmol->umol->mmol->mol
+         filter(state != "AK", sample.source == "DG")
+
+
+```
+
+## Emission rate for population estimate
+Tom Kincaid created a file to be used for population estimates.  Lets add our emission rates estimates to this file.  We can then use Tom's code to construct population estimates of emission rates.
+```{r}
+cdf <- read.csv(paste0(localPath,
+            "/Environmental Protection Agency (EPA)/",
+            "ORD NLA17 Dissolved Gas - Documents/",
+            "inputData/populationEstimates/",
+            "NLA17_DissolvedGases_forPopEst.csv"))
+
+# although data I provided Tom (nla17gasAggregatedForPopEst2019-10-23.txt) included data from both visits,
+# data used for population estimates included only visit one.  I don't know rationale for this, but will
+# do the same with the revised file here.
+unique(cdf$VISIT_NO) # 1
+dg.1 <- dg %>% filter(visit.no == 1)
+
+# even after filtering, dg has 85 more observations than cdf
+dim(cdf) # 1005, 81
+dim(dg.1) # 1090, 396
+
+# which observations in filtered dg, not in cdf?
+# many of these are handpicked (HP) sites.  Others not sure
+# why are excluded
+dg.1 %>% filter(!(dg.1$site.id %in% cdf$SITE_ID)) %>%
+  select(site.id) %>%
+  as_tibble() %>% print(n=Inf)
+
+
+# using left_join to exclude sites from dg.1 that Tom did
+# not include in cdf (see above).  Presumably the excluded sites
+# are not probability sites
+cdf.dg <- left_join(cdf, 
+                    select(dg.1, site.id, visit.no, f.ch4, f.co2, 
+                           f.n2o, f.ch4.d, f.co2.d, f.n2o.d) %>%
+                      # rename for consistency with Tom's data
+                      rename_all(~stringr::str_to_upper(.)) %>% 
+                      rename_all(~stringr::str_replace_all(., '\\.', '_')))
+
+
+dim(cdf.dg) # 1005, 87 same as cdf above, so good
+
+write.csv(cdf.dg, 
+          paste0(localPath,
+            "/Environmental Protection Agency (EPA)/",
+            "ORD NLA17 Dissolved Gas - Documents/",
+            "inputData/populationEstimates/",
+            "NLA17_DissolvedGases_forPopEst.jb.csv"))
+
+                
+
+```
+
+
 ## Write out data
 Write out final .RData object.
 ```{r}
-save(dg, file = paste0(localPath, 
+save(dg, file = paste0(localPath,
                        "/Environmental Protection Agency (EPA)/",
                        "ORD NLA17 Dissolved Gas - Documents/",
                        "inputData/dg.", Sys.Date(), ".RData"))

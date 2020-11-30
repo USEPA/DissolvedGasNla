@@ -1,0 +1,193 @@
+---
+title: "Cumulative Distribution Function (CDF) Estimates for the NLA 2017 Survey"
+author: "Tom Kincaid originally, modified by Jake Beaulieu"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: html_document
+---
+
+## Purpose
+Calculate CDF estimates for the NLA 2017 survey.
+
+## History
+Created: November 5, 2019
+  
+Revised: December 12, 2019 to calculate estimates using the SRS variance
+         estimator in addition to the local mean variance estimator
+         
+         November 2020, expanded to include estimates of N2O emission rates.
+  
+```{r, echo=FALSE}
+
+# Attach the Hmisc and spsurvey packages
+library(Hmisc)
+library(spsurvey)
+
+# Print the date and session information
+cat(date(), "\n\n")
+cat("Session Information:\n\n")
+sessionInfo()
+
+# Read the file containing data for CDF estimates
+#cdf <- read.csv("L:/Priv/ARM Data/NLA 2017/Data Prep/Dissolved Gases/NLA17_DissolvedGases_forPopEst.csv")
+
+# modified file to include N2O emission rates.  See "Users\JBEAULIE\OneDrive - Environmental Protection Agency (EPA)\gitRepository\DissolvedGasNla\scripts\dataMunge.Rmd" for details
+# updated file path
+cdf <- read.csv(file = paste0(localPath, 
+                              "/Environmental Protection Agency (EPA)/",
+                              "ORD NLA17 Dissolved Gas - Documents/",
+                              "inputData/populationEstimates/",
+                              "NLA17_DissolvedGases_forPopEst.JB.csv"))
+nr <- nrow(cdf)
+
+# Reorder levels for the lake size class (AREA_CAT6) variable
+levels(cdf$AREA_CAT6) <- list(
+   "(1,4]" = "(1,4]",
+   "(4,10]" = "(4,10]",
+   "(10,20]" = "(10,20]",
+   "(20,50]" = "(20,50]",
+   ">50" = ">50")
+
+# Reorder levels for the lake U.S. Forest Service (FS_EW) variable
+levels(cdf$FS_EW) <- list(
+   "East" = "East",
+   "West" = "West",
+   "Not_USFS" = "Not_USFS")
+
+# Print the initial six lines in the cdf data frame
+cat("\n\nThe initial six lines in the cdf data frame follow:\n\n")
+head(cdf)
+
+# Print the final six lines in the survey cdf data frame
+cat("\n\nThe final six lines in the cdf data frame follow:\n\n")
+tail(cdf)
+
+# Print summary information for the response variables
+cat("\n\nSummary Information for Response Variables\n")
+temp <- match(c("CH4_SAT_RATIO", "CO2_SAT_RATIO", "DELTA_13_CH4_C",
+   "DELTA_13_CO2_C", "DISSOLVED_CH4", "DISSOLVED_CO2", "DISSOLVED_N2O",
+    "N2O_SAT_RATIO", "F_N2O", "F_N2O_D"), names(cdf))
+for(c in temp) {
+   cat("\n")
+   print(describe(cdf[, c], descript=names(cdf)[c]))
+}
+
+#
+# Calculate CDF estimates using the local mean variance estimator
+#
+
+# Create the sites data frame, which identifies sites to use in the analysis
+sites <- data.frame(siteID=cdf$SITE_ID,
+                    Use=rep(TRUE, nr))
+
+# Create the subpop data frame, which defines populations and subpopulations for
+# which estimates are desired
+subpop <- data.frame(siteID=cdf$SITE_ID,
+                     National=rep("National", nr),
+                     LAKE_ORGN=cdf$LAKE_ORGN,
+                     AREA_CAT6=cdf$AREA_CAT6,
+                     #  > 1 hour with all variables and subpopulations
+                     # AG_ECO3_NM=cdf$AG_ECO3_NM,
+                      AG_ECO9_NM=cdf$AG_ECO9_NM
+                     # EPA_REG=cdf$EPA_REG,
+                     # MAJ_BAS_NM=cdf$MAJ_BAS_NM,
+                     # HUC2_NM=cdf$HUC2_NM,
+                     # OWN_NARS=cdf$OWN_NARS,
+                     # FS_EW=cdf$FS_EW
+)
+
+# Create the design data frame, which identifies the weight, x-coordinate, and
+# y-coordinate for each site ID
+design <- data.frame(siteID=cdf$SITE_ID,
+                     wgt=cdf$WGT_TP,
+                     xcoord=cdf$XCOORD,
+                     ycoord=cdf$YCOORD)
+
+# Create the data.cont data frame, which specifies the variables to use in the
+# analysis.  > 1 hour with all variables.
+data.cont <- data.frame(siteID=cdf$SITE_ID,
+                        # CH4_SAT_RATIO=cdf$CH4_SAT_RATIO,
+                        # CO2_SAT_RATIO=cdf$CO2_SAT_RATIO,
+                        # DELTA_13_CH4_C=cdf$DELTA_13_CH4_C,
+                        # DELTA_13_CO2_C=cdf$DELTA_13_CO2_C,
+                        # DISSOLVED_CH4=cdf$DISSOLVED_CH4,
+                        # DISSOLVED_CO2=cdf$DISSOLVED_CO2,
+                        # DISSOLVED_N2O=cdf$DISSOLVED_N2O,
+                        # N2O_SAT_RATIO=cdf$N2O_SAT_RATIO,
+                        F_N2O = cdf$F_N2O) # diffusive N2O nmol N2O m-2 day-1
+ 
+```
+
+```{r, echo=FALSE, results="hide"}
+
+# Calculate the estimates
+cat("\n\nCalculate CDF estimates using the local mean variance estimator\n")
+if(exists("warn.df")) rm("warn.df")
+CDF_Estimates <- cont.analysis(sites, subpop, design, data.cont) # < 1 hour with all variables. 1 minute with F_N2O
+
+```
+
+```{r, echo=FALSE}
+
+# Check for warning messages and print them if any exist
+if(exists("warn.df")) {
+   cat("\nWarning messages generated during the call to cat.analysis:\n")
+   warnprnt()
+} else {
+   cat("\nNo warning messages were generated during the call to cat.analysis.\n")
+}
+
+# # Write CDF estimates as a comma-separated value (csv) file
+# eval(parse(text = paste0("write.csv(CDF_Estimates$CDF, 'NLA_2017_CDF_Estimates_Local_Mean_",
+#    gsub("-", "", Sys.Date()), ".csv', row.names=FALSE)")))
+# 
+# # Create a PDF file containing plots of the CDF estimates
+# eval(parse(text = paste0("cont.cdfplot('CDF_Estimates_Local_Mean_", gsub("-", "", Sys.Date()), ".pdf', CDF_Estimates$CDF)")))
+
+# Write percentile estimates as a csv file
+write.csv(CDF_Estimates$Pct, 
+          paste0(localPath, 
+                 "/Environmental Protection Agency (EPA)/",
+                 "ORD NLA17 Dissolved Gas - Documents/",
+                 "inputData/populationEstimates/",
+                 "NLA_2017_Percentile_Estimates_Local_Mean_F_N2O_JB",
+                 gsub("-", "", Sys.Date()), ".csv"),
+          row.names=FALSE)
+
+```
+
+#
+# Calculate CDF estimates using the SRS variance estimator
+#
+
+```{r, echo=FALSE, results="hide"}
+
+# Calculate the estimates
+cat("\n\nCalculate CDF estimates using the SRS variance estimator\n")
+if(exists("warn.df")) rm("warn.df")
+CDF_Estimates <- cont.analysis(sites, subpop, design, data.cont,
+   vartype = "SRS")
+
+```
+
+```{r, echo=FALSE}
+
+# Check for warning messages and print them if any exist
+if(exists("warn.df")) {
+   cat("\nWarning messages generated during the call to cat.analysis:\n")
+   warnprnt()
+} else {
+   cat("\nNo warning messages were generated during the call to cat.analysis.\n")
+}
+
+# Write CDF estimates as a comma-separated value (csv) file
+eval(parse(text = paste0("write.csv(CDF_Estimates$CDF, 'NLA_2017_CDF_Estimates_SRS_",
+   gsub("-", "", Sys.Date()), ".csv', row.names=FALSE)")))
+
+# Create a PDF file containing plots of the CDF estimates
+eval(parse(text = paste0("cont.cdfplot('CDF_Estimates_SRS_", gsub("-", "", Sys.Date()), ".pdf', CDF_Estimates$CDF)")))
+
+# Write percentile estimates as a csv file
+eval(parse(text = paste0("write.csv(CDF_Estimates$Pct, 'NLA_2017_Percentile_Estimates_SRS_",
+   gsub("-", "", Sys.Date()), ".csv', row.names=FALSE)")))
+
+```

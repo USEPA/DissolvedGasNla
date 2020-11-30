@@ -11,7 +11,7 @@
 
 
 
-<meta name="date" content="2020-10-08" />
+<meta name="date" content="2020-11-25" />
 
 <title>Data Munging</title>
 
@@ -2775,7 +2775,7 @@ div.tocify {
 
 
 <h1 class="title toc-ignore">Data Munging</h1>
-<h4 class="date">2020-10-08</h4>
+<h4 class="date">2020-11-25</h4>
 
 </div>
 
@@ -2783,7 +2783,7 @@ div.tocify {
 <div id="purpose" class="section level1">
 <h1><span class="header-section-number">1</span> Purpose</h1>
 <p>The purpose of this .rmd is to prepare the data set for subsequent modeling. The data will be written as .RData object and stored at the shared documents library associated with this project: <a href="https://usepa.sharepoint.com/sites/ORD_NLA17_Dissolved_Gas" class="uri">https://usepa.sharepoint.com/sites/ORD_NLA17_Dissolved_Gas</a></p>
-<p>The dissolved gas data were currated in the ‘NLA’ dissolved gas project in RStudio. The code can be found at a private github repository (<a href="https://github.com/USEPA/NLA" class="uri">https://github.com/USEPA/NLA</a>). After aggregating across duplicate samples, the data were written to nla17gasDataAggregated_2020-10-07.txt in the documents library associated with the ‘ORD NLA17 Dissolved Gas’ Private Group on SharePoint (<a href="https://usepa.sharepoint.com/sites/ORD_NLA17_Dissolved_Gas" class="uri">https://usepa.sharepoint.com/sites/ORD_NLA17_Dissolved_Gas</a>). When synced to a local computer, the documents library can be read directly with R, after identifying the local directory path.</p>
+<p>The dissolved gas data were curated in the ‘NLA’ dissolved gas project in RStudio. The code can be found at a private github repository (<a href="https://github.com/USEPA/NLA" class="uri">https://github.com/USEPA/NLA</a>). After aggregating across duplicate samples, the data were written to nla17gasDataAggregated_2020-11-10.txt in the documents library associated with the ‘ORD NLA17 Dissolved Gas’ Private Group on SharePoint (<a href="https://usepa.sharepoint.com/sites/ORD_NLA17_Dissolved_Gas" class="uri">https://usepa.sharepoint.com/sites/ORD_NLA17_Dissolved_Gas</a>). When synced to a local computer, the documents library can be read directly with R, after identifying the local directory path.</p>
 </div>
 <div id="data" class="section level1">
 <h1><span class="header-section-number">2</span> Data</h1>
@@ -2794,26 +2794,215 @@ div.tocify {
 dg &lt;- read.table(file = paste0(localPath, 
                                &quot;/Environmental Protection Agency (EPA)/&quot;,
                                &quot;ORD NLA17 Dissolved Gas - Documents/&quot;,
-                               &quot;inputData/nla17gasDataAggregated_2020-10-08.txt&quot;),
-                 header = TRUE, sep = &quot;\t&quot;, as.is = TRUE) </code></pre>
+                               &quot;inputData/nla17gasDataAggregated_2020-11-10.txt&quot;),
+                 header = TRUE, sep = &quot;\t&quot;, as.is = TRUE) %&gt;%
+  filter(sample.source == &quot;DG&quot;, # pull out dissolved gas and leave out gas samples
+         !grepl(&quot;AK&quot;, site.id)) # omit alaska sites</code></pre>
 </div>
 <div id="manipulate" class="section level2">
 <h2><span class="header-section-number">2.2</span> Manipulate</h2>
-<p>Implement unit conversion and create source/sink column:</p>
+<div id="implement-unit-conversion-and-create-sourcesink-column" class="section level3">
+<h3><span class="header-section-number">2.2.1</span> Implement unit conversion and create source/sink column:</h3>
 <pre class="r"><code>dg &lt;- dg %&gt;%
   # unit conversion
-  mutate(dissolved.ch4 = dissolved.ch4 * 1000000, # mol/L -&gt; umol/L
-         dissolved.co2 = dissolved.co2 * 1000000, # mol/L -&gt; umol/L,
-         dissolved.n2o = dissolved.n2o * 1000000000, # mol/L -&gt; nmol/L
+  mutate(dissolved.ch4.umol = dissolved.ch4 * 1000000, # mol/L -&gt; umol/L
+         dissolved.co2.umol = dissolved.co2 * 1000000, # mol/L -&gt; umol/L,
+         dissolved.n2o.nmol = dissolved.n2o * 1000000000, # mol/L -&gt; nmol/L
          # add source/sink column
          co2.src.snk = ifelse(co2.sat.ratio &gt; 1, &quot;source&quot;, &quot;sink&quot;),
          ch4.src.snk = ifelse(ch4.sat.ratio &gt; 1, &quot;source&quot;, &quot;sink&quot;),
          n2o.src.snk = ifelse(n2o.sat.ratio &gt; 1, &quot;source&quot;, &quot;sink&quot;))</code></pre>
 </div>
+<div id="calculate-emission-rate." class="section level3">
+<h3><span class="header-section-number">2.2.2</span> Calculate emission rate.</h3>
+<p>The emission rate is the mass flux of a gas into or out of a waterbody. Emission rates are typically expressed as mass m<sup>-2</sup> day<sup>-1</sup>. The phrase ‘emission rate’ is used interchangeably with ‘Flux rate’ and is often reported in the literature as (F<sub>gas</sub>), where the subscript ‘gas’ refers to the gas of interest (i.e. N<sub>2</sub>O, CO<sub>2</sub>, CH<sub>4</sub>). Emission rate can be calculated as the product of gas<sup>*</sup> and the gas transfer velocity (k):</p>
+<p>F<sub>gas</sub> = gas<sup>*</sup> * k</p>
+<p>where gas<sup>*</sup> is the difference between the observed (gas<sub>obs</sub>) and equilibrium (gas<sub>eq</sub>) dissolved gas concentration:</p>
+<p>gas^* = (gas<sub>obs</sub>) - (gas<sub>eq</sub>)</p>
+<p>where a positive value indicates the waterbody is a source of the gas and a negative value indicates the waterbody is a sink.</p>
+<p>The gas transfer velocity (k; cm h<sup>-1</sup>) is a measure of the physical interaction between the waterbody and the atmosphere. Wavy and turbulent waterbodies have high gas transfer velocities whereas calm waterbodies have low values. k was not measured in the 2017 National Lakes Assessment, but was estimated from wind speed and lake area (Vachon, D., and Y. T. Prairie (2013), The ecosystem size and shape dependence of gas transfer velocity versus wind speed relationships in lakes, Can. J. Fish. Aquat. Sci., 70(12), 1757-1764, <a href="doi:10.1139/cjfas-2013-0241" class="uri">doi:10.1139/cjfas-2013-0241</a>):</p>
+<p>k<sub>600</sub> = 2.51 + 1.48 * U<sub>10</sub> + 0.39 * U<sub>10</sub> * log<sub>10</sub>Lake area</p>
+<p>where k<sub>600</sub> is the gas transfer velocity normalized to CO<sub>2</sub> at 20 <sup>o</sup>C, U10 is wind speed 10m above the water surface. Wind speed was obtained on a 7.5km grid from the ERA-5 Land database and overlaid on the NLA sampling points. U<sub>10</sub> was averaged between sunrise and sunset for each site, assuming that daytime wind conditions are best matched with the dissolved gas measurements which were conducted during the day.</p>
+<p>k<sub>600</sub> is a standardized value that must be corrected for the differences in diffusivity among gases and water temperature at the sampling sites. These corrections will be implimented at a later date and emission rates will be calculated using k600 for now.</p>
+<pre class="r"><code>dg &lt;- dg %&gt;% 
+  mutate(
+    # f.ch4 umol CH4/m2/d 
+    f.ch4 = ((dissolved.ch4 - (sat.ch4 * 1000000))*1000) * # 1000000 mol -&gt; umol.  1000 L to m3
+           (k600.day * (24/100)), # 24 hour to day.  100 cm to m
+    # f.co2 umol CO2/m2/d
+    f.co2 = ((dissolved.co2 - (sat.co2 * 1000000))*1000) * # 1000000 mol -&gt; umol.  1000 L to m3
+           (k600.day * (24/100)), # 24 hour to day.  100 cm to m
+        # f.n2o nmol N2O/m2/d
+    f.n2o = ((dissolved.n2o - (sat.n2o * 1000000000))*1000) * # 1000000 mol -&gt; nmol.  1000 L to m3
+           (k600.day * (24/100)), # 24 hour to day.  100 cm to m
+    # total flux of CH4 per day kmol CH4 day-1
+    f.ch4.d = f.ch4 * area.ha * 10000 * (1/10^9), # 1ha = 10,000 m2. 10^9 umol-&gt;mmol-&gt;mol-&gt;kmol
+    # total flux of CO2 per day kmol CO2 day-1
+    f.co2.d = f.co2 * area.ha * 10000 * (1/10^9), # 1ha = 10,000 m2. 10^9 umol-&gt;mmol-&gt;mol-&gt;kmol
+    # total flux of N2O per day mol N2O day-1
+    f.n2o.d = f.n2o * area.ha * 10000 * (1/10^9)) %&gt;% # 1ha = 10,000 m2. 10^9 nmol-&gt;umol-&gt;mmol-&gt;mol
+         filter(state != &quot;AK&quot;, sample.source == &quot;DG&quot;)</code></pre>
+</div>
+</div>
+<div id="emission-rate-for-population-estimate" class="section level2">
+<h2><span class="header-section-number">2.3</span> Emission rate for population estimate</h2>
+<p>Tom Kincaid created a file to be used for population estimates. Lets add our emission rates estimates to this file. We can then use Tom’s code to construct population estimates of emission rates.</p>
+<pre class="r"><code>cdf &lt;- read.csv(paste0(localPath,
+            &quot;/Environmental Protection Agency (EPA)/&quot;,
+            &quot;ORD NLA17 Dissolved Gas - Documents/&quot;,
+            &quot;inputData/populationEstimates/&quot;,
+            &quot;NLA17_DissolvedGases_forPopEst.csv&quot;))
+
+# although data I provided Tom (nla17gasAggregatedForPopEst2019-10-23.txt) included data from both visits,
+# data used for population estimates included only visit one.  I don&#39;t know rationale for this, but will
+# do the same with the revised file here.
+unique(cdf$VISIT_NO) # 1</code></pre>
+<pre><code>## [1] 1</code></pre>
+<pre class="r"><code>dg.1 &lt;- dg %&gt;% filter(visit.no == 1)
+
+# even after filtering, dg has 85 more observations than cdf
+dim(cdf) # 1005, 81</code></pre>
+<pre><code>## [1] 1005   81</code></pre>
+<pre class="r"><code>dim(dg.1) # 1090, 396</code></pre>
+<pre><code>## [1] 1090  399</code></pre>
+<pre class="r"><code># which observations in filtered dg, not in cdf?
+# many of these are handpicked (HP) sites.  Others not sure
+# why are excluded
+dg.1 %&gt;% filter(!(dg.1$site.id %in% cdf$SITE_ID)) %&gt;%
+  select(site.id) %&gt;%
+  as_tibble() %&gt;% print(n=Inf)</code></pre>
+<pre><code>## # A tibble: 106 x 1
+##     site.id       
+##     &lt;chr&gt;         
+##   1 NLA17_AL-HP001
+##   2 NLA17_AR-HP001
+##   3 NLA17_CA-10033
+##   4 NLA17_CA-10035
+##   5 NLA17_CA-HP001
+##   6 NLA17_CA-HP002
+##   7 NLA17_CO-HP002
+##   8 NLA17_CO-HP003
+##   9 NLA17_CT-HP001
+##  10 NLA17_FL-10020
+##  11 NLA17_FL-HP002
+##  12 NLA17_GA-HP001
+##  13 NLA17_GA-HP002
+##  14 NLA17_IA-HP001
+##  15 NLA17_IA-HP002
+##  16 NLA17_ID-HP001
+##  17 NLA17_ID-HP002
+##  18 NLA17_IL-HP001
+##  19 NLA17_IN-10031
+##  20 NLA17_IN-10032
+##  21 NLA17_IN-10037
+##  22 NLA17_IN-10039
+##  23 NLA17_IN-10047
+##  24 NLA17_IN-10051
+##  25 NLA17_IN-10053
+##  26 NLA17_IN-10055
+##  27 NLA17_KS-HP001
+##  28 NLA17_KS-HP002
+##  29 NLA17_KS-HP003
+##  30 NLA17_MA-HP001
+##  31 NLA17_ME-HP001
+##  32 NLA17_ME-HP002
+##  33 NLA17_ME-HP003
+##  34 NLA17_MI-HP001
+##  35 NLA17_MN-10842
+##  36 NLA17_MN-HP002
+##  37 NLA17_MN-HP003
+##  38 NLA17_MN-HP004
+##  39 NLA17_MO-HP001
+##  40 NLA17_MO-HP002
+##  41 NLA17_MO-HP003
+##  42 NLA17_MO-HP004
+##  43 NLA17_MO-HP005
+##  44 NLA17_MO-HP006
+##  45 NLA17_MO-HP007
+##  46 NLA17_MO-HP008
+##  47 NLA17_MO-HP009
+##  48 NLA17_MO-HP010
+##  49 NLA17_MT-HP001
+##  50 NLA17_MT-HP002
+##  51 NLA17_ND-10189
+##  52 NLA17_ND-HP001
+##  53 NLA17_ND-HP002
+##  54 NLA17_NE-10032
+##  55 NLA17_NE-10041
+##  56 NLA17_NE-HP004
+##  57 NLA17_NE-HP005
+##  58 NLA17_NH-10530
+##  59 NLA17_NH-10891
+##  60 NLA17_NH-10917
+##  61 NLA17_NH-10999
+##  62 NLA17_NV-HP001
+##  63 NLA17_NY-10014
+##  64 NLA17_NY-HP001
+##  65 NLA17_NY-HP003
+##  66 NLA17_OH-HP001
+##  67 NLA17_OK-10033
+##  68 NLA17_OK-10035
+##  69 NLA17_OK-10045
+##  70 NLA17_OK-HP001
+##  71 NLA17_OK-HP002
+##  72 NLA17_OK-HP004
+##  73 NLA17_OR-10037
+##  74 NLA17_OR-10106
+##  75 NLA17_OR-HP003
+##  76 NLA17_PA-HP001
+##  77 NLA17_PA-HP002
+##  78 NLA17_SC-10011
+##  79 NLA17_SC-10012
+##  80 NLA17_SC-HP002
+##  81 NLA17_SD-10057
+##  82 NLA17_SD-HP001
+##  83 NLA17_TX-10049
+##  84 NLA17_TX-HP002
+##  85 NLA17_TX-HP003
+##  86 NLA17_TX-HP004
+##  87 NLA17_TX-HP005
+##  88 NLA17_UT-10056
+##  89 NLA17_UT-HP002
+##  90 NLA17_VA-10049
+##  91 NLA17_VA-HP001
+##  92 NLA17_VA-HP003
+##  93 NLA17_VA-HP004
+##  94 NLA17_VA-HP005
+##  95 NLA17_VA-HP006
+##  96 NLA17_VA-HP007
+##  97 NLA17_VA-HP008
+##  98 NLA17_WA-10038
+##  99 NLA17_WA-HP001
+## 100 NLA17_WA-HP002
+## 101 NLA17_WA-HP003
+## 102 NLA17_WI-HP001
+## 103 NLA17_WI-HP003
+## 104 NLA17_WI-HP004
+## 105 NLA17_WY-10021
+## 106 NLA17_WY-HP001</code></pre>
+<pre class="r"><code># using left_join to exclude sites from dg.1 that Tom did
+# not include in cdf (see above).  Presumably the excluded sites
+# are not probability sites
+cdf.dg &lt;- left_join(cdf, 
+                    select(dg.1, site.id, visit.no, f.ch4, f.co2, 
+                           f.n2o, f.ch4.d, f.co2.d, f.n2o.d) %&gt;%
+                      # rename for consistency with Tom&#39;s data
+                      rename_all(~stringr::str_to_upper(.)) %&gt;% 
+                      rename_all(~stringr::str_replace_all(., &#39;\\.&#39;, &#39;_&#39;)))</code></pre>
+<pre><code>## Joining, by = c(&quot;SITE_ID&quot;, &quot;VISIT_NO&quot;)</code></pre>
+<pre class="r"><code>dim(cdf.dg) # 1005, 87 same as cdf above, so good</code></pre>
+<pre><code>## [1] 1005   87</code></pre>
+<pre class="r"><code>write.csv(cdf.dg, 
+          paste0(localPath,
+            &quot;/Environmental Protection Agency (EPA)/&quot;,
+            &quot;ORD NLA17 Dissolved Gas - Documents/&quot;,
+            &quot;inputData/populationEstimates/&quot;,
+            &quot;NLA17_DissolvedGases_forPopEst.jb.csv&quot;))</code></pre>
+</div>
 <div id="write-out-data" class="section level2">
-<h2><span class="header-section-number">2.3</span> Write out data</h2>
+<h2><span class="header-section-number">2.4</span> Write out data</h2>
 <p>Write out final .RData object.</p>
-<pre class="r"><code>save(dg, file = paste0(localPath, 
+<pre class="r"><code>save(dg, file = paste0(localPath,
                        &quot;/Environmental Protection Agency (EPA)/&quot;,
                        &quot;ORD NLA17 Dissolved Gas - Documents/&quot;,
                        &quot;inputData/dg.&quot;, Sys.Date(), &quot;.RData&quot;))</code></pre>
