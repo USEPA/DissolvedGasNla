@@ -249,9 +249,13 @@ Create a simple feature on entire dg data frame, then split out a simple feature
 library(janitor) # clean_names function
 names(dg)
 
-dg_1 <- select(dg,site.id:map.lon.dd, dissolved.co2, dissolved.ch4, dissolved.n2o, WSA9, WSA9_NAME)
+dg_1 <- select(dg,site.id:map.lon.dd, dissolved.co2, dissolved.ch4, dissolved.n2o, co2.sat.ratio, ch4.sat.ratio, n2o.sat.ratio, WSA9, WSA9_NAME)
 names(dg_1)
-dg_1 <- clean_names(dg_1) %>% filter(wsa9 != "AK") # underscores are "safer" names used in GIS
+dg_1 <- clean_names(dg_1) %>% filter(wsa9 != "AK") %>% 
+  mutate(log_n2o = round(log(dissolved_n2o),3)) %>% 
+  mutate(log_n2osatratio = round(log(n2o_sat_ratio),3))
+# underscores are "safer" names used in GIS
+
 names(dg_1)
 # To enable spatial analysis of the data, the dataframe will be converted to a 'simple features' (sf) object.
 # Define coordinates
@@ -262,7 +266,7 @@ dg_sf1 <- st_as_sf(dg_1, coords = c("map_lon_dd", "map_lat_dd"),
   st_transform(5070) # 4326 is just the EPSG identifier of WGS84. WGS84 comprises a standard coordinate frame for the Earth, a datum/reference ellipsoid for raw altitude data, and a gravitational equipotential surface (the geoid) that defines the nominal sea level.  5070 is for Albers equal Area.
 st_crs(dg_sf1)
 
-dg_sf1 <- filter(dg_sf1, sample_source == "DG") # now 1219 obs vs. previously 1185 obs., why change in sample size
+dg_sf1 <- filter(dg_sf1, sample_source == "DG") # now 1184 obs vs. previously 1185 obs., why change in sample size
 st_crs(dg_sf1)
 
 # Bryan suggested EPSG 4326
@@ -285,6 +289,10 @@ st_crs(ecoR1)
 # creating a _v1.gpkg having large sample size and should be in Albers
 st_write(dg_sf1, dsn = file.path(getwd(), "nladg_v1.gpkg"), layer = "dg_sf1", driver = "GPKG", quiet = FALSE)
 st_layers("nladg_v1.gpkg")
+
+# N.B. b/c old layer with untransformed was already in geodatabase have to delete it and then append the new layer
+st_write(dg_sf1, dsn = file.path(getwd(), "nladg_v1.gpkg"), layer = "dg_sf1", driver = "GPKG", delete_layer = TRUE, append = TRUE, quiet = FALSE)
+st_layers("nla_dg1.gpkg")
 
 # https://gis.stackexchange.com/questions/223240/writing-multiple-layers-to-geopackage-using-writeogr-in-r
 st_write(ecoR1, dsn = file.path(getwd(), "nladg_v1.gpkg"), layer = "ecoR1", driver = "GPKG", append = TRUE, quiet = FALSE)
