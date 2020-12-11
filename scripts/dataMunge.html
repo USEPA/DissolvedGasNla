@@ -1,17 +1,16 @@
 <!DOCTYPE html>
 
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html>
 
 <head>
 
 <meta charset="utf-8" />
-<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 <meta name="generator" content="pandoc" />
 <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
 
 
-<meta name="date" content="2020-11-25" />
+<meta name="date" content="2020-12-02" />
 
 <title>Data Munging</title>
 
@@ -2554,6 +2553,54 @@ window.onload = function() {
   PagedTableDoc.initAll();
 };
 </script>
+<style type="text/css">
+a.anchor-section {margin-left: 10px; visibility: hidden; color: inherit;}
+a.anchor-section::before {content: '#';}
+.hasAnchor:hover a.anchor-section {visibility: visible;}
+</style>
+<script>// Anchor sections v1.0 written by Atsushi Yasumoto on Oct 3rd, 2020.
+document.addEventListener('DOMContentLoaded', function() {
+  // Do nothing if AnchorJS is used
+  if (typeof window.anchors === 'object' && anchors.hasOwnProperty('hasAnchorJSLink')) {
+    return;
+  }
+
+  const h = document.querySelectorAll('h1, h2, h3, h4, h5, h6');
+
+  // Do nothing if sections are already anchored
+  if (Array.from(h).some(x => x.classList.contains('hasAnchor'))) {
+    return null;
+  }
+
+  // Use section id when pandoc runs with --section-divs
+  const section_id = function(x) {
+    return ((x.classList.contains('section') || (x.tagName === 'SECTION'))
+            ? x.id : '');
+  };
+
+  // Add anchors
+  h.forEach(function(x) {
+    const id = x.id || section_id(x.parentElement);
+    if (id === '') {
+      return null;
+    }
+    let anchor = document.createElement('a');
+    anchor.href = '#' + id;
+    anchor.classList = ['anchor-section'];
+    x.classList.add('hasAnchor');
+    x.appendChild(anchor);
+  });
+});
+</script>
+
+<style type="text/css">
+  code{white-space: pre-wrap;}
+  span.smallcaps{font-variant: small-caps;}
+  span.underline{text-decoration: underline;}
+  div.column{display: inline-block; vertical-align: top; width: 50%;}
+  div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+  ul.task-list{list-style: none;}
+    </style>
 
 <style type="text/css">code{white-space: pre;}</style>
 <style type="text/css">
@@ -2676,6 +2723,7 @@ summary {
   border: none;
   display: inline-block;
   border-radius: 4px;
+  background-color: transparent;
 }
 
 .tabset-dropdown > .nav-tabs.nav-tabs-open > li {
@@ -2704,6 +2752,12 @@ summary {
 }
 }
 
+@media print {
+.toc-content {
+  /* see https://github.com/w3c/csswg-drafts/issues/4434 */
+  float: right;
+}
+}
 
 .toc-content {
   padding-left: 30px;
@@ -2775,7 +2829,7 @@ div.tocify {
 
 
 <h1 class="title toc-ignore">Data Munging</h1>
-<h4 class="date">2020-11-25</h4>
+<h4 class="date">2020-12-02</h4>
 
 </div>
 
@@ -2815,33 +2869,33 @@ dg &lt;- read.table(file = paste0(localPath,
 </div>
 <div id="calculate-emission-rate." class="section level3">
 <h3><span class="header-section-number">2.2.2</span> Calculate emission rate.</h3>
-<p>The emission rate is the mass flux of a gas into or out of a waterbody. Emission rates are typically expressed as mass m<sup>-2</sup> day<sup>-1</sup>. The phrase ‘emission rate’ is used interchangeably with ‘Flux rate’ and is often reported in the literature as (F<sub>gas</sub>), where the subscript ‘gas’ refers to the gas of interest (i.e. N<sub>2</sub>O, CO<sub>2</sub>, CH<sub>4</sub>). Emission rate can be calculated as the product of gas<sup>*</sup> and the gas transfer velocity (k):</p>
-<p>F<sub>gas</sub> = gas<sup>*</sup> * k</p>
+<p>The emission rate (E<sub>gas</sub>) is the rate at which a gas crosses the air water interface and is expressed on an areal basis (i.e. mass m<sup>-2</sup> day<sup>-1</sup>). The emission rate can be converted to a flux (F<sub>gas</sub>; mass per unit time; mass d<sup>-1</sup>). In the context of emissions from waterbodies, the flux (F<sub>gas</sub>) is calculated as the product of the emission rate (E<sub>gas</sub>) and waterbody area.</p>
+<p>E<sub>gas</sub> can be calculated as the product of gas<sup>*</sup> and the gas transfer velocity (k):</p>
+<p>E<sub>gas</sub> = gas<sup>*</sup> * k</p>
 <p>where gas<sup>*</sup> is the difference between the observed (gas<sub>obs</sub>) and equilibrium (gas<sub>eq</sub>) dissolved gas concentration:</p>
 <p>gas^* = (gas<sub>obs</sub>) - (gas<sub>eq</sub>)</p>
 <p>where a positive value indicates the waterbody is a source of the gas and a negative value indicates the waterbody is a sink.</p>
 <p>The gas transfer velocity (k; cm h<sup>-1</sup>) is a measure of the physical interaction between the waterbody and the atmosphere. Wavy and turbulent waterbodies have high gas transfer velocities whereas calm waterbodies have low values. k was not measured in the 2017 National Lakes Assessment, but was estimated from wind speed and lake area (Vachon, D., and Y. T. Prairie (2013), The ecosystem size and shape dependence of gas transfer velocity versus wind speed relationships in lakes, Can. J. Fish. Aquat. Sci., 70(12), 1757-1764, <a href="doi:10.1139/cjfas-2013-0241" class="uri">doi:10.1139/cjfas-2013-0241</a>):</p>
 <p>k<sub>600</sub> = 2.51 + 1.48 * U<sub>10</sub> + 0.39 * U<sub>10</sub> * log<sub>10</sub>Lake area</p>
 <p>where k<sub>600</sub> is the gas transfer velocity normalized to CO<sub>2</sub> at 20 <sup>o</sup>C, U10 is wind speed 10m above the water surface. Wind speed was obtained on a 7.5km grid from the ERA-5 Land database and overlaid on the NLA sampling points. U<sub>10</sub> was averaged between sunrise and sunset for each site, assuming that daytime wind conditions are best matched with the dissolved gas measurements which were conducted during the day.</p>
-<p>k<sub>600</sub> is a standardized value that must be corrected for the differences in diffusivity among gases and water temperature at the sampling sites. These corrections will be implimented at a later date and emission rates will be calculated using k600 for now.</p>
+<p>k<sub>600</sub> is a standardized value that must be corrected for the differences in diffusivity among gases and water temperature at the sampling sites. These corrections will be implemented at a later date and emission rates will be calculated using k600 for now.</p>
 <pre class="r"><code>dg &lt;- dg %&gt;% 
   mutate(
-    # f.ch4 umol CH4/m2/d 
-    f.ch4 = ((dissolved.ch4 - (sat.ch4 * 1000000))*1000) * # 1000000 mol -&gt; umol.  1000 L to m3
+    # e.ch4 umol CH4/m2/d 
+    e.ch4.umol.d = ((dissolved.ch4 - (sat.ch4 * 1000000))*1000) * # 1000000 mol -&gt; umol.  1000 L to m3
            (k600.day * (24/100)), # 24 hour to day.  100 cm to m
-    # f.co2 umol CO2/m2/d
-    f.co2 = ((dissolved.co2 - (sat.co2 * 1000000))*1000) * # 1000000 mol -&gt; umol.  1000 L to m3
+    # e.co2 umol CO2/m2/d
+    e.co2.umol.d = ((dissolved.co2 - (sat.co2 * 1000000))*1000) * # 1000000 mol -&gt; umol.  1000 L to m3
            (k600.day * (24/100)), # 24 hour to day.  100 cm to m
-        # f.n2o nmol N2O/m2/d
-    f.n2o = ((dissolved.n2o - (sat.n2o * 1000000000))*1000) * # 1000000 mol -&gt; nmol.  1000 L to m3
+        # e.n2o nmol N2O/m2/d
+    e.n2o.nmol.d = ((dissolved.n2o - (sat.n2o * 1000000000))*1000) * # 1000000 mol -&gt; nmol.  1000 L to m3
            (k600.day * (24/100)), # 24 hour to day.  100 cm to m
     # total flux of CH4 per day kmol CH4 day-1
-    f.ch4.d = f.ch4 * area.ha * 10000 * (1/10^9), # 1ha = 10,000 m2. 10^9 umol-&gt;mmol-&gt;mol-&gt;kmol
+    f.ch4.km.d = e.ch4.umol.d * area.ha * 10000 * (1/10^9), # 1ha = 10,000 m2. 10^9 umol-&gt;mmol-&gt;mol-&gt;kmol
     # total flux of CO2 per day kmol CO2 day-1
-    f.co2.d = f.co2 * area.ha * 10000 * (1/10^9), # 1ha = 10,000 m2. 10^9 umol-&gt;mmol-&gt;mol-&gt;kmol
+    f.co2.km.d = e.co2.umol.d * area.ha * 10000 * (1/10^9), # 1ha = 10,000 m2. 10^9 umol-&gt;mmol-&gt;mol-&gt;kmol
     # total flux of N2O per day mol N2O day-1
-    f.n2o.d = f.n2o * area.ha * 10000 * (1/10^9)) %&gt;% # 1ha = 10,000 m2. 10^9 nmol-&gt;umol-&gt;mmol-&gt;mol
-         filter(state != &quot;AK&quot;, sample.source == &quot;DG&quot;)</code></pre>
+    f.n2o.m.d = e.n2o.nmol.d * area.ha * 10000 * (1/10^9))  # 1ha = 10,000 m2. 10^9 nmol-&gt;umol-&gt;mmol-&gt;mol</code></pre>
 </div>
 </div>
 <div id="emission-rate-for-population-estimate" class="section level2">
@@ -2863,7 +2917,7 @@ unique(cdf$VISIT_NO) # 1</code></pre>
 # even after filtering, dg has 85 more observations than cdf
 dim(cdf) # 1005, 81</code></pre>
 <pre><code>## [1] 1005   81</code></pre>
-<pre class="r"><code>dim(dg.1) # 1090, 396</code></pre>
+<pre class="r"><code>dim(dg.1) # 1090, 399</code></pre>
 <pre><code>## [1] 1090  399</code></pre>
 <pre class="r"><code># which observations in filtered dg, not in cdf?
 # many of these are handpicked (HP) sites.  Others not sure
@@ -2984,13 +3038,14 @@ dg.1 %&gt;% filter(!(dg.1$site.id %in% cdf$SITE_ID)) %&gt;%
 # not include in cdf (see above).  Presumably the excluded sites
 # are not probability sites
 cdf.dg &lt;- left_join(cdf, 
-                    select(dg.1, site.id, visit.no, f.ch4, f.co2, 
-                           f.n2o, f.ch4.d, f.co2.d, f.n2o.d) %&gt;%
+                    select(dg.1, site.id, visit.no, 
+                           e.ch4.umol.d , e.co2.umol.d, e.n2o.nmol.d, 
+                           f.ch4.km.d, f.co2.km.d, f.n2o.m.d) %&gt;%
                       # rename for consistency with Tom&#39;s data
                       rename_all(~stringr::str_to_upper(.)) %&gt;% 
                       rename_all(~stringr::str_replace_all(., &#39;\\.&#39;, &#39;_&#39;)))</code></pre>
 <pre><code>## Joining, by = c(&quot;SITE_ID&quot;, &quot;VISIT_NO&quot;)</code></pre>
-<pre class="r"><code>dim(cdf.dg) # 1005, 87 same as cdf above, so good</code></pre>
+<pre class="r"><code>dim(cdf.dg) # 1005, 86 same as cdf above, so good</code></pre>
 <pre><code>## [1] 1005   87</code></pre>
 <pre class="r"><code>write.csv(cdf.dg, 
           paste0(localPath,
@@ -3020,7 +3075,7 @@ cdf.dg &lt;- left_join(cdf,
 
 // add bootstrap table styles to pandoc tables
 function bootstrapStylePandocTables() {
-  $('tr.header').parent('thead').parent('table').addClass('table table-condensed');
+  $('tr.odd').parent('tbody').parent('table').addClass('table table-condensed');
 }
 $(document).ready(function () {
   bootstrapStylePandocTables();
@@ -3059,7 +3114,7 @@ $(document).ready(function ()  {
       theme: "bootstrap3",
       context: '.toc-content',
       hashGenerator: function (text) {
-        return text.replace(/[.\\/?&!#<>]/g, '').replace(/\s/g, '_').toLowerCase();
+        return text.replace(/[.\\/?&!#<>]/g, '').replace(/\s/g, '_');
       },
       ignoreSelector: ".toc-ignore",
       scrollTo: 0
