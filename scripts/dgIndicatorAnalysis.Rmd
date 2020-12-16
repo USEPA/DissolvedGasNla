@@ -23,6 +23,7 @@ library(tidyverse) # dplyr, ggplot
 library(janitor) # clean names
 library(spdep) # k-NN and Moran plot
 library(ncf) # ncf::correlogram
+library(lattice) # xyplot
 
 
 # Identify local path for each user
@@ -1651,6 +1652,91 @@ n2o.v.fit <- fit.variogram(n2o.v, vgm("Exp")) # refit exponential, no convergenc
 plot(co2.v, model = co2.v.fit, main = "CO2 semivariogram")
 plot(ch4.v, main = "CH4 semivariogram")
 plot(n2o.v, main = "N2O semivariogram")
+
+```
+
+## Random Semivariograms
+Semivariogram for pH shows evidence of spatial autocorrelation out to ~ 500 km compared to randomized semivariograms.  Downloaded Chapter 8 code from https://asdar-book.org/ for generating random variograms.  An initial empirical, or sample, variogram is calculated and plotted for pH, with that object saved.  Then pH values are randomly sampled and assigned to the coordinates so that a random semivariogram can be calculated.  That is done 100 times, and the gray lines of the random semivariograms are plotted with the blue line of the empirical semivariogram.
+
+
+The empirical semivariogram for surface dissolved oxygen is approximately a horizontal line, showing no evidence of spatial autocorrelation.
+```{r, random_semivar}
+names(dg)
+dg_1 <- clean_names(dg)
+# also includ WSA9, WSA9_NAME feature plus variables from Jake's 02/25/2020 email
+# added ntl.lab.result, ptl.lab.result on 06/18/2020
+# added physical variables, temperature and depth, on 06/23/2020
+# added silica and calcium based on Leon-Palmero 2020 paper 06/24/2020
+# made nitrate_n_result into binary variable nitrate_n_b b/c 1/4th of observation have 0.000 value 06/25/2020
+# added ph_result 12/14/2020
+names(dg_1)
+dg_1 <- select(dg_1,site_id:date_col, map_lat_dd, map_lon_dd, dissolved_co2_umol, dissolved_ch4_umol, dissolved_n2o_nmol, co2_sat_ratio, ch4_sat_ratio, n2o_sat_ratio, wsa9, wsa9_name, onoffnet, nitrate_n_result, chla_result_vol, ntl_lab_result, ph_result, ptl_lab_result,max_bf, temp_surf, temp_bottom, o2_surf, o2_bottom, lake_orgn, state, size_cat, silica_result, calcium_result, visit_no) %>% filter(visit_no == 1 & wsa9 != "AK")
+
+names(dg_1)
+
+#filter in View returns 514 nitrate_n_result equal to zero
+dg_1 <- dg_1 %>% mutate(log_n2o = round(log(dissolved_n2o_nmol),3)) %>%  
+  mutate(log_ntl = round(log(ntl_lab_result),3)) %>% 
+  mutate(log_ptl = round(log(ptl_lab_result),3)) %>% 
+  mutate(log_chla = round(log(chla_result_vol),1)) %>% 
+  mutate(log_si = round(log(silica_result),2)) %>% 
+  mutate(log_ca = round(log(calcium_result),2)) %>% 
+  mutate(ph_result = round(ph_result,2)) %>% 
+  mutate(nitrate_n_b = case_when(
+    nitrate_n_result <= 0.0001 ~ "low",
+    nitrate_n_result > 0.0001 ~ "high"))  
+
+dg_1$nitrate_n_b <- factor(dg_1$nitrate_n_b, levels = c("low", "high"))
+summary(dg_1$nitrate_n_b)
+
+# To enable spatial analysis of the data, the dataframe will be converted to a 'simple features' (sf) object.
+# Define coordinates
+coords <- data.frame(longitude = dg_1$map_lon_dd, latitude = dg_1$map_lat_dd)
+
+dg_sf1 <- st_as_sf(dg_1, coords = c("map_lon_dd", "map_lat_dd"), 
+                  crs = 4269) %>% # standard for lat/lon
+  st_transform(5070) # project to CONUS ALBERS for plotting 
+
+st_crs(dg_sf1)
+
+z_ph_sf1 = variogram(ph_result~1, dg_sf1)
+plot(z_ph_sf1)
+# plot(z_ph_sf1, plot.numbers = TRUE)
+# plot(z_ph_sf1, ylab = "NLA ph Semivariance")
+# plot(z_ph_sf1, cex = 0.5, type = "b", pch = 20, asp = 1, xlab = "Distance (meters)", ylab = "NLA ph semivariance")
+# z_ph_plot1 <- plot(z_ph_sf1, cex = 0.5, type = "b", pch = 20, asp = 1, xlab = "Distance (meters) ")
+
+print(xyplot(gamma ~ dist, z_ph_sf1, pch = 3, type = 'b', lwd = 2, col = 'darkblue',
+             panel = function(x, y, ...) {
+                 for (i in 1:100) {
+                     dg_sf1$random = sample(dg_sf1$ph_result)
+                     v = variogram(random ~ 1, dg_sf1)
+                     llines(v$dist, v$gamma, col = 'grey')
+                 }
+                 panel.xyplot(x, y, ...)
+             },
+             ylim = c(0, 0.8), xlab = 'distance', ylab = 'semivariance'
+))
+
+z_cressie_ph <- variogram(ph_result~1, dg_sf1, cressie = TRUE)
+plot(variogram(ph_result~1, dg_sf1, cressie = TRUE))
+
+print(xyplot(gamma ~ dist, z_cressie_ph, pch = 3, type = 'b', lwd = 2, col = 'darkblue',
+             panel = function(x, y, ...) {
+                 for (i in 1:100) {
+                     dg_sf1$random = sample(dg_sf1$ph_result)
+                     v = variogram(random ~ 1, dg_sf1, cressie = TRUE)
+                     llines(v$dist, v$gamma, col = 'grey')
+                 }
+                 panel.xyplot(x, y, ...)
+             },
+             ylim = c(0, 0.8), xlab = 'distance', ylab = 'semivariance'
+))
+
+z_do_sf1 = filter(dg_sf1, (!is.na(o2_surf))) %>% variogram(log(o2_surf)~1, .)
+plot(z_do_sf1)
+# plot(z_ph_sf1, plot.numbers = TRUE)
+plot(z_do_sf1, ylab = "NLA Surface DO Semivariance")
 
 ```
 
