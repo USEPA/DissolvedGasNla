@@ -52,7 +52,7 @@ The dissolved gas data were currated the 'NLA' dissolved gas project in RStudio.
  load(paste0(localPath,
             "/Environmental Protection Agency (EPA)/",
             "ORD NLA17 Dissolved Gas - Documents/",
-            "inputData/dg.2020-12-02.RData"))
+            "inputData/dg.2021-01-14.RData"))
 
 ```
 
@@ -474,11 +474,9 @@ Create a simple feature on entire dg data frame.  The geopackage will contain tw
 library(janitor) # clean_names function
 names(dg)
 
-<<<<<<< HEAD
-dg_1 <- select(dg,site.id:map.lon.dd, dissolved.co2, dissolved.ch4, dissolved.n2o, co2.sat.ratio, ch4.sat.ratio, n2o.sat.ratio, WSA9, WSA9_NAME)
-=======
+
 dg_1 <- select(dg,site.id:map.lon.dd, dissolved.co2.umol, dissolved.ch4.umol, dissolved.n2o.nmol, WSA9, WSA9_NAME)
->>>>>>> ca13e968a984bc044cde3b9819b3e2092894f251
+
 names(dg_1)
 dg_1 <- clean_names(dg_1) %>% filter(wsa9 != "AK") %>% 
   mutate(log_n2o = round(log(dissolved_n2o),3)) %>% 
@@ -496,11 +494,10 @@ dg_sf1 <- st_as_sf(dg_1, coords = c("map_lon_dd", "map_lat_dd"),
 st_crs(dg_sf1)
 dim(dg_sf1) # 1184 observations
 
-<<<<<<< HEAD
+
 dg_sf1 <- filter(dg_sf1, sample_source == "DG") # now 1184 obs vs. previously 1185 obs., why change in sample size
 st_crs(dg_sf1)
-=======
->>>>>>> ca13e968a984bc044cde3b9819b3e2092894f251
+
 
 # Bryan suggested EPSG 4326
 # Bryan Chastain as GeoServices suggested reducing the number of fields, and I tried that but was still unable to open the geodatabase in ArcMap 
