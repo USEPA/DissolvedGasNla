@@ -52,17 +52,25 @@ dg <- dg %>%
   mutate(dissolved.ch4.umol = dissolved.ch4 * 1000000, # mol/L -> umol/L
          dissolved.co2.umol = dissolved.co2 * 1000000, # mol/L -> umol/L,
          dissolved.n2o.nmol = dissolved.n2o * 1000000000, # mol/L -> nmol/L
+         sat.ch4.umol = sat.ch4 * 1000000, # mol/L -> umol/L
+         sat.co2.umol = sat.co2 * 1000000, # mol/L -> umol/L
+         sat.n2o.nmol =  sat.n2o * 1000000000, # mol/L -> nmol/L
          # add source/sink column
          co2.src.snk = ifelse(co2.sat.ratio > 1, "source", "sink"),
          ch4.src.snk = ifelse(ch4.sat.ratio > 1, "source", "sink"),
-         n2o.src.snk = ifelse(n2o.sat.ratio > 1, "source", "sink"))
+         n2o.src.snk = ifelse(n2o.sat.ratio > 1, "source", "sink")) %>%
+  # remove fields no longer needed
+  select(-dissolved.ch4, -dissolved.co2, -dissolved.n2o,
+         -sat.ch4, -sat.co2, - sat.n2o)
 ```
 
 
 ### Calculate emission rate. 
-The emission rate is the mass flux of a gas into or out of a waterbody.  Emission rates are typically expressed as mass m^-2^ day^-1^.  The phrase 'emission rate' is used interchangeably with 'Flux rate' and is often reported in the literature as (F~gas~), where the subscript 'gas' refers to the gas of interest (i.e. N~2~O, CO~2~, CH~4~).  Emission rate can be  calculated as the product of gas^\*^ and the gas transfer velocity (k):
+The emission rate (E~gas~) is the rate at which a gas crosses the air water interface and is expressed on an areal basis (i.e. mass m^-2^ day^-1^).  The emission rate can be converted to a flux (F~gas~; mass per unit time; mass d^-1^).  In the context of emissions from waterbodies, the flux (F~gas~) is calculated as the product of the emission rate (E~gas~) and waterbody area.  
 
-F~gas~ = gas^\*^ * k
+E~gas~ can be calculated as the product of gas^\*^ and the gas transfer velocity (k):
+
+E~gas~ = gas^\*^ * k
 
 where gas^\*^ is the difference between the observed (gas~obs~) and equilibrium (gas~eq~) dissolved gas concentration:
 
@@ -82,22 +90,21 @@ k~600~ is a standardized value that must be corrected for the differences in dif
 ```{r}
 dg <- dg %>% 
   mutate(
-    # f.ch4 umol CH4/m2/d 
-    f.ch4 = ((dissolved.ch4 - (sat.ch4 * 1000000))*1000) * # 1000000 mol -> umol.  1000 L to m3
+    # e.ch4 umol CH4/m2/d 
+    e.ch4.umol.d = ((dissolved.ch4.umol - sat.ch4.umol) * 1000) * # 1000 L to m3
            (k600.day * (24/100)), # 24 hour to day.  100 cm to m
-    # f.co2 umol CO2/m2/d
-    f.co2 = ((dissolved.co2 - (sat.co2 * 1000000))*1000) * # 1000000 mol -> umol.  1000 L to m3
+    # e.co2 umol CO2/m2/d
+    e.co2.umol.d = ((dissolved.co2.umol - sat.co2.umol) * 1000) * # 1000 L to m3
            (k600.day * (24/100)), # 24 hour to day.  100 cm to m
-        # f.n2o nmol N2O/m2/d
-    f.n2o = ((dissolved.n2o - (sat.n2o * 1000000000))*1000) * # 1000000 mol -> nmol.  1000 L to m3
+        # e.n2o nmol N2O/m2/d
+    e.n2o.nmol.d = ((dissolved.n2o.nmol - sat.n2o.nmol) * 1000) * # 1000 L to m3
            (k600.day * (24/100)), # 24 hour to day.  100 cm to m
     # total flux of CH4 per day kmol CH4 day-1
-    f.ch4.d = f.ch4 * area.ha * 10000 * (1/10^9), # 1ha = 10,000 m2. 10^9 umol->mmol->mol->kmol
+    f.ch4.km.d = e.ch4.umol.d * area.ha * 10000 * (1/10^9), # 1ha = 10,000 m2. 10^9 umol->mmol->mol->kmol
     # total flux of CO2 per day kmol CO2 day-1
-    f.co2.d = f.co2 * area.ha * 10000 * (1/10^9), # 1ha = 10,000 m2. 10^9 umol->mmol->mol->kmol
+    f.co2.km.d = e.co2.umol.d * area.ha * 10000 * (1/10^9), # 1ha = 10,000 m2. 10^9 umol->mmol->mol->kmol
     # total flux of N2O per day mol N2O day-1
-    f.n2o.d = f.n2o * area.ha * 10000 * (1/10^9)) %>% # 1ha = 10,000 m2. 10^9 nmol->umol->mmol->mol
-         filter(state != "AK", sample.source == "DG")
+    f.n2o.m.d = e.n2o.nmol.d * area.ha * 10000 * (1/10^9))  # 1ha = 10,000 m2. 10^9 nmol->umol->mmol->mol
 
 
 ```
@@ -119,7 +126,7 @@ dg.1 <- dg %>% filter(visit.no == 1)
 
 # even after filtering, dg has 85 more observations than cdf
 dim(cdf) # 1005, 81
-dim(dg.1) # 1090, 396
+dim(dg.1) # 1090, 399
 
 # which observations in filtered dg, not in cdf?
 # many of these are handpicked (HP) sites.  Others not sure
@@ -133,14 +140,15 @@ dg.1 %>% filter(!(dg.1$site.id %in% cdf$SITE_ID)) %>%
 # not include in cdf (see above).  Presumably the excluded sites
 # are not probability sites
 cdf.dg <- left_join(cdf, 
-                    select(dg.1, site.id, visit.no, f.ch4, f.co2, 
-                           f.n2o, f.ch4.d, f.co2.d, f.n2o.d) %>%
+                    select(dg.1, site.id, visit.no, 
+                           e.ch4.umol.d , e.co2.umol.d, e.n2o.nmol.d, 
+                           f.ch4.km.d, f.co2.km.d, f.n2o.m.d) %>%
                       # rename for consistency with Tom's data
                       rename_all(~stringr::str_to_upper(.)) %>% 
                       rename_all(~stringr::str_replace_all(., '\\.', '_')))
 
 
-dim(cdf.dg) # 1005, 87 same as cdf above, so good
+dim(cdf.dg) # 1005, 86 same as cdf above, so good
 
 write.csv(cdf.dg, 
           paste0(localPath,
