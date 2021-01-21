@@ -1,0 +1,329 @@
+---
+title: "Evaluating sensitivity to measurement error in dissolved gas measurements"
+author: "Roy Martin, Jake Beaulieu, Michael McManus"
+date: "`r Sys.Date()`"
+output:
+  html_notebook: 
+    depth: 4
+    fig_caption: yes
+    number_sections: yes
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    toc: yes
+#bibliography: RWM_Endnote_Library.bib
+link-citations: yes
+---
+
+<style>
+.vscroll-plot {
+    width: 800px;
+    height: 600px;
+    overflow-y: scroll;
+    overflow-x: hidden;
+}
+</style>
+
+# Background
+In this document we explore a range of models for fitting dissolved $\text{N}_2\text{O}$ data observed as part of the 2017 National Lakes Assessment (NLA).
+
+# Setup R
+```{r setup_1, include=FALSE, echo=FALSE}
+library(knitr)
+opts_knit$set(root.dir = "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/scripts")
+
+#set directories and R package library
+setwd("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/scripts")
+.libPaths("C:/Users/rmartin/Desktop/R/library")
+```
+
+```{r load_packages, warning=FALSE, message=FALSE}
+library(brms)
+library(bayesplot)
+library(kableExtra)
+library(tidyverse)
+library(ggplot2)
+library(ggExtra)
+library(gridExtra)
+
+options(mc.cores = parallel::detectCores())
+options( max.print = 2000 )
+```
+
+
+```{r utility_functions, include=FALSE}
+# Identify local path for each user
+localPath <- Sys.getenv("USERPROFILE")
+
+# Define helper functions
+# standardized formatting for column names
+toEPA <- function(X1){
+  names(X1) = tolower(names(X1))
+  names(X1) = gsub(pattern = c("\\(| |#|)|/|-|\\+|:|_"), replacement = ".", x = names(X1))
+  X1
+}
+
+#Calc geometric mean
+gm_mean = function(x, na.rm=TRUE, zero.propagate = FALSE){
+  if(any(x < 0, na.rm = TRUE)){
+    return(NaN)
+  }
+  if(zero.propagate){
+    if(any(x == 0, na.rm = TRUE)){
+      return(0)
+    }
+    exp(mean(log(x), na.rm = na.rm))
+  } else {
+    exp(sum(log(x[x > 0]), na.rm=na.rm) / length(x))
+  }
+}
+
+gm_sd = function(x, na.rm=TRUE, zero.propagate = FALSE){
+  if(any(x < 0, na.rm = TRUE)){
+    return(NaN)
+  }
+  if(zero.propagate){
+    if(any(x == 0, na.rm = TRUE)){
+      return(0)
+    }
+    exp(sd(log(x), na.rm = na.rm))
+  } else {
+    exp(sd(log(x[x > 0]), na.rm=na.rm) / length(x))
+  }
+}
+
+#calculate skew
+MySkew <- function(x) {
+     n <- length(x)
+     v <- var(x)
+     m <- mean(x)
+     third.moment <- (1/(n - 2)) * sum((x - m)^3)
+     third.moment/(var(x)^(3/2))
+ }
+
+#Center and scale by (1) sd
+MyStd <- function(x){ (x-mean(x))/(sd(x)*2)}
+
+#First letter in string to uppercase
+firstup <- function(x) {
+  substr(x, 1, 1) <- toupper(substr(x, 1, 1))
+  x}
+```
+
+# Dissolved gas concentration calculation
+
+The full equation for estimating the concentration (nM) of $N_20$ gas dissolved in water is:
+
+$$C = 10^{-6}B \frac{V_{air}(Mr_h - Mr_r)}{(8.3144598 * K * V_{water}) + H^{\theta} \exp( 2700 * ( \frac{1}{K} - \frac{1}{298.15}) * Mr_h}$$
+
+# Set up model for simulating true value
+
+```{r setvars_and_check}
+B <- 99 # barometric pressure (kPa)
+V_g <- 20 # volume of reference gas in headspace
+V_w <- 40 # volume of water below headspace
+T_c <- 23 # temperature ( C )
+C_e <- 0.055 # gas mixture ratio in headspace
+C_a <- 0.091 # gas mixture ratio in reference
+H <- 0.00024 #mol m-3 Pa, range: 0.00018 - 0.00025; Henry's law constant
+
+C <- 10e-6 * B * ( V_g * ( C_e - C_a ) / ( 8.3144598 * ( T_c + 273.15 ) * V_w ) + H * exp( 2700 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) * C_e ) 
+
+C <- C * 1e9 #convert mol to nmol
+
+round( C, 1 )
+
+```
+
+# Simulate measurement error for gas measured in water
+```{r simulate_me_Ce, message=F}
+C_me <- rep( NA, 1e4 )
+
+C_e_me <- rnorm( 1e4, C_e, 0.001 ) #m.e. in measured gas in headspace
+
+for( i in 1:length( C_me ) ){
+  C_me[ i ] <- 10e-6 * B * ( V_g * ( C_e_me[ i ] - C_a ) / ( 8.3144598 * ( T_c + 273.15 ) * V_w ) + H * exp( 2700 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) * C_e_me[ i ] )
+}
+
+qplot( x = C_e_me ) +  
+  geom_histogram( binwidth = 0.0001 ) + 
+  geom_vline( xintercept = C_e , color = 'red' ) + 
+  ggtitle( "Simulated measurement error in water gas concentration") +
+  xlab( "concentration (?)")
+
+qplot( x = C_me * 1e9 ) +  
+  geom_histogram( binwidth = 0.01 ) + 
+  geom_vline( xintercept = C , color = 'red' ) + 
+  ggtitle( "Uncertainty in N20 concentration due to measurment error") +
+  xlab( "concentration (nMol)")
+
+qplot( x = C_me * 1e9 - C ) +  
+  geom_histogram( binwidth = 0.01 ) + 
+  geom_vline( xintercept = 0 , color = 'red' ) + 
+  ggtitle( "Uncertainty in N20 concentration due to measurment error") +
+  xlab( "absolute error (nMol)")
+```
+
+
+# Simulate measurement error for gas measured in air
+```{r simulate_me_Ca, message=F}
+C_me <- rep( NA, 1e4 )
+
+C_a_me <- rnorm( 1e4, C_a, 0.001 ) #m.e. in measured gas in air
+
+for( i in 1:length( C_me ) ){
+  C_me[ i ] <- 10e-6 * B * ( V_g * ( C_e - C_a_me[ i ] ) / ( 8.3144598 * ( T_c + 273.15 ) * V_w ) + H * exp( 2700 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) * C_e )
+}
+
+qplot( x = C_a_me ) +  
+  geom_histogram( binwidth = 0.0001 ) + 
+  geom_vline( xintercept = C_a , color = 'red' ) + 
+  ggtitle( "Simulated measurement error in air gas concentration") +
+  xlab( "concentration (?)")
+
+qplot( x = C_me * 1e9 ) +  
+  geom_histogram( binwidth = 0.01 ) + 
+  geom_vline( xintercept = C , color = 'red' ) + 
+  ggtitle( "Uncertainty in N20 concentration due to measurment error") +
+  xlab( "concentration (nMol)")
+
+qplot( x = C_me * 1e9 - C ) +  
+  geom_histogram( binwidth = 0.01 ) + 
+  geom_vline( xintercept = 0 , color = 'red' ) + 
+  ggtitle( "Uncertainty in N20 concentration due to measurment error") +
+  xlab( "absolute error (nMol)")
+```
+
+# Simulate measurement error in $C_e$ and $C_a$
+```{r simulate_me_Ca_Ce, message=F}
+C_me <- rep( NA, 1e4 )
+
+for( i in 1:length( C_me ) ){
+  C_me[ i ] <- 10e-6 * B * ( V_g * ( C_e_me[ i ] - C_a_me[ i ] ) / ( 8.3144598 * ( T_c + 273.15 ) * V_w ) + H * exp( 2700 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) * C_e_me[ i ] )
+}
+
+qplot( x = C_me * 1e9 ) +  
+  geom_histogram( binwidth = 0.01 ) + 
+  geom_vline( xintercept = C , color = 'red' ) + 
+  ggtitle( "Uncertainty in N20 concentration due to measurment error") +
+  xlab( "concentration (nMol)")
+
+qplot( x = C_me * 1e9 - C ) +  
+  geom_histogram( binwidth = 0.01 ) + 
+  geom_vline( xintercept = 0 , color = 'red' ) + 
+  ggtitle( "Uncertainty in N20 concentration due to measurment error") +
+  xlab( "absolute error (nMol)")
+```
+
+# Simulate measurement error in water temperature
+```{r simulate_me_T_c, message=F}
+C_me <- rep( NA, 1e4 )
+
+T_c_me <- rnorm( 1e4, T_c, 0.1 ) #m.e. in measured water temp
+
+for( i in 1:length( C_me ) ){
+  C_me[ i ] <- 10e-6 * B * ( V_g * ( C_e - C_a ) / ( 8.3144598 * ( T_c_me[ i ] + 273.15 ) * V_w ) + H * exp( 2700 * ( 1 / ( T_c_me[ i ] + 273.15 ) - 1 / 298.15 ) ) * C_e )
+}
+
+qplot( x = T_c_me ) +  
+  geom_histogram( binwidth = 0.01 ) + 
+  geom_vline( xintercept = T_c , color = 'red' ) + 
+  ggtitle( "Simulated measurement error in temperature") +
+  xlab( "temperature (C)")
+
+qplot( x = C_me * 1e9 ) +  
+  geom_histogram( binwidth = 0.01 ) + 
+  geom_vline( xintercept = C , color = 'red' ) + 
+  ggtitle( "Uncertainty in N20 concentration due to measurment error") +
+  xlab( "concentration (nMol)")
+
+qplot( x = C_me * 1e9 - C ) +  
+  geom_histogram( binwidth = 0.01 ) + 
+  geom_vline( xintercept = 0 , color = 'red' ) + 
+  ggtitle( "Uncertainty in N20 concentration due to measurment error") +
+  xlab( "absolute error (nMol)")
+```
+
+
+# Simulate measurement error in barometric pressure
+```{r simulate_me_B, message=F}
+C_me <- rep( NA, 1e4 )
+
+B_me <- rnorm( 1e4, B, 0.25 ) #m.e. in measured water temp
+
+for( i in 1:length( C_me ) ){
+  C_me[ i ] <- 10e-6 * B_me[ i ] * ( V_g * ( C_e - C_a ) / ( 8.3144598 * ( T_c + 273.15 ) * V_w ) + H * exp( 2700 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) * C_e )
+}
+
+qplot( x = B_me ) +  
+  geom_histogram( binwidth = 0.01 ) + 
+  geom_vline( xintercept = B , color = 'red' ) + 
+  ggtitle( "Simulated measurement error in barometric pressure") +
+  xlab( "barometric pressure (kPa)")
+
+qplot( x = C_me * 1e9 ) +  
+  geom_histogram( binwidth = 0.01 ) + 
+  geom_vline( xintercept = C , color = 'red' ) + 
+  ggtitle( "Uncertainty in N20 concentration due to measurment error") +
+  xlab( "concentration (nMol)")
+
+qplot( x = C_me * 1e9 - C ) +  
+  geom_histogram( binwidth = 0.01 ) + 
+  geom_vline( xintercept = 0 , color = 'red' ) + 
+  ggtitle( "Uncertainty in N20 concentration due to measurment error") +
+  xlab( "absolute error (nMol)")
+```
+
+
+# Simulate measurement error in water volume
+```{r simulate_me_V_w, message=F}
+C_me <- rep( NA, 1e4 )
+
+V_w_me <- rnorm( 1e4, V_w, 1 ) #m.e. in measured water volume
+V_g_me <- 60 - V_w_me
+
+for( i in 1:length( C_me ) ){
+  C_me[ i ] <- 10e-6 * B * ( V_g_me[ i ] * ( C_e - C_a ) / ( 8.3144598 * ( T_c + 273.15 ) * V_w_me[ i ] ) + H * exp( 2700 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) * C_e )
+}
+
+qplot( x = V_w_me ) +  
+  geom_histogram( binwidth = 0.01 ) + 
+  geom_vline( xintercept = V_w , color = 'red' ) + 
+  ggtitle( "Simulated measurement error in water volume") +
+  xlab( "water vol (mL)")
+
+qplot( x = C_me * 1e9 ) +  
+  geom_histogram( binwidth = 0.01 ) + 
+  geom_vline( xintercept = C , color = 'red' ) + 
+  ggtitle( "Uncertainty in N20 concentration due to measurment error") +
+  xlab( "concentration (nMol)")
+
+qplot( x = C_me * 1e9 - C ) +  
+  geom_histogram( binwidth = 0.01 ) + 
+  geom_vline( xintercept = 0 , color = 'red' ) + 
+  ggtitle( "Uncertainty in N20 concentration due to measurment error") +
+  xlab( "absolute error (nMol)")
+```
+
+
+# Simulate measurement error for all observables
+```{r simulate_me_all, message=F}
+C_me <- rep( NA, 1e4 )
+
+for( i in 1:length( C_me ) ){
+  C_me[ i ] <- 10e-6 * B_me[ i ] * ( V_g_me[ i ] * ( C_e_me[ i ] - C_a_me[ i ] ) / ( 8.3144598 * ( T_c_me[ i ] + 273.15 ) * V_w_me[ i ] ) + H * exp( 2700 * ( 1 / ( T_c_me[ i ] + 273.15 ) - 1 / 298.15 ) ) * C_e )
+}
+
+
+qplot( x = C_me * 1e9 ) +  
+  geom_histogram( binwidth = 0.01 ) + 
+  geom_vline( xintercept = C , color = 'red' ) + 
+  ggtitle( "Uncertainty in N20 concentration due to measurment error") +
+  xlab( "concentration (nMol)")
+
+qplot( x = C_me * 1e9 - C ) +  
+  geom_histogram( binwidth = 0.01 ) + 
+  geom_vline( xintercept = 0 , color = 'red' ) + 
+  ggtitle( "Uncertainty in N20 concentration due to measurment error") +
+  xlab( "absolute error (nMol)")
+```
