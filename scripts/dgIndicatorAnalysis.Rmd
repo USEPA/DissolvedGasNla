@@ -48,11 +48,11 @@ The dissolved gas data were currated the 'NLA' dissolved gas project in RStudio.
 
 
 ```{r}
-# Read data file 
+# Had used dg.2021-01-14 now try dg.2021-02-01.RData to see if results change
  load(paste0(localPath,
             "/Environmental Protection Agency (EPA)/",
             "ORD NLA17 Dissolved Gas - Documents/",
-            "inputData/dg.2021-01-14.RData"))
+            "inputData/dg.2021-02-01.RData"))
 
 ```
 
@@ -67,11 +67,15 @@ dg %>%
   select(dissolved.co2.umol, dissolved.ch4.umol, dissolved.n2o.nmol, co2.sat.ratio, ch4.sat.ratio, n2o.sat.ratio) %>%
   {summary(.)}
 
-dg %>% 
-  ggplot(aes(as.factor(x = WSA9), y = log(dissolved.n2o.nmol))) + geom_boxplot()
+names(dg)
 
 dg %>% 
-  ggplot(aes(as.factor(x = WSA9), y = (n2o.sat.ratio))) + geom_boxplot()
+  ggplot(aes(as.factor(x = ag.eco9), y = log(dissolved.n2o.nmol))) + geom_boxplot()
+# shows a boxplot for NA category
+
+dg %>% 
+  ggplot(aes(as.factor(x = ag.eco9), y = (n2o.sat.ratio))) + geom_boxplot()
+# shows a boxplot for NA category
 ```
 
 
@@ -471,31 +475,53 @@ ggplot() +
 ## Geopackage
 Create a simple feature on entire dg data frame.  The geopackage will contain two simple features, the dissolved gas sampled points/lakes and the nine aggregated ecoregions.
 ```{r, geopackage, eval=FALSE, echo=FALSE,}
-library(janitor) # clean_names function
+
 names(dg)
+dg_1 <- clean_names(dg)
+names(dg_1)
+# dropped onoffnet variable as I don't think it occurs in this version of the data frame, dg.2021-01-14.RData
+dg_1 <- filter( dg_1, sample_source == "DG")
 
-
-dg_1 <- select(dg,site.id:map.lon.dd, dissolved.co2.umol, dissolved.ch4.umol, dissolved.n2o.nmol, WSA9, WSA9_NAME)
+dg_1 <- select(dg_1,site_id:date_col, map_lat_dd, map_lon_dd, dissolved_co2_umol, dissolved_ch4_umol, dissolved_n2o_nmol, co2_sat_ratio, ch4_sat_ratio, n2o_sat_ratio, ag_eco9, ag_eco9_nm, nitrate_n_result, chla_result, ntl_result, ph_result, ptl_result,max_bf, temp_surf, temp_bottom, o2_surf, o2_bottom, lake_orgn, pstl_code , area_cat6, silica_result, calcium_result, visit_no) %>% filter(visit_no == 1 & ag_eco9 != "AK")
 
 names(dg_1)
-dg_1 <- clean_names(dg_1) %>% filter(wsa9 != "AK") %>% 
-  mutate(log_n2o = round(log(dissolved_n2o),3)) %>% 
-  mutate(log_n2osatratio = round(log(n2o_sat_ratio),3))
-# underscores are "safer" names used in GIS
+str(dg_1)
 
-names(dg_1)
+dg_1 %>% 
+  ggplot(aes(as.factor(x = ag_eco9), y = log(dissolved_n2o_nmol))) + geom_boxplot()
+# now no longer show a boxplot for NA category
+
+dg_1 %>% 
+  ggplot(aes(as.factor(x = ag_eco9), y = (n2o_sat_ratio))) + geom_boxplot()
+# now no longer show a boxplot for NA category
+
+#filter in View returns 514 nitrate_n_result equal to zero
+dg_1 <- dg_1 %>% mutate(log_n2o = round(log(dissolved_n2o_nmol),3)) %>%  
+  mutate(log_ntl = round(log(ntl_result),3)) %>% 
+  mutate(log_ptl = round(log(ptl_result),3)) %>% 
+  mutate(log_chla = round(log(chla_result),1)) %>% 
+  mutate(log_si = round(log(silica_result),2)) %>% 
+  mutate(log_ca = round(log(calcium_result),2)) %>% 
+  mutate(ph_result = round(ph_result,2))
+# %>% 
+#   mutate(nitrate_n_b = case_when(
+#     nitrate_n_result <= 0.0001 ~ "low",
+#     nitrate_n_result > 0.0001 ~ "high"))  
+# 
+# dg_1$nitrate_n_b <- factor(dg_1$nitrate_n_b, levels = c("low", "high"))
+# summary(dg_1$nitrate_n_b)
+
 # To enable spatial analysis of the data, the dataframe will be converted to a 'simple features' (sf) object.
 # Define coordinates
 coords <- data.frame(longitude = dg_1$map_lon_dd, latitude = dg_1$map_lat_dd)
 
 dg_sf1 <- st_as_sf(dg_1, coords = c("map_lon_dd", "map_lat_dd"), 
                   crs = 4269) %>% # standard for lat/lon
-  st_transform(5070) # 4326 is just the EPSG identifier of WGS84. WGS84 comprises a standard coordinate frame for the Earth, a datum/reference ellipsoid for raw altitude data, and a gravitational equipotential surface (the geoid) that defines the nominal sea level.  5070 is for Albers equal Area.
-st_crs(dg_sf1)
+  st_transform(5070) # project to CONUS ALBERS for plotting 
 dim(dg_sf1) # 1184 observations
 
 
-dg_sf1 <- filter(dg_sf1, sample_source == "DG") # now 1184 obs vs. previously 1185 obs., why change in sample size
+dg_sf1 <- filter(dg_sf1, sample_source == "DG") # now 1082 obs vs. 1184 obs vs. previously 1185 obs., why change in sample size
 st_crs(dg_sf1)
 
 
@@ -517,13 +543,13 @@ st_crs(ecoR1)
 # 74. Creating a geopackage geodatabase, then adding more layers
 # https://github.com/r-spatial/sf/issues/392
 # creating a _v1.gpkg having large sample size and should be in Albers
-st_write(dg_sf1, dsn = file.path(getwd(), "nladg_v1.gpkg"), layer = "dg_sf1", driver = "GPKG", quiet = FALSE, 
-         delete_layer = TRUE) # needed, else function gives error if object already exists
+# st_write(dg_sf1, dsn = file.path(getwd(), "nladg_v1.gpkg"), layer = "dg_sf1", driver = "GPKG", quiet = FALSE, 
+#          delete_layer = TRUE) # needed, else function gives error if object already exists
 st_layers("nladg_v1.gpkg")
 
 # N.B. b/c old layer with untransformed was already in geodatabase have to delete it and then append the new layer
 st_write(dg_sf1, dsn = file.path(getwd(), "nladg_v1.gpkg"), layer = "dg_sf1", driver = "GPKG", delete_layer = TRUE, append = TRUE, quiet = FALSE)
-st_layers("nla_dg1.gpkg")
+st_layers("nladg_v1.gpkg")
 
 # https://gis.stackexchange.com/questions/223240/writing-multiple-layers-to-geopackage-using-writeogr-in-r
 st_write(ecoR1, dsn = file.path(getwd(), "nladg_v1.gpkg"), layer = "ecoR1", driver = "GPKG", append = TRUE, quiet = FALSE, delete_layer = TRUE) # needed, else function gives error if object already exists
@@ -1670,38 +1696,20 @@ plot(n2o.v, main = "N2O semivariogram")
 ```
 
 ## Random Semivariograms
-Semivariogram for pH shows evidence of spatial autocorrelation out to ~ 500 km compared to randomized semivariograms.  Downloaded Chapter 8 code from https://asdar-book.org/ for generating random variograms.  An initial empirical, or sample, variogram is calculated and plotted for pH, with that object saved.  Then pH values are randomly sampled and assigned to the coordinates so that a random semivariogram can be calculated.  That is done 100 times, and the gray lines of the random semivariograms are plotted with the blue line of the empirical semivariogram.
+Empirical semivariograms were calculated for:  pH, total nitrogen (ntl), total phosphorous (ptl), and chloropyll a (chla).  In addition, semivariograms were calculated for the dissolved gasses:  DO, N2O, CH4, and CO2. We downloaded Chapter 8 code from https://asdar-book.org/ for generating random variograms.  An initial empirical, or sample, variogram is calculated and plotted for pH, with that object saved.  Then pH values are randomly sampled and assigned to the coordinates so that a random semivariogram can be calculated.  That is done 100 times, and the gray lines of the random semivariograms are plotted with the blue line of the empirical semivariogram. Semivariogram for pH shows evidence of spatial autocorrelation out to ~ 500 km compared to randomized semivariograms.
 
-
-The empirical semivariogram for surface dissolved oxygen is approximately a horizontal line, showing no evidence of spatial autocorrelation.
+The water quality variables of pH, tnl, tpl, and chla showe strong evidence of spatial autocorrelation given the structure of their semivariograms versus randomized semivariograms.  The dissolved gasses, DO, N2O, CH4, and CO2 show none to modest spatial autocorrelation. The empirical semivariogram for surface dissolved oxygen is approximately a horizontal line, showing no evidence of spatial autocorrelation over the Euclidean distances that the lakes were sampled.  CH4 shows some autocorrelation to ~ 1000 km, but with no sill or leveling off the semivariance.
 ```{r, random_semivar}
 names(dg)
 dg_1 <- clean_names(dg)
-# also includ WSA9, WSA9_NAME feature plus variables from Jake's 02/25/2020 email
-# added ntl.lab.result, ptl.lab.result on 06/18/2020
-# added physical variables, temperature and depth, on 06/23/2020
-# added silica and calcium based on Leon-Palmero 2020 paper 06/24/2020
-# made nitrate_n_result into binary variable nitrate_n_b b/c 1/4th of observation have 0.000 value 06/25/2020
-# added ph_result 12/14/2020
 names(dg_1)
-dg_1 <- select(dg_1,site_id:date_col, map_lat_dd, map_lon_dd, dissolved_co2_umol, dissolved_ch4_umol, dissolved_n2o_nmol, co2_sat_ratio, ch4_sat_ratio, n2o_sat_ratio, wsa9, wsa9_name, onoffnet, nitrate_n_result, chla_result_vol, ntl_lab_result, ph_result, ptl_lab_result,max_bf, temp_surf, temp_bottom, o2_surf, o2_bottom, lake_orgn, state, size_cat, silica_result, calcium_result, visit_no) %>% filter(visit_no == 1 & wsa9 != "AK")
+# dropped onoffnet variable as I don't think it occurs in this version of the data frame, dg.2021-01-14.RData
+dg_1 <- filter( dg_1, sample_source == "DG")
+
+dg_1 <- select(dg_1,site_id:date_col, map_lat_dd, map_lon_dd, dissolved_co2_umol, dissolved_ch4_umol, dissolved_n2o_nmol, co2_sat_ratio, ch4_sat_ratio, n2o_sat_ratio, ag_eco9, ag_eco9_nm, nitrate_n_result, chla_result, ntl_result, ph_result, ptl_result,max_bf, temp_surf, temp_bottom, o2_surf, o2_bottom, lake_orgn, pstl_code , area_cat6, silica_result, calcium_result, visit_no) %>% filter(visit_no == 1 & ag_eco9 != "AK")
 
 names(dg_1)
-
-#filter in View returns 514 nitrate_n_result equal to zero
-dg_1 <- dg_1 %>% mutate(log_n2o = round(log(dissolved_n2o_nmol),3)) %>%  
-  mutate(log_ntl = round(log(ntl_lab_result),3)) %>% 
-  mutate(log_ptl = round(log(ptl_lab_result),3)) %>% 
-  mutate(log_chla = round(log(chla_result_vol),1)) %>% 
-  mutate(log_si = round(log(silica_result),2)) %>% 
-  mutate(log_ca = round(log(calcium_result),2)) %>% 
-  mutate(ph_result = round(ph_result,2)) %>% 
-  mutate(nitrate_n_b = case_when(
-    nitrate_n_result <= 0.0001 ~ "low",
-    nitrate_n_result > 0.0001 ~ "high"))  
-
-dg_1$nitrate_n_b <- factor(dg_1$nitrate_n_b, levels = c("low", "high"))
-summary(dg_1$nitrate_n_b)
+str(dg_1)
 
 # To enable spatial analysis of the data, the dataframe will be converted to a 'simple features' (sf) object.
 # Define coordinates
@@ -1712,6 +1720,8 @@ dg_sf1 <- st_as_sf(dg_1, coords = c("map_lon_dd", "map_lat_dd"),
   st_transform(5070) # project to CONUS ALBERS for plotting 
 
 st_crs(dg_sf1)
+## pH
+hist(dg_sf1$ph_result)
 
 z_ph_sf1 = variogram(ph_result~1, dg_sf1)
 plot(z_ph_sf1)
@@ -1729,9 +1739,10 @@ print(xyplot(gamma ~ dist, z_ph_sf1, pch = 3, type = 'b', lwd = 2, col = 'darkbl
                  }
                  panel.xyplot(x, y, ...)
              },
-             ylim = c(0, 0.8), xlab = 'distance', ylab = 'semivariance'
+             ylim = c(0, 0.8), xlab = 'distance', ylab = 'pH semivariance'
 ))
 
+# used Cressie's robust variogram b/c skewness and not wanting to transform pH as it is already on a log scale
 z_cressie_ph <- variogram(ph_result~1, dg_sf1, cressie = TRUE)
 plot(variogram(ph_result~1, dg_sf1, cressie = TRUE))
 
@@ -1744,13 +1755,222 @@ print(xyplot(gamma ~ dist, z_cressie_ph, pch = 3, type = 'b', lwd = 2, col = 'da
                  }
                  panel.xyplot(x, y, ...)
              },
-             ylim = c(0, 0.8), xlab = 'distance', ylab = 'semivariance'
+             ylim = c(0, 0.8), xlab = 'distance', ylab = 'pH semivariance'
 ))
 
-z_do_sf1 = filter(dg_sf1, (!is.na(o2_surf))) %>% variogram(log(o2_surf)~1, .)
-plot(z_do_sf1)
+## NTL
+summary(dg_sf1$ntl_result) #no NA's
+
+filter(dg_1,(!is.na(ntl_result))) %>% ggplot(., aes(ntl_result)) + geom_histogram()
+
+# log transformation ~ unimodal & symmetric
+filter(dg_1,(!is.na(ntl_result))) %>% ggplot(., aes(log(ntl_result))) + geom_histogram()
+
+# hist(dg_sf1$ntl_result)
+# hist(log(dg_sf1$ntl_result))
+
+# default cutoff and width and no transformation
+z_lntl_sf1 = variogram(log(ntl_result) ~ 1, dg_sf1)
+plot(z_lntl_sf1, ylab = "NLA NTL Semivariance")
+# set ylim for random semivariograms based on this plot
+
+# cutoff and width from King et al. paper still not working even with tranform
+z1_ntl_king = variogram(log(ntl_result) ~1, dg_sf1, cutoff=2500, width=20)
+plot(z1_ntl_king)
+
 # plot(z_ph_sf1, plot.numbers = TRUE)
-plot(z_do_sf1, ylab = "NLA Surface DO Semivariance")
+# plot(z_ph_sf1, ylab = "NLA ph Semivariance")
+# plot(z_ph_sf1, cex = 0.5, type = "b", pch = 20, asp = 1, xlab = "Distance (meters)", ylab = "NLA ph semivariance")
+# z_ph_plot1 <- plot(z_ph_sf1, cex = 0.5, type = "b", pch = 20, asp = 1, xlab = "Distance (meters) ")
+
+print(xyplot(gamma ~ dist, z_lntl_sf1, pch = 3, type = 'b', lwd = 2, col = 'darkblue',
+             panel = function(x, y, ...) {
+                 for (i in 1:100) {
+                     dg_sf1$random = sample(dg_sf1$ntl_result)
+                     v = variogram(log(random) ~ 1, dg_sf1)
+                     llines(v$dist, v$gamma, col = 'grey')
+                 }
+                 panel.xyplot(x, y, ...)
+             },
+             ylim = c(0, 1.2), xlab = 'distance', ylab = 'NTL semivariance'
+))
+
+## PTL
+summary(dg_sf1$ptl_result) # no NA's
+
+filter(dg_sf1,(!is.na(ptl_result))) %>% ggplot(., aes(ptl_result)) + geom_histogram()
+
+# log transformation ~ unimodal & symmetric
+filter(dg_sf1,(!is.na(ptl_result))) %>% ggplot(., aes(log(ptl_result))) + geom_histogram()
+
+# hist(log(dg_sf1$ntl_result))
+
+z_lptl_sf1 = filter(dg_sf1, (!is.na(ptl_result))) %>% variogram(log(ptl_result)~1, .)
+plot(z_lptl_sf1, ylab = "NLA TP Semivariance")
+# set ylim of random semivariograms based on this plot
+# plot(z_ph_sf1, plot.numbers = TRUE)
+
+# data frame with no NA's
+# dg_sf2 <- filter(dg_sf1, (!is.na(ptl_result)))
+
+print(xyplot(gamma ~ dist, z_lptl_sf1, pch = 3, type = 'b', lwd = 2, col = 'darkblue',
+             panel = function(x, y, ...) {
+                 for (i in 1:100) {
+                     dg_sf1$random = sample(dg_sf1$ptl_result)
+                     v = variogram(log(random) ~ 1, dg_sf1)
+                     llines(v$dist, v$gamma, col = 'grey')
+                 }
+                 panel.xyplot(x, y, ...)
+             },
+             ylim = c(0, 2), xlab = 'distance', ylab = 'TP semivariance'
+))
+
+## CHLA
+summary(dg_sf1$chla_result) # no NA's
+
+filter(dg_sf1,(!is.na(chla_result))) %>% ggplot(., aes(chla_result)) + geom_histogram()
+
+# log transformation not that great but use for now
+filter(dg_sf1,(!is.na(chla_result))) %>% ggplot(., aes(log(chla_result))) + geom_histogram()
+
+# hist(log(dg_sf1$ntl_result))
+
+z_lchla_sf1 = filter(dg_sf1, (!is.na(chla_result))) %>% variogram(log(chla_result)~1, .)
+plot(z_lchla_sf1, ylab = "NLA CHLA Semivariance")
+# set ylim of random semivariograms based on this plot
+# plot(z_ph_sf1, plot.numbers = TRUE)
+
+# data frame with no NA's
+# dg_sf2 <- filter(dg_sf1, (!is.na(chla_result)))
+
+print(xyplot(gamma ~ dist, z_lchla_sf1, pch = 3, type = 'b', lwd = 2, col = 'darkblue',
+             panel = function(x, y, ...) {
+                 for (i in 1:100) {
+                     dg_sf1$random = sample(dg_sf1$chla_result)
+                     v = variogram(log(random) ~ 1, dg_sf1)
+                     llines(v$dist, v$gamma, col = 'grey')
+                 }
+                 panel.xyplot(x, y, ...)
+             },
+             ylim = c(0, 2.5), xlab = 'distance', ylab = 'CHLa semivariance'
+))
+
+## DO
+summary(dg_sf1$o2_surf) # have 4 NA's
+
+filter(dg_1,(!is.na(o2_surf))) %>% ggplot(., aes(o2_surf)) + geom_histogram()
+
+# log probably too strong of transformation but use for now
+filter(dg_1,(!is.na(o2_surf))) %>% ggplot(., aes(log(o2_surf))) + geom_histogram()
+
+# hist(log(dg_sf1$ntl_result))
+
+z_ldo_sf1 = filter(dg_sf1, (!is.na(o2_surf))) %>% variogram(log(o2_surf)~1, .)
+# plot(z_ldo_sf1)
+# plot(z_ph_sf1, plot.numbers = TRUE)
+plot(z_ldo_sf1, ylab = "NLA Surface DO Semivariance")
+
+# data frame with no NA's
+dg_sf2 <- filter(dg_sf1, (!is.na(o2_surf)))
+
+print(xyplot(gamma ~ dist, z_ldo_sf1, pch = 3, type = 'b', lwd = 2, col = 'darkblue',
+             panel = function(x, y, ...) {
+                 for (i in 1:100) {
+                     dg_sf2$random = sample(dg_sf2$o2_surf)
+                     v = variogram(log(random) ~ 1, dg_sf2)
+                     llines(v$dist, v$gamma, col = 'grey')
+                 }
+                 panel.xyplot(x, y, ...)
+             },
+             ylim = c(0, 0.12), xlab = 'distance', ylab = 'NLA DO semivariance'
+))
+
+## N2O
+summary(dg_sf1$dissolved_n2o_nmol) # no NA's
+
+filter(dg_sf1, (!is.na(dissolved_n2o_nmol))) %>% ggplot(., aes(dissolved_n2o_nmol)) + geom_histogram()
+
+# unimodal, but not symmetrical
+filter(dg_sf1, (!is.na(dissolved_n2o_nmol))) %>% ggplot(., aes(log(dissolved_n2o_nmol))) + geom_histogram()
+
+z_n2o_sf1 <- filter(dg_sf1, (!is.na(dissolved_n2o_nmol))) %>% variogram(log(dissolved_n2o_nmol) ~1, .)
+plot(z_n2o_sf1, ylab = "N2O Semivariance")
+
+# change cutoff and width
+z_n2o = filter(dg_sf1, (!is.na(dissolved_n2o_nmol))) %>% variogram(log(dissolved_n2o_nmol)~1, ., cutoff = 750000, width = 25000)
+# plot(z_n2o, ylab = "N2O Semivariance", plot.numbers = TRUE)
+plot(z_n2o, ylab = "NLA N2O Semivariance")
+
+print(xyplot(gamma ~ dist, z_n2o, pch = 3, type = 'b', lwd = 2, col = 'darkblue',
+    panel = function(x, y, ...) {
+        for (i in 1:100) {
+            dg_sf1$random = sample(dg_sf1$dissolved_n2o_nmol)
+            v = variogram(log(random) ~ 1, dg_sf1, cutoff = 750000, width = 25000)
+            llines(v$dist, v$gamma, col = 'grey')
+        }
+        panel.xyplot(x, y, ...)
+    },
+    ylim = c(0, 0.35), xlab = 'distance', ylab = 'N2O semivariance'
+))
+
+## CH4
+summary(dg_1$dissolved_ch4_umo) # no NA's
+
+filter(dg_1,(!is.na(dissolved_ch4_umol))) %>% ggplot(., aes(dissolved_ch4_umol)) + geom_histogram()
+
+# log transformation looks good, ~ unimodal & symmetric
+filter(dg_1,(!is.na(dissolved_ch4_umol))) %>% ggplot(., aes(log(dissolved_ch4_umol))) + geom_histogram()
+
+z_lch4_sf1 = filter(dg_sf1, (!is.na(dissolved_ch4_umol))) %>% variogram(log(dissolved_ch4_umol)~1, .)
+plot(z_lch4_sf1, ylab = "NLA CH4 Semivariance")
+# change ylim below in random semivariogram based on this plot
+# plot(z_ph_sf1, plot.numbers = TRUE)
+
+
+# data frame with no NA's for random sampling below
+# dg_sf2 <- filter(dg_sf1, (!is.na(dissolved_ch4_umol)))
+
+print(xyplot(gamma ~ dist, z_lch4_sf1, pch = 3, type = 'b', lwd = 2, col = 'darkblue',
+             panel = function(x, y, ...) {
+                 for (i in 1:100) {
+                     dg_sf1$random = sample(dg_sf1$dissolved_ch4_umol)
+                     v = variogram(log(random) ~ 1, dg_sf1)
+                     llines(v$dist, v$gamma, col = 'grey')
+                 }
+                 panel.xyplot(x, y, ...)
+             },
+             ylim = c(0, 2), xlab = 'distance', ylab = 'NLA CH4 semivariance'
+))
+
+## CO2
+summary(dg_1$dissolved_co2_umo) # no NA's
+
+filter(dg_1,(!is.na(dissolved_co2_umol))) %>% ggplot(., aes(dissolved_co2_umol)) + geom_histogram()
+
+# log transformation, unimodal and symmetric
+filter(dg_1,(!is.na(dissolved_co2_umol))) %>% ggplot(., aes(log(dissolved_co2_umol))) + geom_histogram()
+
+# hist(log(dg_sf1$ntl_result))
+
+z_lco2_sf1 = filter(dg_sf1, (!is.na(dissolved_co2_umol))) %>% variogram(log(dissolved_co2_umol)~1, .)
+plot(z_lco2_sf1, ylab = "NLA CO2 Semivariance")
+# change ylim in random semivariogram based on this plot
+# plot(z_ph_sf1, plot.numbers = TRUE)
+
+# data frame with no NA's
+# dg_sf2 <- filter(dg_sf1, (!is.na(dissolved_co2_umol)))
+
+print(xyplot(gamma ~ dist, z_lco2_sf1, pch = 3, type = 'b', lwd = 2, col = 'darkblue',
+             panel = function(x, y, ...) {
+                 for (i in 1:100) {
+                     dg_sf1$random = sample(dg_sf1$dissolved_co2_umol)
+                     v = variogram(log(random) ~ 1, dg_sf1)
+                     llines(v$dist, v$gamma, col = 'grey')
+                 }
+                 panel.xyplot(x, y, ...)
+             },
+             ylim = c(0, 1.2), xlab = 'distance', ylab = 'NLA CO2 semivariance'
+))
 
 ```
 
@@ -1777,8 +1997,8 @@ A correlation matrix of dissolved N2O concentration and potential controlling va
 
 ```{r}
 library(corrr)
-dg %>%
-  select(dissolved.n2o.nmol, MeanDUsed, ph.result, nitrate.n.result, ntl.lab.result, chla.result.vol, ptl.lab.result, surftemp) %>%
+dg_1 %>%
+  select(index_site_depth, dissolved_n2o_nmol, ph_result, nitrate_n_result, ntl_result, chla_result, ptl_result, temp_surf) %>%
   correlate()
 ```
 
