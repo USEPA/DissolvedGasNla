@@ -36,7 +36,7 @@ Below we read in the data files.
 dg <- read.table(file = paste0(localPath, 
                                "/Environmental Protection Agency (EPA)/",
                                "ORD NLA17 Dissolved Gas - Documents/",
-                               "inputData/nla17gasDataAggregated_2021-01-13.txt"),
+                               "inputData/nla17gasDataAggregated_2021-02-01.txt"),
                  header = TRUE, sep = "\t", as.is = TRUE) %>%
   filter(!grepl("AK", site.id)) # omit Alaska sites
 ```
