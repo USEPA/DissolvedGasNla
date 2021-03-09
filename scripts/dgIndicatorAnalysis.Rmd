@@ -1698,14 +1698,14 @@ plot(n2o.v, main = "N2O semivariogram")
 ## Random Semivariograms
 Empirical semivariograms were calculated for:  pH, total nitrogen (ntl), total phosphorous (ptl), and chloropyll a (chla).  In addition, semivariograms were calculated for the dissolved gasses:  DO, N2O, CH4, and CO2. We downloaded Chapter 8 code from https://asdar-book.org/ for generating random variograms.  An initial empirical, or sample, variogram is calculated and plotted for pH, with that object saved.  Then pH values are randomly sampled and assigned to the coordinates so that a random semivariogram can be calculated.  That is done 100 times, and the gray lines of the random semivariograms are plotted with the blue line of the empirical semivariogram. Semivariogram for pH shows evidence of spatial autocorrelation out to ~ 500 km compared to randomized semivariograms.
 
-The water quality variables of pH, tnl, tpl, and chla showe strong evidence of spatial autocorrelation given the structure of their semivariograms versus randomized semivariograms.  The dissolved gasses, DO, N2O, CH4, and CO2 show none to modest spatial autocorrelation. The empirical semivariogram for surface dissolved oxygen is approximately a horizontal line, showing no evidence of spatial autocorrelation over the Euclidean distances that the lakes were sampled.  CH4 shows some autocorrelation to ~ 1000 km, but with no sill or leveling off the semivariance.
+The water quality variables of pH, tnl, tpl, and chla show strong evidence of spatial autocorrelation given the structure of their semivariograms versus randomized semivariograms.  The dissolved gasses, DO, N2O, CH4, and CO2 show none to modest spatial autocorrelation. The empirical semivariogram for surface dissolved oxygen is approximately a horizontal line, showing no evidence of spatial autocorrelation over the Euclidean distances that the lakes were sampled.  CH4 shows some autocorrelation to ~ 1000 km, but with no sill or leveling off the semivariance.
 ```{r, random_semivar}
 names(dg)
 dg_1 <- clean_names(dg)
 names(dg_1)
 # dropped onoffnet variable as I don't think it occurs in this version of the data frame, dg.2021-01-14.RData
-dg_1 <- filter( dg_1, sample_source == "DG")
 
+dg_1 <- filter( dg_1, sample_source == "DG")
 dg_1 <- select(dg_1,site_id:date_col, map_lat_dd, map_lon_dd, dissolved_co2_umol, dissolved_ch4_umol, dissolved_n2o_nmol, co2_sat_ratio, ch4_sat_ratio, n2o_sat_ratio, ag_eco9, ag_eco9_nm, nitrate_n_result, chla_result, ntl_result, ph_result, ptl_result,max_bf, temp_surf, temp_bottom, o2_surf, o2_bottom, lake_orgn, pstl_code , area_cat6, silica_result, calcium_result, visit_no) %>% filter(visit_no == 1 & ag_eco9 != "AK")
 
 names(dg_1)
@@ -1971,6 +1971,44 @@ print(xyplot(gamma ~ dist, z_lco2_sf1, pch = 3, type = 'b', lwd = 2, col = 'dark
              },
              ylim = c(0, 1.2), xlab = 'distance', ylab = 'NLA CO2 semivariance'
 ))
+
+```
+
+## Random Ecoregional Semivariogram N2O for ASLO Abstract
+I used ecoregional-specific data frames to feed into random semivariogram function.  
+```{r, ecoregion_semivar}
+
+## N2O
+summary(dg_sf1$dissolved_n2o_nmol) # no NA's
+
+filter(dg_sf1, (!is.na(dissolved_n2o_nmol))) %>% ggplot(., aes(dissolved_n2o_nmol)) + geom_histogram()
+
+# unimodal, but not symmetrical
+filter(dg_sf1, (!is.na(dissolved_n2o_nmol))) %>% filter(ag_eco9 =="XER") %>%  ggplot(., aes(log(dissolved_n2o_nmol))) + geom_histogram()
+
+# zcpl <- filter(dg_sf1, (!is.na(dissolved_n2o_nmol))) %>% filter(ag_eco9 =="CPL")
+# zcpl_variog <- variogram(log(dissolved_n2o_nmol) ~1, zcpl)
+# plot(zcpl_variog, ylab = "N2O zCPL Semivariance")
+# the 2-step process above matches the piped process below
+xer_n2o_sf1 <- filter(dg_sf1,!is.na(dissolved_n2o_nmol)) %>%
+  filter(ag_eco9 =="XER") %>% 
+  variogram(log(dissolved_n2o_nmol) ~1, .)
+plot(xer_n2o_sf1, ylab = "N2O XER Semivariance")
+
+xer <- filter(dg_sf1, (!is.na(dissolved_n2o_nmol))) %>% filter(ag_eco9 =="XER")
+
+print(xyplot(gamma ~ dist, wmt_n2o_sf1, pch = 3, type = 'b', lwd = 2, col = 'darkblue',
+    panel = function(x, y, ...) {
+        for (i in 1:100) {
+            xer$random = sample(xer$dissolved_n2o_nmol)
+            v = variogram(log(random) ~ 1, xer)
+            llines(v$dist, v$gamma, col = 'grey')
+        }
+        panel.xyplot(x, y, ...)
+    },
+    ylim = c(0, 0.35), xlab = 'distance', ylab = 'XER N2O semivariance'
+))
+
 
 ```
 
