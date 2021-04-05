@@ -1,0 +1,68 @@
+---
+title: "Create NLA Sample Frame"
+author: "Roy Martin, Jake Beaulieu, Michael McManus"
+date: "`r Sys.Date()`"
+output:
+  html_notebook: 
+    toc: yes
+    toc_depth: 4
+    toc_float: true
+    code_folding: show
+    font_size: 14
+    number_sections: true
+    theme: simplex
+---
+# Background
+Steps to import, mung, and save NLA sample frame.
+
+# Setup R
+```{r load_packages, message=FALSE, warning=FALSE}
+library(tidyverse)
+```
+
+```{r utility_functions, include=FALSE}
+# Identify local path for each user
+localPath <- Sys.getenv("USERPROFILE")
+
+# Define helper functions
+# standardized formatting for column names
+toEPA <- function(X1){
+  names(X1) = tolower(names(X1))
+  names(X1) = gsub(pattern = c("\\(| |#|)|/|-|\\+|:|_"), replacement = ".", x = names(X1))
+  X1
+}
+```
+
+# Mung and save to file
+```{r import_sample_frame, echo=TRUE, paged.print=TRUE}
+sframe <- read.csv( file = paste0( localPath,
+              "/Environmental Protection Agency (EPA)/",
+              "ORD NLA17 Dissolved Gas - Documents/",
+              "inputData/NLA_Sample_Frame.csv" ), header = T )
+
+sframe <- sframe %>%
+  filter(nla17_sf != "Exclude2017") %>%
+  filter(nla17_sf != "Exclude2017_Include2017NH") %>%
+  mutate(WSA9 = factor(ag_eco9),
+          state = factor(state),
+          size_cat = factor(area_cat6)) %>% 
+  select(WSA9, state, size_cat, area_ha, perim_km) %>% 
+  filter(state != "DC") %>%
+  filter(state != "HI") %>%
+  droplevels() %>%
+  mutate(WSA9 = fct_drop(WSA9)) %>% # remove NA level
+  #filter( size_cat != "(0,1]" ) %>%
+  mutate(size_cat = recode(size_cat, 
+                           "(1,4]" = "min_4" ,
+                           "(10,20]" = "10_20",
+                           "(20,50]" = "20_50",
+                           "(4,10]" = "4_10",
+                           ">50" = "50_max")) %>%
+  mutate(size_cat = factor(size_cat, 
+                           levels = c("min_4", "4_10", "10_20", "20_50", "50_max"),
+                           ordered = TRUE))
+
+save(sframe, file = "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/sframe.rda") 
+
+print(sframe)
+```
