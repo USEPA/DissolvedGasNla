@@ -68,10 +68,10 @@ dg %>%
   {summary(.)}
 
 dg %>% 
-  ggplot(aes(as.factor(x = WSA9), y = log(dissolved.n2o.nmol))) + geom_boxplot()
+  ggplot(aes(as.factor(x = ag.eco9.nm), y = log(dissolved.n2o.nmol))) + geom_boxplot()
 
 dg %>% 
-  ggplot(aes(as.factor(x = WSA9), y = (n2o.sat.ratio))) + geom_boxplot()
+  ggplot(aes(as.factor(x = ag.eco9.nm), y = (n2o.sat.ratio))) + geom_boxplot()
 ```
 
 
@@ -475,10 +475,10 @@ library(janitor) # clean_names function
 names(dg)
 
 
-dg_1 <- select(dg,site.id:map.lon.dd, dissolved.co2.umol, dissolved.ch4.umol, dissolved.n2o.nmol, WSA9, WSA9_NAME)
+dg_1 <- select(dg,site.id:map.lon.dd, dissolved.co2.umol, dissolved.ch4.umol, dissolved.n2o.nmol, ag.eco9.nm, ag.eco9.nm)
 
 names(dg_1)
-dg_1 <- clean_names(dg_1) %>% filter(wsa9 != "AK") %>% 
+dg_1 <- clean_names(dg_1) %>% filter(ag.eco9.nm != "AK") %>% 
   mutate(log_n2o = round(log(dissolved_n2o),3)) %>% 
   mutate(log_n2osatratio = round(log(n2o_sat_ratio),3))
 # underscores are "safer" names used in GIS
@@ -510,7 +510,7 @@ st_crs(ecoR)
 names(ecoR)
 # changed from 4326 to 5070
 ecoR1 <- st_transform(ecoR, 5070) %>% 
-  select(OBJECTID, WSA9, WSA9_NAME) # Grab variables of interest
+  select(OBJECTID, ag.eco9.nm, ag.eco9.nm) # Grab variables of interest
 st_crs(ecoR1)
 
 # write out dg.sf and ecoR as two layers in geopackage, gpkg, geodatabase
@@ -537,11 +537,11 @@ summary(dg_sf1$dissolved_n2o_nmol) # matches Roy's stats
 Getting distances between sites overall and by ecoregion to help set distances for lagged scatterplots.  First, Worked out steps on a sample of NLA sites.  Could only get parts of Anna Springsteen's code to work.
 ```{r, eval=FALSE, echo=FALSE, distances}
 names(dg.sf)
-head(dg.sf$WSA9_NAME)
+head(dg.sf$ag.eco9.nm)
 # distinct returns all unique geometry + attribute combinations.  convert to df if not interested in geometry
-dg.sf %>% as.data.frame() %>% distinct(WSA9_NAME) 
-# distinct.Spatial(dg.sf, WSA9_NAME) # this doesn't work either.
-distinct(dg, WSA9_NAME)
+dg.sf %>% as.data.frame() %>% distinct(ag.eco9.nm) 
+# distinct.Spatial(dg.sf, ag.eco9.nm) # this doesn't work either.
+distinct(dg, ag.eco9.nm)
 
 # take a small sample of dg.sf to test getting distances
 set.seed(1859)
@@ -574,10 +574,10 @@ round(max(rdistmat1[rdistmat1!=0]))
 
 names(ecoR)
 class(ecoR)
-# contrast ecoRname <- as.data.frame(select(ecoR,"WSA9_NAME"))
+# contrast ecoRname <- as.data.frame(select(ecoR,"ag.eco9.nm"))
 # geom is sticky with select but not pull
-# ecoRname <- as.data.frame(pull(ecoR,"WSA9_NAME"))
-ecoRname1 <- as.character(pull(ecoR,"WSA9_NAME")) #Springsteen code needs to be character to populate columns of matrix below
+# ecoRname <- as.data.frame(pull(ecoR,"ag.eco9.nm"))
+ecoRname1 <- as.character(pull(ecoR,"ag.eco9.nm")) #Springsteen code needs to be character to populate columns of matrix below
 class(ecoRname1)
 head(ecoRname1, 9)
 # initialize summary tables
@@ -619,10 +619,10 @@ print(euc.summary_dg)
 # brute force to get 5-number summary of ecoregions cut-n-paste ecoregions to get specific data frames:  cpl, nap, npl, sap, spl, tpl, umw, wmt, xer
 names(dg.sf)
 
-count(dg.sf, WSA9_NAME) %>% print(n = Inf)
+count(dg.sf, ag.eco9.nm) %>% print(n = Inf)
 
 # Get ecoregion-specific NLA sites
-cpl <- dg.sf %>% filter(WSA9_NAME == "Coastal Plains")
+cpl <- dg.sf %>% filter(ag.eco9.nm == "Coastal Plains")
 
 distmat_cpl <- st_distance(cpl, cpl,by_element = FALSE)
 dim(distmat_cpl)
@@ -672,7 +672,7 @@ hscat(dissolved.n2o.nmol~1, cpl_sp, c(0, 50000, 150000, 250000, 500000, 1000000,
 hscat(log10(dissolved.n2o.nmol)~1, cpl_sp, c(0, 10000, 25000, 50000, 150000, 250000, 500000))
 
 # nap # nap object doesn't exist
-nap <- dg.sf %>% filter(WSA9_NAME == "Northern Appalachians")
+nap <- dg.sf %>% filter(ag.eco9.nm == "Northern Appalachians")
 nap_sp <- as(nap, "Spatial")
 class(nap_sp)
 ggplot(nap,aes(dissolved.ch4.umol)) + geom_histogram()
@@ -702,7 +702,7 @@ hscat(dissolved.n2o.nmol~1, nap_sp, c(0, 10000, 50000, 100000, 200000, 300000, 4
 hscat(log10(dissolved.n2o.nmol)~1, nap_sp, c(0, 25000, 50000, 100000, 200000, 300000, 400000))
 
 # npl 
-npl <- dg.sf %>% filter(WSA9_NAME == "Northern Plains")
+npl <- dg.sf %>% filter(ag.eco9.nm == "Northern Plains")
 npl_sp <- as(npl, "Spatial")
 class(npl_sp)
 ggplot(npl,aes(dissolved.ch4.umol)) + geom_histogram()
@@ -732,7 +732,7 @@ hscat(dissolved.n2o.nmol~1, npl_sp, c(0, 10000, 50000, 100000, 200000, 300000, 4
 hscat(log10(dissolved.n2o.nmol)~1, npl_sp, c(0, 25000, 50000, 100000, 200000, 300000, 400000))
 
 # sap
-sap <- dg.sf %>% filter(WSA9_NAME == "Southern Appalachians")
+sap <- dg.sf %>% filter(ag.eco9.nm == "Southern Appalachians")
 sap_sp <- as(sap, "Spatial")
 class(sap_sp)
 ggplot(sap,aes(dissolved.ch4.umol)) + geom_histogram()
@@ -762,7 +762,7 @@ hscat(dissolved.n2o.nmol~1, sap_sp, c(0, 10000, 50000, 150000, 300000, 450000, 6
 hscat(log10(dissolved.n2o.nmol)~1, sap_sp, c(0, 25000, 50000, 75000, 100000, 125000, 150000))
 
 # spl
-spl <- dg.sf %>% filter(WSA9_NAME == "Southern Plains")
+spl <- dg.sf %>% filter(ag.eco9.nm == "Southern Plains")
 spl_sp <- as(spl, "Spatial")
 class(spl_sp)
 ggplot(spl,aes(dissolved.ch4.umol)) + geom_histogram()
@@ -792,7 +792,7 @@ hscat(dissolved.n2o.nmol~1, spl_sp, c(0, 10000, 50000, 100000, 200000, 300000, 4
 hscat(log10(dissolved.n2o.nmol)~1, spl_sp, c(0, 25000, 50000, 75000, 100000, 125000, 150000))
 
 # tpl
-tpl <- dg.sf %>% filter(WSA9_NAME == "Temperate Plains")
+tpl <- dg.sf %>% filter(ag.eco9.nm == "Temperate Plains")
 tpl_sp <- as(tpl, "Spatial")
 class(tpl_sp)
 ggplot(tpl,aes(dissolved.ch4.umol)) + geom_histogram()
@@ -822,7 +822,7 @@ hscat(dissolved.n2o.nmol~1, tpl_sp, c(0, 10000, 50000, 100000, 200000, 300000, 6
 hscat(log10(dissolved.n2o.nmol)~1, tpl_sp, c(0, 25000, 50000, 75000, 100000, 125000, 150000))
 
 # umw
-umw <- dg.sf %>% filter(WSA9_NAME == "Upper Midwest")
+umw <- dg.sf %>% filter(ag.eco9.nm == "Upper Midwest")
 umw_sp <- as(umw, "Spatial")
 class(umw_sp)
 ggplot(umw,aes(dissolved.ch4.umol)) + geom_histogram()
@@ -852,7 +852,7 @@ hscat(dissolved.n2o.nmol~1, umw_sp, c(0, 25000, 50000, 75000, 100000, 250000, 35
 hscat(log10(dissolved.n2o.nmol)~1, umw_sp, c(0, 25000, 50000, 100000, 200000, 300000, 400000))
 
 # wmt
-wmt <- dg.sf %>% filter(WSA9_NAME == "Western Mountains")
+wmt <- dg.sf %>% filter(ag.eco9.nm == "Western Mountains")
 wmt_sp <- as(wmt, "Spatial")
 class(wmt_sp)
 ggplot(wmt,aes(dissolved.ch4.umol)) + geom_histogram()
@@ -882,7 +882,7 @@ hscat(dissolved.n2o.nmol~1, wmt_sp, c(0, 10000, 50000, 100000, 200000, 350000, 7
 hscat(log10(dissolved.n2o.nmol)~1, wmt_sp, c(0, 25000, 50000, 100000, 200000, 350000, 700000))
 
 # xer
-xer <- dg.sf %>% filter(WSA9_NAME == "Xeric")
+xer <- dg.sf %>% filter(ag.eco9.nm == "Xeric")
 xer_sp <- as(xer, "Spatial")
 class(xer_sp)
 ggplot(xer,aes(dissolved.ch4.umol)) + geom_histogram()
@@ -949,12 +949,12 @@ As with the lagged scatter plots, I had to take a simple feature object and conv
 The code below is to be run separately for each ecoregion.  The CPL, TPL, and UMW ecoregions show strong positive spatial autocorrelation.  Negative spatial autocorrelation occurs in the NPL ecoregion because of the maximum outlier at a South Dakota site.  The SPL and XER ecoregions show no evidence of spatial autocorrelation.  Interestingly, it appears that the ecoregions with the highest dissolved.n2o concentrations, CPL, TPL, and UMW, drive the national pattern.
 ```{r, knn_moran}
 names(dg)
-# also includ WSA9, WSA9_NAME feature
-dg_1 <- select(dg,site.id:dissolved.n2o.nmol, WSA9, WSA9_NAME)
+# also includ ag.eco9.nm, ag.eco9.nm feature
+dg_1 <- dg
 names(dg_1)
 dg_1 <- clean_names(dg_1)
 names(dg_1)
-distinct(dg_1, wsa9)
+distinct(dg_1, ag_eco9_nm)
 # To enable spatial analysis of the data, the dataframe will be converted to a 'simple features' (sf) object.
 # Define coordinates
 coords <- data.frame(longitude = dg_1$map_lon_dd, latitude = dg_1$map_lat_dd)
@@ -966,7 +966,7 @@ st_crs(dg_sf1)
 glimpse(dg_sf1)
 # Get ecoregion-specific NLA sites
 ## CPL
-cpl <- dg_sf1 %>% filter(wsa9 == "CPL" & visit_no == 1 & sample_source == "DG")
+cpl <- dg_sf1 %>% filter(ag_eco9 == "CPL" & visit_no == 1 & sample_source == "DG")
 
 cpl_sp <- as(cpl, "Spatial")
 class(cpl_sp)
@@ -995,7 +995,7 @@ moran.plot(log(cpl$dissolved_n2o_nmol), listw = dsnb1.listw, labels = cpl$site_i
 rm(ds1coords, ds1nb1, dsnb1, dsnb1.listw, dsnb1_dist)
 
 ## NAP
-nap <- dg_sf1 %>% filter(wsa9 == "NAP" & visit_no == 1 & sample_source == "DG")
+nap <- dg_sf1 %>% filter(ag_eco9_nm == "NAP" & visit_no == 1 & sample_source == "DG")
 
 nap_sp <- as(nap, "Spatial")
 class(nap_sp)
@@ -1024,7 +1024,7 @@ moran.plot(log(nap$dissolved_n2o_nmol), listw = dsnb1.listw, labels = nap$site_i
 rm(ds1coords, ds1nb1, dsnb1, dsnb1.listw, dsnb1_dist)
 
 ## NPL
-npl <- dg_sf1 %>% filter(wsa9 == "NPL" & visit_no == 1 & sample_source == "DG")
+npl <- dg_sf1 %>% filter(ag_eco9_nm == "NPL" & visit_no == 1 & sample_source == "DG")
 
 npl_sp <- as(npl, "Spatial")
 class(npl_sp)
@@ -1053,7 +1053,7 @@ moran.plot(log(npl$dissolved_n2o_nmol), listw = dsnb1.listw, labels = npl$site_i
 rm(ds1coords, ds1nb1, dsnb1, dsnb1.listw, dsnb1_dist)
 
 ## SAP
-sap <- dg_sf1 %>% filter(wsa9 == "SAP" & visit_no == 1 & sample_source == "DG")
+sap <- dg_sf1 %>% filter(ag_eco9_nm == "SAP" & visit_no == 1 & sample_source == "DG")
 
 sap_sp <- as(sap, "Spatial")
 class(sap_sp)
@@ -1082,7 +1082,7 @@ moran.plot(log(sap$dissolved_n2o_nmol), listw = dsnb1.listw, labels = sap$site_i
 rm(ds1coords, ds1nb1, dsnb1, dsnb1.listw, dsnb1_dist)
 
 ## SPL
-spl <- dg_sf1 %>% filter(wsa9 == "SPL" & visit_no == 1 & sample_source == "DG")
+spl <- dg_sf1 %>% filter(ag_eco9_nm == "SPL" & visit_no == 1 & sample_source == "DG")
 
 spl_sp <- as(spl, "Spatial")
 class(spl_sp)
@@ -1111,7 +1111,7 @@ moran.plot(log(spl$dissolved_n2o_nmol), listw = dsnb1.listw, labels = spl$site_i
 rm(ds1coords, ds1nb1, dsnb1, dsnb1.listw, dsnb1_dist)
 
 ## TPL
-tpl <- dg_sf1 %>% filter(wsa9 == "TPL" & visit_no == 1 & sample_source == "DG")
+tpl <- dg_sf1 %>% filter(ag_eco9_nm == "TPL" & visit_no == 1 & sample_source == "DG")
 
 tpl_sp <- as(tpl, "Spatial")
 class(tpl_sp)
@@ -1147,7 +1147,7 @@ moran.plot(log(tpl$dissolved_n2o_nmol), listw = dsnb1.listw, labels = tpl$site_i
 rm(ds1coords, ds1nb1, dsnb1, dsnb1.listw, dsnb1_dist)
 
 ## UMW
-umw <- dg_sf1 %>% filter(wsa9 == "UMW" & visit_no == 1 & sample_source == "DG")
+umw <- dg_sf1 %>% filter(ag_eco9_nm == "UMW" & visit_no == 1 & sample_source == "DG")
 
 umw_sp <- as(umw, "Spatial")
 class(umw_sp)
@@ -1183,7 +1183,7 @@ moran.plot(log(umw$dissolved_n2o_nmol), listw = dsnb1.listw, labels = umw$site_i
 rm(ds1coords, ds1nb1, dsnb1, dsnb1.listw, dsnb1_dist)
 
 ## WMT
-wmt <- dg_sf1 %>% filter(wsa9 == "WMT" & visit_no == 1 & sample_source == "DG")
+wmt <- dg_sf1 %>% filter(ag_eco9_nm == "WMT" & visit_no == 1 & sample_source == "DG")
 
 wmt_sp <- as(wmt, "Spatial")
 class(wmt_sp)
@@ -1219,7 +1219,7 @@ moran.plot(log(wmt$dissolved_n2o_nmol), listw = dsnb1.listw, labels = wmt$site_i
 rm(ds1coords, ds1nb1, dsnb1, dsnb1.listw, dsnb1_dist)
 
 ## XER
-xer <- dg_sf1 %>% filter(wsa9 == "XER" & visit_no == 1 & sample_source == "DG")
+xer <- dg_sf1 %>% filter(ag_eco9_nm == "XER" & visit_no == 1 & sample_source == "DG")
 
 xer_sp <- as(xer, "Spatial")
 class(xer_sp)
@@ -1306,7 +1306,7 @@ dg_sf1 <- st_as_sf(dg_1, coords = c("map_lon_dd", "map_lat_dd"),
 
 st_crs(dg_sf1)
 names(dg_sf1)
-nap_visit1 <- dg_sf1 %>% filter(wsa9 == "NAP" & visit_no == 1)
+nap_visit1 <- dg_sf1 %>% filter(ag_eco9_nm == "NAP" & visit_no == 1)
 class(nap_visit1)
 st_crs(nap_visit1)
 
@@ -1319,7 +1319,7 @@ class(nap_sp_visit1)
 # Looks like 71 pairs of points being used.
 # With a lag, or bin distance, of 50 km only go out 10 bins, 500 km, and do a Bonferroni adjustment of 0.05/10 = 0.005
 names(dg_1)
-dg_cplvisit1 <- dg_1 %>% filter(wsa9 == "CPL" & visit_no == 1)
+dg_cplvisit1 <- dg_1 %>% filter(ag_eco9 == "CPL" & visit_no == 1)
 # N.B. default is resamp = 1000 so that can take 10 minutes for n =1090 sites
 class(dg_cplvisit1)
 
@@ -1339,7 +1339,7 @@ class(correlo_n2o_ncf)
 #ncf::plot.correlog(correlo_n2o_ncf)
 
 # CPL outlier check by working through all 10 pairwise removal of cluster of 5 high Delaware sites
-out_cplvisit1 <- dg_1 %>% filter(wsa9 == "CPL" & visit_no == 1 & (site_id != "NLA17_DE-10003" & site_id != "NLA17_DE-10004"))
+out_cplvisit1 <- dg_1 %>% filter(ag_eco9 == "CPL" & visit_no == 1 & (site_id != "NLA17_DE-10003" & site_id != "NLA17_DE-10004"))
 
 out_cplcorrelo_n2o <- ncf::correlog(x = out_cplvisit1$map_lon_dd, y = out_cplvisit1$map_lat_dd, z = log(out_cplvisit1$dissolved_n2o_nmol), increment = 50, resamp = 1000, latlon = TRUE)
 
@@ -1349,7 +1349,7 @@ out_cplcorrelo_n2o <- ncf::correlog(x = out_cplvisit1$map_lon_dd, y = out_cplvis
 # trying pgirmess package uses library spdep including moran.test and geary.test functions.  Distances are euclidean and in the same units as the spatial coordinates.  As run below, using geographical coordinates in decimal degrees so are distance classes retuned in decimal degrees?
 # what if run on a spatial points data frame?
 # Uses normality assumption, which is faster, to assess significance
-dg_napvisit1 <- dg_1 %>% filter(wsa9 == "NAP" & visit_no == 1)
+dg_napvisit1 <- dg_1 %>% filter(ag_eco9 == "NAP" & visit_no == 1)
 coords_nap <- cbind(dg_napvisit1$map_lon_dd, dg_napvisit1$map_lat_dd)
 correl_napn2o_pg <- pgirmess::correlog(coords_nap, log(dg_napvisit1$dissolved_n2o_nmol), method = "Moran", nbclass = NULL, alternative = "two.sided")
 
@@ -1466,7 +1466,7 @@ plot_correlog <- function(ncf_correlog,
   return(g)
 }
 
-dg_1 <- select(dg,site.id:map.lon.dd, dissolved.n2o.nmol, WSA9, WSA9_NAME, ONOFFNET, nitrate.n.result,chla.result.vol, max.bf, temp.surf, temp.bottom, o2.surf, o2.bottom, lake.orgn, state, size.cat)
+dg_1 <- select(dg,site.id:map.lon.dd, dissolved.n2o.nmol, ag.eco9.nm, ag.eco9.nm, ONOFFNET, nitrate.n.result,chla.result.vol, max.bf, temp.surf, temp.bottom, o2.surf, o2.bottom, lake.orgn, state, size.cat)
 names(dg_1)
 dg_1 <- clean_names(dg_1)
 names(dg_1)
@@ -1474,7 +1474,7 @@ dg_1 <- dg_1 %>% mutate(log_n2o = round(log(dissolved_n2o_nmol),3))
 ## Subset dg_1 by visit_no == 1
 dg_visit1 <- dg_1 %>% dplyr::filter(visit_no == 1)
 
-## Perform the same test for each wsa9 using Z = "log_n2o"
+## Perform the same test for each ag.eco9.nm using Z = "log_n2o"
 ## Start by defining a function
 ncf_correlog <- function(dat, # data to send to ncf::correlog
                          z_col, # name of the column in the dataset for water quality parameter
@@ -1498,15 +1498,15 @@ ncf_correlog <- function(dat, # data to send to ncf::correlog
   return(crlg)
 } 
 
-## Split the dataframe by each wsa9: turns the data frame into a list 
-##   where each list item is a data frame filtered to that wsa9
+## Split the dataframe by each ag.eco9.nm: turns the data frame into a list 
+##   where each list item is a data frame filtered to that ag.eco9.nm
 ## lapply applies the function ncf_correlog on each list object (a data frame)
 ## the final product is a list of correlog objects
 ## this is similar to looping
 ## setting seed so get same result from permutations ncf::correlog function
 set.seed(2035)
 log_n2o_correlog_list <- dg_visit1 %>%
-  split(.$wsa9) %>% # '.' means use the data frame that preceded this line
+  split(.$ag_eco9_nm) %>% # '.' means use the data frame that preceded this line
   lapply(function(x) ncf_correlog(dat = x, z_col = "log_n2o")) 
 #ncf_correlog is the function name, 
 #dat is the paramater that takes a data.frame,
@@ -1540,24 +1540,24 @@ log_n2o_correlog_dats <- lapply(log_n2o_correlog_list,
                                 function(x) crlg_to_dat(ncf_correlog = x))
 str(log_n2o_correlog_dats) # each item in the list is now a dataframe
 
-## combine into one dataframe to grab the wsa9 (notice the name no longer has an s at the end)
+## combine into one dataframe to grab the ag.eco9.nm (notice the name no longer has an s at the end)
 
 log_n2o_correlog_dat <- log_n2o_correlog_dats %>%
-  dplyr::bind_rows(., .id = "wsa9")
+  dplyr::bind_rows(., .id = "ag.eco9.nm")
 
 str(log_n2o_correlog_dat)
 head(log_n2o_correlog_dat)
 ## Make individual plots, the following object is a list containing a ggplot for each
 log_n2o_correlog_plots <- log_n2o_correlog_dat %>%
-  split(.$wsa9) %>% # splits the data frame by wsa9, which creates a list with 9 data frames
-  lapply(function(x) plot_correlog(ncf_correlog = x, # use the data.frame for each wsa9 to make a plot
+  split(.$ag.eco9.nm) %>% # splits the data frame by ag.eco9.nm, which creates a list with 9 data frames
+  lapply(function(x) plot_correlog(ncf_correlog = x, # use the data.frame for each ag.eco9.nm to make a plot
                                    plot_title = NULL,
                                    n_col = "n", 
                                    mean_col = "mean",
                                    cor_col = "cor",
                                    xint_col = "xint",
                                    pval_col = "pval",
-                                   name_col = "wsa9",
+                                   name_col = "ag.eco9.nm",
                                    title_size = 14, 
                                    subtitle_size = 14, 
                                    axis_title_size = 14, 
@@ -1588,14 +1588,14 @@ print(log_n2o_correlog_plotgrid) # click 'Zoom' in plots quadrant, takes a few s
 ## can play with scale, width, and height to adjust the output of the figure saved to the png file
 
 ## alternatively, can make a facet plot since log_n20_correlog_dat is a dataframe in the correct format
-names(log_n2o_correlog_dat) #"n"    "mean" "cor"  "xint" "pval" "wsa9"
+names(log_n2o_correlog_dat) #"n"    "mean" "cor"  "xint" "pval" "ag.eco9.nm"
 
 ## create column to shape point, sig == TRUE means two-sided test < 0.05
 log_n2o_correlog_dat$sig <- ifelse(log_n2o_correlog_dat$pval * 2 < 0.05,
                                    TRUE, FALSE) 
 head(log_n2o_correlog_dat)
-## can change wsa9 to a factor to arrange what order the plots are shown, otherwise default arranges them alphabetically
-# log_n20_correlog_dat$wsa9 <- factor(log_n20_correlog_dat, 
+## can change ag.eco9.nm to a factor to arrange what order the plots are shown, otherwise default arranges them alphabetically
+# log_n20_correlog_dat$ag.eco9.nm <- factor(log_n20_correlog_dat, 
 #                                     levels = c("CPL", "NAP", "NPL", "SAP", "SPL", "TPL", "UMW", "WMT", "XER"))
 
 ## make facet plot
@@ -1610,7 +1610,7 @@ log_n2o_correlog_facetplot <- ggplot(log_n2o_correlog_dat) +
   scale_shape_manual(values=c("TRUE"=19, "FALSE"=1), 
                      labels=c("TRUE"="Sig.", "FALSE"="Not Sig."),
                      guide=FALSE) +
-  facet_wrap(~wsa9, ncol=3, scales="free") +
+  facet_wrap(~ag.eco9.nm, ncol=3, scales="free") +
   labs(x="Distance (mean-of-class)", y="Correlation") +
   theme_bw() +
   theme(plot.title = element_text(size=14, hjust=0.5, 
@@ -1677,14 +1677,14 @@ The empirical semivariogram for surface dissolved oxygen is approximately a hori
 ```{r, random_semivar}
 names(dg)
 dg_1 <- clean_names(dg)
-# also includ WSA9, WSA9_NAME feature plus variables from Jake's 02/25/2020 email
+# also includ ag.eco9.nm, ag.eco9.nm feature plus variables from Jake's 02/25/2020 email
 # added ntl.lab.result, ptl.lab.result on 06/18/2020
 # added physical variables, temperature and depth, on 06/23/2020
 # added silica and calcium based on Leon-Palmero 2020 paper 06/24/2020
 # made nitrate_n_result into binary variable nitrate_n_b b/c 1/4th of observation have 0.000 value 06/25/2020
 # added ph_result 12/14/2020
 names(dg_1)
-dg_1 <- select(dg_1,site_id:date_col, map_lat_dd, map_lon_dd, dissolved_co2_umol, dissolved_ch4_umol, dissolved_n2o_nmol, co2_sat_ratio, ch4_sat_ratio, n2o_sat_ratio, wsa9, wsa9_name, onoffnet, nitrate_n_result, chla_result_vol, ntl_lab_result, ph_result, ptl_lab_result,max_bf, temp_surf, temp_bottom, o2_surf, o2_bottom, lake_orgn, state, size_cat, silica_result, calcium_result, visit_no) %>% filter(visit_no == 1 & wsa9 != "AK")
+dg_1 <- select(dg_1,site_id:date_col, map_lat_dd, map_lon_dd, dissolved_co2_umol, dissolved_ch4_umol, dissolved_n2o_nmol, co2_sat_ratio, ch4_sat_ratio, n2o_sat_ratio, ag.eco9.nm, ag.eco9.nm, onoffnet, nitrate_n_result, chla_result_vol, ntl_lab_result, ph_result, ptl_lab_result,max_bf, temp_surf, temp_bottom, o2_surf, o2_bottom, lake_orgn, state, size_cat, silica_result, calcium_result, visit_no) %>% filter(visit_no == 1 & ag.eco9.nm != "AK")
 
 names(dg_1)
 
@@ -1786,7 +1786,7 @@ Categorization and regression analysis (CART), which can accomodate non-linear a
 
 ```{r}
 library(tree)
-model <- tree(dissolved.n2o.nmol ~ MeanDUsed + nitrate.n.result + ntl.lab.result + chla.result.vol + ptl.lab.result + surftemp + WSA9, data = dg)
+model <- tree(dissolved.n2o.nmol ~ MeanDUsed + nitrate.n.result + ntl.lab.result + chla.result.vol + ptl.lab.result + surftemp + ag.eco9.nm, data = dg)
 
 plot(model)
 text(model)
