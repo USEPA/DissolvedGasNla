@@ -1,0 +1,182 @@
+---
+title: "ASLO 2021"
+author: "J. Beaulieu"
+date: "6/8/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+# load libraries
+library(sf) # spatial data
+#library(gstat) # lagged scatterplot, variogram
+library(tidyverse) # dplyr, ggplot
+#library(janitor) # clean names
+#library(spdep) # k-NN and Moran plot
+#library(ncf) # ncf::correlogram
+#library(lattice) # xyplot
+library(USAboundaries)
+
+# Identify local path for each user
+localPath <- Sys.getenv("USERPROFILE")
+
+# Define helper functions
+# standardized formatting for column names
+toEPA <- function(X1){
+  names(X1) = tolower(names(X1))
+  names(X1) = gsub(pattern = c("\\(| |#|)|/|-|\\+|:|_"), replacement = ".", x = names(X1))
+  X1
+}
+```
+
+## ASLO 2021
+
+This is a convenient place to generate the stats and figures included in the ASLO 2021 presentation.
+
+## Site Map
+```{r}
+# Load data
+ load(paste0(localPath,
+            "/Environmental Protection Agency (EPA)/",
+            "ORD NLA17 Dissolved Gas - Documents/",
+            "inputData/dg.2021-02-01.RData"))
+
+# To enable mapping the dataframe will be converted to a 'simple features' (sf) object.
+# Define coordinates
+coords <- data.frame(longitude = dg$map.lon.dd, latitude = dg$map.lat.dd)
+
+dg.sf <- st_as_sf(dg, coords = c("map.lon.dd", "map.lat.dd"), 
+                  crs = 4269) %>% # standard for lat/lon
+  st_transform(5070) # project to CONUS ALBERS for plotting
+
+# read in ecoregion polygons
+ecoR <- st_read(dsn = paste0(localPath, 
+                             "/Environmental Protection Agency (EPA)/",
+                             "ORD NLA17 Dissolved Gas - Documents/inputData"),
+                layer = "aggr_ecoregions_simple")
+
+# Check CRS
+#st_crs(ecoR) # 3857
+ecoR <- st_transform(ecoR, 5070) # convert to CONUS Albers
+#st_crs(ecoR) # 5070
+
+# Load state boundaries
+states <- USAboundaries::us_states() %>%
+  dplyr::filter(!state_name %in% c("Alaska", "District of Columbia", "Hawaii", "Puerto Rico")) %>%
+  st_transform(5070) # convert to CONUS Albers
+
+
+ggplot() +
+  geom_sf(data = ecoR, color = NA, aes(fill = WSA9_NAME)) +
+  geom_sf(data = dg.sf) +
+  geom_sf(data = states, fill = NA, color = "white", size = 0.1) +
+  theme_void() +
+  theme(legend.title = element_blank())
+
+ggsave("output/figures/siteMap.tiff")
+
+```
+
+
+## Population Data
+
+```{r}
+# about 15 minutes to load first time
+# 6/7/21 <2 minutes
+Sys.time()
+load(paste0(localPath, "\\Environmental Protection Agency (EPA)\\ORD NLA17 Dissolved Gas - Documents\\inputData\\all_predictions.rda"))
+Sys.time()
+```
+
+
+## Explore structure of all_predictions object
+```{r}
+head(all_predictions)
+```
+.row uniquely identifies each waterbody.  There are `r all_predictions %>% distinct(.row) %>% nrow()` waterbodies in the sample frame.  `.draw` reflects the simulation number for each waterbody. I think this is a 'draw from the posterior distribution'.  The data contains `r all_predictions %>% distinct(.draw) %>% nrow()` draws for each waterbody.
+
+
+## N2O saturation ratio: continuous variable
+```{r}
+# PLOT N2O SAT RATIO BY WSA9
+
+# point and linerange
+all_predictions %>%
+  group_by(WSA9, .draw) %>%
+  #group_by(.draw) %>%
+  summarise( mean_sat = mean(preds_sat)) %>%
+  summarise( estimate = round(median(mean_sat), 3),
+    LCL = round(quantile(mean_sat, probs = 0.025), 3),
+    UCL = round(quantile(mean_sat, probs = 0.975), 3)) %>% 
+  mutate(ecoregion = factor(WSA9)) %>%
+  #mutate(type = "MR") %>%
+  select(ecoregion, estimate, LCL, UCL) %>%
+  mutate(ecoregion = fct_reorder(ecoregion, estimate)) %>%
+  ggplot( aes( x = ecoregion, y = estimate ) ) +
+  geom_point() +
+  geom_linerange( aes( ymin = LCL, ymax = UCL)) +
+  geom_hline(yintercept = 1, color='blue') +
+  ylab("mean N2O saturation ratio") +
+  coord_flip() + 
+  theme_bw()
+
+
+
+
+
+
+
+
+```
+
+## N2O saturation ratio: extent estimate
+```{r}
+# EXTENT OF WATERBODIES FUNCTIONING AS SINKS BY ECOREGION
+
+# density plot
+all_predictions %>%
+  group_by(WSA9, .draw) %>%
+  # below summarise generates 500 proportions per WSA
+  summarise(prop_sat = sum(preds_sat < 1) / length(unique(.row))) %>%
+  ggplot(aes(x=prop_sat)) + 
+  geom_density() +
+  facet_wrap(~WSA9) +
+  xlab("Proportion of waterbodies functioning as N2O sinks") +
+  theme_bw()
+ggsave("output/figures/extentDensityPlot.tiff")
+  
+# point and line plot
+all_predictions %>%
+  group_by(WSA9, .draw) %>%
+  summarise(prop_sat = sum(preds_sat < 1) / length(.row)) %>% # Roy had length(unique(.row)) here, but the unique isn't necessary.  this object is grouped by WSA9
+  summarise(estimate = round(median(prop_sat), 3),
+    LCL = round(quantile(prop_sat, probs = 0.025), 3),
+    UCL = round(quantile(prop_sat, probs = 0.975), 3)) %>% 
+  mutate(ecoregion = factor(WSA9)) %>%
+  select(ecoregion, estimate, LCL, UCL) %>%
+  mutate(ecoregion = fct_reorder(ecoregion, estimate)) %>%
+  ggplot( aes( x = ecoregion, y = estimate ) ) +
+  geom_point() +
+  geom_linerange( aes( ymin = LCL, ymax = UCL )) +
+  ylab("Proportion of waterbodies functioning as N2O sinks") +
+  coord_flip() + 
+  theme_bw()
+ggsave("output/figures/extentPointLinerange.tiff")
+
+# bar and line plot
+all_predictions %>%
+  group_by(WSA9, .draw) %>%
+  summarise(prop_sat = sum(preds_sat < 1) / length(.row)) %>% # Roy had length(unique(.row)) here, but the unique isn't necessary.  this object is grouped by WSA9
+  summarise(estimate = round(median(prop_sat), 3),
+    LCL = round(quantile(prop_sat, probs = 0.025), 3),
+    UCL = round(quantile(prop_sat, probs = 0.975), 3)) %>% 
+  mutate(ecoregion = factor(WSA9)) %>%
+  select(ecoregion, estimate, LCL, UCL) %>%
+  mutate(ecoregion = fct_reorder(ecoregion, estimate)) %>%
+  ggplot( aes( x = ecoregion, y = estimate ) ) +
+  geom_bar(stat = "identity", aes(fill = ecoregion)) +
+  geom_linerange( aes( ymin = LCL, ymax = UCL )) +
+  ylab("Proportion of waterbodies functioning as N2O sinks") +
+  coord_flip() + 
+  theme_bw()  
+ggsave("output/figures/extentBar.tiff")
+```
