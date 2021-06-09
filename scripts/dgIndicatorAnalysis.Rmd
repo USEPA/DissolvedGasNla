@@ -2023,6 +2023,11 @@ print(xyplot(gamma ~ dist, wmt_n2o_sf1, pch = 3, type = 'b', lwd = 2, col = 'dar
 ## Linked micromaps
 The ecoreg_stats summary is for population estimates.  The code at the bottom, ecoreg_pred, I believe gives summary stats for the predicted distributions, but I would double-check with Roy. There is a quick-and-dirty micromap code used to look trying linked micromap plots on different variables.  When you settle on the variables you want to use then the full micromap code produces the pretty linked micromap plots.
 ```{r, linked_micromap}
+# Read data object containing predictions for population
+Sys.time()
+load(paste0(localPath, "\\Environmental Protection Agency (EPA)\\ORD NLA17 Dissolved Gas - Documents\\inputData\\all_predictions.rda"))
+Sys.time()
+
 
 # summarize means by WSA9 (posterior median for mean and 95% credible intervals)
 # this is analogous to spsurvey "population estimates"
@@ -2051,7 +2056,9 @@ str(ecoreg_stats)
 
 ecoreg_stats
 
-ecoregions <- st_read("aggr_ecoregions_simple.shp")
+ecoregions <- st_read(paste0(localPath, "\\Environmental Protection Agency (EPA)\\",
+                             "ORD NLA17 Dissolved Gas - Documents\\inputData\\aggr_ecoregions_simple.shp"))
+
 wsa9names <- st_set_geometry(ecoregions, NULL) %>%
   select(WSA9, WSA9_NAME)
 
@@ -2084,6 +2091,9 @@ mmplot(stat.data=ecoreg_stats,
 # Full code:  Use this to produce final linked micromaps of the variables you want
 # export as pdf US letter landscape from Plots pane
 # export as PNG Width 900 Height 968, maintain aspect ratio
+tiff(filename = "output/figures/mmplot.tiff",
+     res = 800, width = 9.00, height = 9.68, units = "in" )
+
 mmplot(stat.data=ecoreg_stats,
        map.data=ecor.polys,
        panel.types=c('dot_legend', 'labels', 'dot_cl', 'dot_cl', 'map'),
@@ -2124,6 +2134,8 @@ mmplot(stat.data=ecoreg_stats,
                       list(5, header='Light Gray Means\n Highlighted Above',
                            inactive.border.color=gray(.7), inactive.border.size=2,
                            panel.width=2)))
+
+dev.off()
 
 
 # To get ecoregional distributions of the predictions I think this is the code we would use based on our conversation with Roy, but I would double-check with him.
