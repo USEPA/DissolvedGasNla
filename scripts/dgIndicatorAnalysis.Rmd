@@ -24,7 +24,7 @@ library(janitor) # clean names
 library(spdep) # k-NN and Moran plot
 library(ncf) # ncf::correlogram
 library(lattice) # xyplot
-
+library(micromap) # linked micromaps
 
 # Identify local path for each user
 localPath <- Sys.getenv("USERPROFILE")
@@ -2020,6 +2020,127 @@ print(xyplot(gamma ~ dist, wmt_n2o_sf1, pch = 3, type = 'b', lwd = 2, col = 'dar
 
 ```
 
+## Linked micromaps
+The ecoreg_stats summary is for population estimates.  The code at the bottom, ecoreg_pred, I believe gives summary stats for the predicted distributions, but I would double-check with Roy. There is a quick-and-dirty micromap code used to look trying linked micromap plots on different variables.  When you settle on the variables you want to use then the full micromap code produces the pretty linked micromap plots.
+```{r, linked_micromap}
+
+# summarize means by WSA9 (posterior median for mean and 95% credible intervals)
+# this is analogous to spsurvey "population estimates"
+ecoreg_stats <- all_predictions %>%
+  group_by(WSA9, .draw) %>%
+  summarise( mean_n2o = mean(preds_n2o),
+             mean_n2oeq = mean(preds_n2oeq),
+             mean_sat = mean(preds_sat))%>%
+  summarise( post_med_n2o = round(median(mean_n2o), 1),
+    LCI_n2o = round(quantile(mean_n2o, probs = 0.025), 1),
+    UCI_n2o = round(quantile(mean_n2o, probs = 0.975), 1),
+     post_med_n2oeq = round(median(mean_n2oeq), 2),
+    LCI_n2oeq = round(quantile(mean_n2oeq, probs = 0.025), 2),
+    UCI_n2oeq = round(quantile(mean_n2oeq, probs = 0.975), 2),
+     post_med_sat = round(median(mean_sat), 2),
+    LCI_sat = round(quantile(mean_sat, probs = 0.025), 2),
+    UCI_sat = round(quantile(mean_sat, probs = 0.975), 2),
+    n = dplyr::n())
+
+ecoreg_stats <- as.data.frame(ecoreg_stats)
+class(ecoreg_stats)
+str(ecoreg_stats) # WSA9 is a factor, but some of the stats have attribute of Named num
+
+ecoreg_stats$WSA9 <- as.character(ecoreg_stats$WSA9)
+str(ecoreg_stats)
+
+ecoreg_stats
+
+ecoregions <- st_read("aggr_ecoregions_simple.shp")
+wsa9names <- st_set_geometry(ecoregions, NULL) %>%
+  select(WSA9, WSA9_NAME)
+
+ecoreg_stats <- left_join(ecoreg_stats, wsa9names)
+
+ecoregions <- st_transform(ecoregions, 5070)
+# make spatial polygon dataframe need for micromap
+ecoregions_sp1 <- as(ecoregions, "Spatial")
+
+# convert to map_table for linked micromap
+ecor.polys <- create_map_table(ecoregions_sp1, 'WSA9')
+class(ecor.polys)
+str(ecor.polys, max =2) # ID is chr "CPL"...
+
+
+# Quick & Dirty micromap code:  use this to test out micromap plot of different summary statistics to get their x-axis values
+mmplot(stat.data=ecoreg_stats,
+       map.data=ecor.polys,
+       panel.types=c('dot_legend', 'labels', 'dot_cl', 'dot_cl', 'map'),
+       panel.data=list(
+         NA,
+         'WSA9_NAME',
+         list('post_med_n2o', 'LCI_n2o', 'UCI_n2o'),
+         list('post_med_sat', 'LCI_sat', 'UCI_sat'),
+         NA),
+       ord.by='post_med_n2o', grouping=3,
+       median.row=FALSE,
+       map.link=c('WSA9', 'ID'))
+
+# Full code:  Use this to produce final linked micromaps of the variables you want
+# export as pdf US letter landscape from Plots pane
+# export as PNG Width 900 Height 968, maintain aspect ratio
+mmplot(stat.data=ecoreg_stats,
+       map.data=ecor.polys,
+       panel.types=c('dot_legend', 'labels', 'dot_cl', 'dot_cl', 'map'),
+       panel.data=list(
+         NA,
+         'WSA9_NAME',
+         list('post_med_n2o', 'LCI_n2o', 'UCI_n2o'),
+         list('post_med_sat', 'LCI_sat', 'UCI_sat'),
+         NA),
+       ord.by = 'post_med_n2o', rev.ord = TRUE, grouping=3,
+       median.row=FALSE,
+       map.link=c('WSA9', 'ID'),
+       
+       plot.height=7, plot.width=7, #for poster use plot.height=6, plot.width=9,
+       colors=brewer.pal(5, "Spectral"), #for journal use plot.height=9, plot.width=6.8
+       map.color2='lightgray', 
+       
+       panel.att=list(list(1, point.type=20, point.size=2,
+                           graph.border.color='white',
+                           xaxis.text.display=F, xaxis.line.display=F,
+                           graph.grid.major=F),
+                      
+                      list(2, header='NARS Reporting\n Regions', panel.width=1.25,#increased panel.width to 1.1 from .8
+                           align='left', text.size=1),#increased text.size to .8 from .6
+                      
+                      list(3, header='N2O Concentration\n with 95% CI',
+                           graph.bgcolor='lightgray',
+                           xaxis.ticks=list(6.0, 7.0, 8.0, 9.0, 10.0),
+                           xaxis.labels=list(6.0, 7.0, 8.0, 9.0, 10.0),
+                           xaxis.title='N2O mg/L', panel.width=1.25),
+                      
+                      list(4, header='N2O Saturation\n with 95% CI',
+                           graph.bgcolor='lightgray',
+                           xaxis.ticks=list(0.8, 1.0, 1.2, 1.4, 1.6),
+                           xaxis.labels=list(0.8, 1.0, 1.2, 1.4, 1.6),
+                           xaxis.title='N2O Saturation, %',panel.width=1.25),              
+                      
+                      list(5, header='Light Gray Means\n Highlighted Above',
+                           inactive.border.color=gray(.7), inactive.border.size=2,
+                           panel.width=2)))
+
+
+# To get ecoregional distributions of the predictions I think this is the code we would use based on our conversation with Roy, but I would double-check with him.
+
+ecoreg_preds <- all_predictions %>%
+  group_by(WSA9, .draw) %>%
+  summarise( post_med_n2o = round(median(mean_n2o), 1),
+    LCI_n2o = round(quantile(mean_n2o, probs = 0.025), 1),
+    UCI_n2o = round(quantile(mean_n2o, probs = 0.975), 1),
+     post_med_n2oeq = round(median(mean_n2oeq), 2),
+    LCI_n2oeq = round(quantile(mean_n2oeq, probs = 0.025), 2),
+    UCI_n2oeq = round(quantile(mean_n2oeq, probs = 0.975), 2),
+     post_med_sat = round(median(mean_sat), 2),
+    LCI_sat = round(quantile(mean_sat, probs = 0.025), 2),
+    UCI_sat = round(quantile(mean_sat, probs = 0.975), 2),
+    n = dplyr::n())
+```
 # Exploratory analysis of N2O data
 The mean N2O saturation ratio for the country is `r pop.eco.sat %>% filter(type == "National", subpopulation == "National", indicator == "N2O_SAT_RATIO") %>% select(estimate) %>% pull() %>% round(2)` (95% CI = `r pop.eco.sat %>% filter(type == "National", subpopulation == "National", indicator == "N2O_SAT_RATIO") %>% select(lcb95pct) %>% pull() %>% round(2)` - `r pop.eco.sat %>% filter(type == "National", subpopulation == "National", indicator == "N2O_SAT_RATIO") %>% select(ucb95pct) %>% pull() %>% round(2)`), suggesting that US waterbodies are a new N2O sink during the NLA index period.  This finding is consistent with a recent report that 67% of 101 agricultural ponds in Canada were undersaturated in N2O during the summer (Webb et al. 2019, PNAS).
 
