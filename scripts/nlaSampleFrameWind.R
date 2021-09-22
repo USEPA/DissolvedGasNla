@@ -54,6 +54,7 @@ dim(sampFrm) # 465,897, 71
 # https://cran.r-project.org/web/packages/futureheatwaves/vignettes/starting_from_netcdf.html#:~:text=You%20can%20read%20netCDF%20data,connection%20to%20a%20netCDF%20file.
 # ncdf file downloaded  from Climate Data Center contains hourly wind and lake temperature
 # for US.
+# 10u10v24hour.nc file is too big.  crashed system after 32 hours
 wind <- nc_open(paste0(Sys.getenv("USERPROFILE"), 
                        "/Environmental Protection Agency (EPA)/",
                        "ORD NLA17 Dissolved Gas - Documents/",
