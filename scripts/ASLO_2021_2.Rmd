@@ -88,7 +88,7 @@ ggsave("output/figures/siteMap.tiff")
 
 
 ## Population Data
-
+Roy Martin predicted dissolved N2O concentration (preds_n2O), dissolved equilibrium N2O concentration (preds_n2oeq), and N2O saturation ratio (preds_sat) for all waterbodies in the population.  See his .rmd for more details.  
 ```{r}
 # about 15 minutes to load first time
 # 6/7/21 <2 minutes
@@ -99,10 +99,11 @@ Sys.time()
 
 
 ## Explore structure of all_predictions object
+.row uniquely identifies each waterbody.  There are `r all_predictions %>% distinct(.row) %>% nrow()` waterbodies in the sample frame.  `.draw` reflects the simulation number for each waterbody. I think this is a 'draw from the posterior distribution'.  The data contains `r all_predictions %>% distinct(.draw) %>% nrow()` draws for each waterbody.
 ```{r}
 head(all_predictions)
 ```
-.row uniquely identifies each waterbody.  There are `r all_predictions %>% distinct(.row) %>% nrow()` waterbodies in the sample frame.  `.draw` reflects the simulation number for each waterbody. I think this is a 'draw from the posterior distribution'.  The data contains `r all_predictions %>% distinct(.draw) %>% nrow()` draws for each waterbody.
+
 
 
 ## N2O saturation ratio: continuous variable
@@ -128,7 +129,8 @@ all_predictions %>%
   geom_hline(yintercept = 1, color='blue') +
   ylab("mean N2O saturation ratio") +
   coord_flip() + 
-  theme_bw()
+  theme_bw() +
+  ggtitle("Mean (+/- 95% CI) predicted N2O saturation ratio")
 
 
 
