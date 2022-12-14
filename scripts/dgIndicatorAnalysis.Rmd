@@ -134,6 +134,81 @@ ggplot(pop.eco.diss, aes(estimate, subpopulation)) +
   geom_errorbarh(aes(xmax = ucb95pct, xmin = lcb95pct)) +
   facet_wrap(~indicator, scales = "free_x") +
   theme(axis.title = element_blank())
+
+
+# prep object for linked micromap
+pop.eco_stats <- pop.eco.diss %>%
+  mutate(subpopulation = as.character(subpopulation)) %>%
+  rename(WSA9_NAME = subpopulation)
+
+# read in ecoregion polygons
+ecoregions <- st_read(dsn = paste0(localPath, 
+                             "/Environmental Protection Agency (EPA)/",
+                             "ORD NLA17 Dissolved Gas - Documents/inputData"),
+                layer = "aggr_ecoregions_simple")
+
+wsa9names <- st_set_geometry(ecoregions, NULL) %>%
+  select(WSA9, WSA9_NAME)
+
+pop.eco_stats <- left_join(pop.eco_stats, wsa9names)
+
+ecoregions <- st_transform(ecoregions, 5070)
+# make spatial polygon dataframe need for micromap
+ecoregions_sp1 <- as(ecoregions, "Spatial")
+
+# convert to map_table for linked micromap
+ecor.polys <- create_map_table(ecoregions_sp1, 'WSA9')
+class(ecor.polys)
+str(ecor.polys, max =2) # ID is chr "CPL"...
+
+
+
+# Full code:  Use this to produce final linked micromaps of the variables you want
+# export as pdf US letter landscape from Plots pane
+# export as PNG Width 900 Height 968, maintain aspect ratio
+
+mmplot(stat.data=pop.eco_stats %>% 
+         filter(WSA9_NAME != "National",
+                indicator == "DISSOLVED_CH4"),
+       map.data=ecor.polys,
+       panel.types=c('dot_legend', 'labels', 'dot_cl', 'map'),
+       panel.data=list(
+         NA,
+         'WSA9_NAME',
+         list('estimate', 'lcb95pct', 'ucb95pct'),
+         NA),
+       ord.by = 'estimate', rev.ord = TRUE, grouping=3,
+       median.row=FALSE,
+       map.link=c('WSA9', 'ID'),
+       
+       plot.height=5, # what does this do?
+       plot.width=5.5, #what does this do? 
+       colors=brewer.pal(5, "Spectral"), #for journal use plot.height=9, plot.width=6.8
+       map.color2='lightgray', 
+       
+       panel.att=list(list(1, point.type=20, point.size=2,
+                           graph.border.color='white',
+                           xaxis.text.display=F, xaxis.line.display=F,
+                           graph.grid.major=F, 
+                           panel.width = 2), # added this argument to ensure the full point is shown
+                      
+                      list(2,  panel.width=2,#increased panel.width to 1.1 from .8, removed header='NARS Reporting\n Regions',
+                           align='left', text.size=0.8),#increased text.size to .8 from .6
+                      
+                      list(3, header= "CH4 concentration\n with 95% CI", 
+                           graph.bgcolor='lightgray',
+                           #xaxis.ticks=list(6.0, 7.0, 8.0, 9.0, 10.0),
+                           #xaxis.labels=list(6.0, 7.0, 8.0, 9.0, 10.0),
+                           xaxis.title='CH4 concentration (uM)', panel.width=2.3),
+                      
+                      list(4, header='Light Gray Means\n Highlighted Above',
+                           inactive.border.color=gray(.7), inactive.border.size=2,
+                           panel.width=2)),
+       
+       print.file = "output/figures/mmapCh4concentration.tiff", print.res = 300)
+
+
+
 ```
 
 ### Dissolved gas saturation ratios and source/sink status
@@ -446,13 +521,16 @@ Spatial patterns in dissolved CH4 are not apparent, although all but two sites a
 ```{r}
 ggplot() +
   geom_sf(data = ecoR, color = NA, aes(fill = WSA9_NAME)) +
-  geom_sf(data = dg.sf, aes(size = dissolved.ch4.umol, color = ch4.src.snk), 
+  geom_sf(data = dg.sf %>% filter(!is.na(ch4.src.snk)), 
+          aes(size = dissolved.ch4.umol, color = ch4.src.snk), 
           show.legend = "point") +
   ggtitle("Dissolved CH4 (uM)") +
   scale_color_manual(values = c("white", "black"), name = "source/sink") +
   scale_size(name = "dissolved CH4 (uM)",
              range = c(0.1, 10), # custom size range
-             breaks = c(0.1, 1, 10, 50, 100)) # custom breaks
+             breaks = c(0.1, 10, 50, 100)) # custom breaks
+
+ggsave("output/figures/ch4BubblePlot.tiff" )
 ```
 
 The prevalance of undersaturated dissolved N2O concentrations is an important finding.  The IPCC assumes surface waters are an important source of N2O to the atmosphere.   Webb et al. recently published a paper in PNAS reporting that 70 out of 101 reservoirs sampled in Saskatchewan were N2O sinks.  This paper made quite a splash.  In our study, `r sum(dg$n2o.src.snk == "sink")` out of `r sum(!is.na(dg$dissolved.n2o.nmol))` sampled waterbodies were an N2O sink. It is somewhat interesting to note that the some of the highest concentrations were observed in Indiana/Ohio, where I conducted much of my dissertation research on aquatic N2O emissions.
