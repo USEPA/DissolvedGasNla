@@ -25,6 +25,7 @@ library(spdep) # k-NN and Moran plot
 library(ncf) # ncf::correlogram
 library(lattice) # xyplot
 library(micromap) # linked micromaps
+library(tictoc) # time operations
 
 # Identify local path for each user
 localPath <- Sys.getenv("USERPROFILE")
@@ -44,7 +45,7 @@ This is a convenient place to generate the stats and figures included in the ASL
 
 ## Site Map
 ```{r}
-# Load data
+# Load data.  Loaded object is named dg.
  load(paste0(localPath,
             "/Environmental Protection Agency (EPA)/",
             "ORD NLA17 Dissolved Gas - Documents/",
@@ -90,11 +91,10 @@ ggsave("output/figures/siteMap.tiff")
 ## Population Data
 Roy Martin predicted dissolved N2O concentration (preds_n2O), dissolved equilibrium N2O concentration (preds_n2oeq), and N2O saturation ratio (preds_sat) for all waterbodies in the population.  See his .rmd for more details.  
 ```{r}
-# about 15 minutes to load first time
-# 6/7/21 <2 minutes
-Sys.time()
+# 12/14/22 <2 minutes
+tic()
 load(paste0(localPath, "\\Environmental Protection Agency (EPA)\\ORD NLA17 Dissolved Gas - Documents\\inputData\\all_predictions.rda"))
-Sys.time()
+toc()
 ```
 
 
@@ -115,8 +115,8 @@ N2O saturation ratio in the sample data has a long right tail, with a maximum va
 all_predictions %>%
   group_by(WSA9, .draw) %>%
   #group_by(.draw) %>%
-  summarise( mean_sat = mean(preds_sat)) %>%
-  summarise( estimate = round(median(mean_sat), 3),
+  summarise(mean_sat = mean(n2osat)) %>%
+  summarise(estimate = round(median(mean_sat), 3),
     LCL = round(quantile(mean_sat, probs = 0.025), 3),
     UCL = round(quantile(mean_sat, probs = 0.975), 3)) %>% 
   mutate(ecoregion = factor(WSA9)) %>%
@@ -137,14 +137,14 @@ all_predictions %>%
 # density plots of predicted distribution
 # huge right tail
 p <- all_predictions %>%
-  filter(.draw %in% 1:10) %>% # subset for practice
+  #filter(.draw %in% 1:10) %>% # subset for practice
   mutate(ecoregion = factor(WSA9)) %>%
-  mutate(ecoregion = fct_reorder(ecoregion, preds_sat)) %>%
-  ggplot( aes( x = preds_sat, group = .draw, color = .draw ) ) +
+  mutate(ecoregion = fct_reorder(ecoregion, n2osat)) %>%
+  ggplot( aes( x = n2osat, group = .draw, color = .draw ) ) +
   geom_density(show.legend = FALSE) +
   geom_vline(xintercept = 1, color = "red") +
   xlab("N2O saturation ratio") +
-  xlim(0,5) + # data range is 0-600, but sample max is 30
+  xlim(0,5) + # data range is 0-300, but sample max is 30
   facet_wrap(~ecoregion) +
   theme_bw()
   
