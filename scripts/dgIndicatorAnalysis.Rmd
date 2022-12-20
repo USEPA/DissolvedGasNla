@@ -24,7 +24,7 @@ library(janitor) # clean names
 library(spdep) # k-NN and Moran plot
 library(ncf) # ncf::correlogram
 library(lattice) # xyplot
-
+library(micromap) # linked micromaps
 
 # Identify local path for each user
 localPath <- Sys.getenv("USERPROFILE")
@@ -134,6 +134,81 @@ ggplot(pop.eco.diss, aes(estimate, subpopulation)) +
   geom_errorbarh(aes(xmax = ucb95pct, xmin = lcb95pct)) +
   facet_wrap(~indicator, scales = "free_x") +
   theme(axis.title = element_blank())
+
+
+# prep object for linked micromap
+pop.eco_stats <- pop.eco.diss %>%
+  mutate(subpopulation = as.character(subpopulation)) %>%
+  rename(WSA9_NAME = subpopulation)
+
+# read in ecoregion polygons
+ecoregions <- st_read(dsn = paste0(localPath, 
+                             "/Environmental Protection Agency (EPA)/",
+                             "ORD NLA17 Dissolved Gas - Documents/inputData"),
+                layer = "aggr_ecoregions_simple")
+
+wsa9names <- st_set_geometry(ecoregions, NULL) %>%
+  select(WSA9, WSA9_NAME)
+
+pop.eco_stats <- left_join(pop.eco_stats, wsa9names)
+
+ecoregions <- st_transform(ecoregions, 5070)
+# make spatial polygon dataframe need for micromap
+ecoregions_sp1 <- as(ecoregions, "Spatial")
+
+# convert to map_table for linked micromap
+ecor.polys <- create_map_table(ecoregions_sp1, 'WSA9')
+class(ecor.polys)
+str(ecor.polys, max =2) # ID is chr "CPL"...
+
+
+
+# Full code:  Use this to produce final linked micromaps of the variables you want
+# export as pdf US letter landscape from Plots pane
+# export as PNG Width 900 Height 968, maintain aspect ratio
+
+mmplot(stat.data=pop.eco_stats %>% 
+         filter(WSA9_NAME != "National",
+                indicator == "DISSOLVED_CH4"),
+       map.data=ecor.polys,
+       panel.types=c('dot_legend', 'labels', 'dot_cl', 'map'),
+       panel.data=list(
+         NA,
+         'WSA9_NAME',
+         list('estimate', 'lcb95pct', 'ucb95pct'),
+         NA),
+       ord.by = 'estimate', rev.ord = TRUE, grouping=3,
+       median.row=FALSE,
+       map.link=c('WSA9', 'ID'),
+       
+       plot.height=5, # what does this do?
+       plot.width=5.5, #what does this do? 
+       colors=brewer.pal(5, "Spectral"), #for journal use plot.height=9, plot.width=6.8
+       map.color2='lightgray', 
+       
+       panel.att=list(list(1, point.type=20, point.size=2,
+                           graph.border.color='white',
+                           xaxis.text.display=F, xaxis.line.display=F,
+                           graph.grid.major=F, 
+                           panel.width = 2), # added this argument to ensure the full point is shown
+                      
+                      list(2,  panel.width=2,#increased panel.width to 1.1 from .8, removed header='NARS Reporting\n Regions',
+                           align='left', text.size=0.8),#increased text.size to .8 from .6
+                      
+                      list(3, header= "CH4 concentration\n with 95% CI", 
+                           graph.bgcolor='lightgray',
+                           #xaxis.ticks=list(6.0, 7.0, 8.0, 9.0, 10.0),
+                           #xaxis.labels=list(6.0, 7.0, 8.0, 9.0, 10.0),
+                           xaxis.title='CH4 concentration (uM)', panel.width=2.3),
+                      
+                      list(4, header='Light Gray Means\n Highlighted Above',
+                           inactive.border.color=gray(.7), inactive.border.size=2,
+                           panel.width=2)),
+       
+       print.file = "output/figures/mmapCh4concentration.tiff", print.res = 300)
+
+
+
 ```
 
 ### Dissolved gas saturation ratios and source/sink status
@@ -446,13 +521,16 @@ Spatial patterns in dissolved CH4 are not apparent, although all but two sites a
 ```{r}
 ggplot() +
   geom_sf(data = ecoR, color = NA, aes(fill = WSA9_NAME)) +
-  geom_sf(data = dg.sf, aes(size = dissolved.ch4.umol, color = ch4.src.snk), 
+  geom_sf(data = dg.sf %>% filter(!is.na(ch4.src.snk)), 
+          aes(size = dissolved.ch4.umol, color = ch4.src.snk), 
           show.legend = "point") +
   ggtitle("Dissolved CH4 (uM)") +
   scale_color_manual(values = c("white", "black"), name = "source/sink") +
   scale_size(name = "dissolved CH4 (uM)",
              range = c(0.1, 10), # custom size range
-             breaks = c(0.1, 1, 10, 50, 100)) # custom breaks
+             breaks = c(0.1, 10, 50, 100)) # custom breaks
+
+ggsave("output/figures/ch4BubblePlot.tiff" )
 ```
 
 The prevalance of undersaturated dissolved N2O concentrations is an important finding.  The IPCC assumes surface waters are an important source of N2O to the atmosphere.   Webb et al. recently published a paper in PNAS reporting that 70 out of 101 reservoirs sampled in Saskatchewan were N2O sinks.  This paper made quite a splash.  In our study, `r sum(dg$n2o.src.snk == "sink")` out of `r sum(!is.na(dg$dissolved.n2o.nmol))` sampled waterbodies were an N2O sink. It is somewhat interesting to note that the some of the highest concentrations were observed in Indiana/Ohio, where I conducted much of my dissertation research on aquatic N2O emissions.
@@ -2020,6 +2098,139 @@ print(xyplot(gamma ~ dist, wmt_n2o_sf1, pch = 3, type = 'b', lwd = 2, col = 'dar
 
 ```
 
+## Linked micromaps
+The ecoreg_stats summary is for population estimates.  The code at the bottom, ecoreg_pred, I believe gives summary stats for the predicted distributions, but I would double-check with Roy. There is a quick-and-dirty micromap code used to look trying linked micromap plots on different variables.  When you settle on the variables you want to use then the full micromap code produces the pretty linked micromap plots.
+```{r, linked_micromap}
+# Read data object containing predictions for population
+Sys.time()
+load(paste0(localPath, "\\Environmental Protection Agency (EPA)\\ORD NLA17 Dissolved Gas - Documents\\inputData\\all_predictions.rda"))
+Sys.time()
+
+
+# summarize means by WSA9 (posterior median for mean and 95% credible intervals)
+# this is analogous to spsurvey "population estimates"
+ecoreg_stats <- all_predictions %>%
+  group_by(WSA9, .draw) %>%
+  summarise( mean_n2o = mean(preds_n2o),
+             mean_n2oeq = mean(preds_n2oeq),
+             mean_sat = mean(preds_sat))%>%
+  summarise( post_med_n2o = round(median(mean_n2o), 1),
+    LCI_n2o = round(quantile(mean_n2o, probs = 0.025), 1),
+    UCI_n2o = round(quantile(mean_n2o, probs = 0.975), 1),
+     post_med_n2oeq = round(median(mean_n2oeq), 2),
+    LCI_n2oeq = round(quantile(mean_n2oeq, probs = 0.025), 2),
+    UCI_n2oeq = round(quantile(mean_n2oeq, probs = 0.975), 2),
+     post_med_sat = round(median(mean_sat), 2),
+    LCI_sat = round(quantile(mean_sat, probs = 0.025), 2),
+    UCI_sat = round(quantile(mean_sat, probs = 0.975), 2),
+    n = dplyr::n())
+
+ecoreg_stats <- as.data.frame(ecoreg_stats)
+class(ecoreg_stats)
+str(ecoreg_stats) # WSA9 is a factor, but some of the stats have attribute of Named num
+
+ecoreg_stats$WSA9 <- as.character(ecoreg_stats$WSA9)
+str(ecoreg_stats)
+
+ecoreg_stats
+
+ecoregions <- st_read(paste0(localPath, "\\Environmental Protection Agency (EPA)\\",
+                             "ORD NLA17 Dissolved Gas - Documents\\inputData\\aggr_ecoregions_simple.shp"))
+
+wsa9names <- st_set_geometry(ecoregions, NULL) %>%
+  select(WSA9, WSA9_NAME)
+
+ecoreg_stats <- left_join(ecoreg_stats, wsa9names)
+
+ecoregions <- st_transform(ecoregions, 5070)
+# make spatial polygon dataframe need for micromap
+ecoregions_sp1 <- as(ecoregions, "Spatial")
+
+# convert to map_table for linked micromap
+ecor.polys <- create_map_table(ecoregions_sp1, 'WSA9')
+class(ecor.polys)
+str(ecor.polys, max =2) # ID is chr "CPL"...
+
+
+# Quick & Dirty micromap code:  use this to test out micromap plot of different summary statistics to get their x-axis values
+mmplot(stat.data=ecoreg_stats,
+       map.data=ecor.polys,
+       panel.types=c('dot_legend', 'labels', 'dot_cl', 'dot_cl', 'map'),
+       panel.data=list(
+         NA,
+         'WSA9_NAME',
+         list('post_med_n2o', 'LCI_n2o', 'UCI_n2o'),
+         list('post_med_sat', 'LCI_sat', 'UCI_sat'),
+         NA),
+       ord.by='post_med_n2o', grouping=3,
+       median.row=FALSE,
+       map.link=c('WSA9', 'ID'))
+
+# Full code:  Use this to produce final linked micromaps of the variables you want
+# export as pdf US letter landscape from Plots pane
+# export as PNG Width 900 Height 968, maintain aspect ratio
+tiff(filename = "output/figures/mmplot.tiff",
+     res = 800, width = 9.00, height = 9.68, units = "in" )
+
+mmplot(stat.data=ecoreg_stats,
+       map.data=ecor.polys,
+       panel.types=c('dot_legend', 'labels', 'dot_cl', 'dot_cl', 'map'),
+       panel.data=list(
+         NA,
+         'WSA9_NAME',
+         list('post_med_n2o', 'LCI_n2o', 'UCI_n2o'),
+         list('post_med_sat', 'LCI_sat', 'UCI_sat'),
+         NA),
+       ord.by = 'post_med_n2o', rev.ord = TRUE, grouping=3,
+       median.row=FALSE,
+       map.link=c('WSA9', 'ID'),
+       
+       plot.height=7, plot.width=7, #for poster use plot.height=6, plot.width=9,
+       colors=brewer.pal(5, "Spectral"), #for journal use plot.height=9, plot.width=6.8
+       map.color2='lightgray', 
+       
+       panel.att=list(list(1, point.type=20, point.size=2,
+                           graph.border.color='white',
+                           xaxis.text.display=F, xaxis.line.display=F,
+                           graph.grid.major=F),
+                      
+                      list(2, header='NARS Reporting\n Regions', panel.width=1.25,#increased panel.width to 1.1 from .8
+                           align='left', text.size=1),#increased text.size to .8 from .6
+                      
+                      list(3, header='N2O Concentration\n with 95% CI',
+                           graph.bgcolor='lightgray',
+                           xaxis.ticks=list(6.0, 7.0, 8.0, 9.0, 10.0),
+                           xaxis.labels=list(6.0, 7.0, 8.0, 9.0, 10.0),
+                           xaxis.title='N2O mg/L', panel.width=1.25),
+                      
+                      list(4, header='N2O Saturation\n with 95% CI',
+                           graph.bgcolor='lightgray',
+                           xaxis.ticks=list(0.8, 1.0, 1.2, 1.4, 1.6),
+                           xaxis.labels=list(0.8, 1.0, 1.2, 1.4, 1.6),
+                           xaxis.title='N2O Saturation, %',panel.width=1.25),              
+                      
+                      list(5, header='Light Gray Means\n Highlighted Above',
+                           inactive.border.color=gray(.7), inactive.border.size=2,
+                           panel.width=2)))
+
+dev.off()
+
+
+# To get ecoregional distributions of the predictions I think this is the code we would use based on our conversation with Roy, but I would double-check with him.
+
+ecoreg_preds <- all_predictions %>%
+  group_by(WSA9, .draw) %>%
+  summarise( post_med_n2o = round(median(mean_n2o), 1),
+    LCI_n2o = round(quantile(mean_n2o, probs = 0.025), 1),
+    UCI_n2o = round(quantile(mean_n2o, probs = 0.975), 1),
+     post_med_n2oeq = round(median(mean_n2oeq), 2),
+    LCI_n2oeq = round(quantile(mean_n2oeq, probs = 0.025), 2),
+    UCI_n2oeq = round(quantile(mean_n2oeq, probs = 0.975), 2),
+     post_med_sat = round(median(mean_sat), 2),
+    LCI_sat = round(quantile(mean_sat, probs = 0.025), 2),
+    UCI_sat = round(quantile(mean_sat, probs = 0.975), 2),
+    n = dplyr::n())
+```
 # Exploratory analysis of N2O data
 The mean N2O saturation ratio for the country is `r pop.eco.sat %>% filter(type == "National", subpopulation == "National", indicator == "N2O_SAT_RATIO") %>% select(estimate) %>% pull() %>% round(2)` (95% CI = `r pop.eco.sat %>% filter(type == "National", subpopulation == "National", indicator == "N2O_SAT_RATIO") %>% select(lcb95pct) %>% pull() %>% round(2)` - `r pop.eco.sat %>% filter(type == "National", subpopulation == "National", indicator == "N2O_SAT_RATIO") %>% select(ucb95pct) %>% pull() %>% round(2)`), suggesting that US waterbodies are a new N2O sink during the NLA index period.  This finding is consistent with a recent report that 67% of 101 agricultural ponds in Canada were undersaturated in N2O during the summer (Webb et al. 2019, PNAS).
 
@@ -2057,3 +2268,710 @@ model <- tree(dissolved.n2o.nmol ~ MeanDUsed + nitrate.n.result + ntl.lab.result
 plot(model)
 text(model)
 ```
+# ASLO 2021
+
+## Site Map
+```{r}
+# Load data
+ load(paste0(localPath,
+            "/Environmental Protection Agency (EPA)/",
+            "ORD NLA17 Dissolved Gas - Documents/",
+            "inputData/dg.2021-02-01.RData"))
+
+# To enable mapping the dataframe will be converted to a 'simple features' (sf) object.
+# Define coordinates
+coords <- data.frame(longitude = dg$map.lon.dd, latitude = dg$map.lat.dd)
+
+dg.sf <- st_as_sf(dg, coords = c("map.lon.dd", "map.lat.dd"), 
+                  crs = 4269) %>% # standard for lat/lon
+  st_transform(5070) # project to CONUS ALBERS for plotting
+
+# read in ecoregion polygons
+ecoR <- st_read(dsn = paste0(localPath, 
+                             "/Environmental Protection Agency (EPA)/",
+                             "ORD NLA17 Dissolved Gas - Documents/inputData"),
+                layer = "aggr_ecoregions_simple")
+
+# Check CRS
+#st_crs(ecoR) # 3857
+ecoR <- st_transform(ecoR, 5070) # convert to CONUS Albers
+#st_crs(ecoR) # 5070
+
+# Load state boundaries
+states <- USAboundaries::us_states() %>%
+  dplyr::filter(!state_name %in% c("Alaska", "District of Columbia", "Hawaii", "Puerto Rico")) %>%
+  st_transform(5070) # convert to CONUS Albers
+
+
+ggplot() +
+  geom_sf(data = ecoR, color = NA, aes(fill = WSA9_NAME)) +
+  geom_sf(data = dg.sf) +
+  geom_sf(data = states, fill = NA, color = "white", size = 0.1) +
+  theme_void() +
+  theme(legend.title = element_blank())
+
+ggsave("output/figures/siteMap.tiff")
+
+```
+
+
+## Population Data
+
+```{r}
+# about 15 minutes to load first time
+# 6/7/21 <2 minutes
+Sys.time()
+load(paste0(localPath, "\\Environmental Protection Agency (EPA)\\ORD NLA17 Dissolved Gas - Documents\\inputData\\all_predictions.rda"))
+Sys.time()
+```
+
+
+## Explore structure of all_predictions object
+```{r}
+head(all_predictions)
+```
+.row uniquely identifies each waterbody.  There are `r all_predictions %>% distinct(.row) %>% nrow()` waterbodies in the sample frame.  `.draw` reflects the simulation number for each waterbody. I think this is a 'draw from the posterior distribution'.  The data contains `r all_predictions %>% distinct(.draw) %>% nrow()` draws for each waterbody.
+
+The `size_cat` variable largely uses the NLA size category definitions.  This may not be the best for showing N2O fluxes by lake size bins, however.  The >50 ha (0.5km2) has most of the surface area
+
+```{r}
+# total area by size_cat bar chart
+all_predictions %>%
+  filter(.draw == 1) %>%
+  group_by(WSA9, size_cat) %>%
+  summarise(tot_area = sum(area_ha)) %>%
+  ggplot(aes(x=size_cat, y=tot_area)) +
+  geom_bar(stat = "identity") +
+  facet_wrap(~WSA9)
+
+
+
+
+```
+
+Lets create a new size category with more even surface area distributions.
+
+```{r}
+# 11 minutes on VM!
+all_predictions <- all_predictions %>%
+  #filter(.draw == 1) %>% # testing
+  mutate(area_km2 = area_ha / 100, # this works
+         size_cat2 = ifelse(area_km2 < 0.1,
+                            "<0.1",
+                            ifelse(area_km2 >= 0.1 & area_km2 < 1,
+                                   "0.1 - 1",
+                                   ifelse(area_km2 >=1 & area_km2 <10,
+                                          "0.1 - 1",
+                                          ifelse(area_km2 >=10 & area_km2 <100,
+                                                 "10 - 100",
+                                                 ifelse(area_km2 >=100, 
+                                                        ">100",
+                                                        NA))))),
+         size_cat2 = factor(size_cat2, ordered = TRUE, 
+                            levels = c("<0.1", "0.1 - 1", "1 - 10", "10 - 100", ">100"))) %>%
+  select(-area_km2)
+
+# total area by size_cat2 bar chart
+all_predictions %>%
+  filter(.draw == 1) %>%
+  group_by(WSA9, size_cat2) %>%
+  summarise(tot_area = sum(area_ha)) %>%
+  ggplot(aes(x=size_cat2, y=tot_area)) +
+  geom_bar(stat = "identity") +
+  facet_wrap(~WSA9)
+
+```
+
+## Reorder WSA9
+Reorder WSA9 to correspond with order of first micromap produced below, which is ordered by extent of N2O saturation.
+```{r}
+all_predictions <- all_predictions %>%
+  mutate(WSA9 = factor(WSA9,
+                       levels = c("NPL", "TPL", "UMW", 
+                                  "CPL", "SPL", "SAP",
+                                  "XER", "NAP", "WMT"),
+                       labels = c("Northern Plains", "Temperate Plains",
+                                  "Upper Midwest", "Coastal Plains", "Southern Plains", "Southern Appalachians", "Xeric", "Northern Appalachians", "Western Mountains")))
+
+
+```
+
+
+## N2O saturation ratio: continuous variable
+N2O saturation ratio in the sample data has a long right tail, with a maximum value of ~30.  The distribution of the values predicted to the population also has a long right tail, but features more extreme values (>600).
+```{r}
+# PLOT N2O SAT RATIO BY WSA9
+
+
+# point and linerange
+all_predictions %>%
+  group_by(WSA9, .draw) %>%
+  #group_by(.draw) %>%
+  summarise( mean_sat = mean(preds_sat)) %>%
+  summarise( estimate = round(median(mean_sat), 3),
+    LCL = round(quantile(mean_sat, probs = 0.025), 3),
+    UCL = round(quantile(mean_sat, probs = 0.975), 3)) %>% 
+  mutate(ecoregion = factor(WSA9)) %>%
+  #mutate(type = "MR") %>%
+  select(ecoregion, estimate, LCL, UCL) %>%
+  mutate(ecoregion = fct_reorder(ecoregion, estimate)) %>%
+  ggplot( aes( x = ecoregion, y = estimate ) ) +
+  geom_point() +
+  geom_linerange( aes( ymin = LCL, ymax = UCL)) +
+  geom_hline(yintercept = 1, color='blue') +
+  ylab("mean N2O saturation ratio") +
+  coord_flip() + 
+  theme_bw()
+
+
+
+# density plots of predicted distribution
+# using xlim to zoom in on values close to 1
+p <- all_predictions %>%
+  filter(.draw %in% 1:10) %>% # subset for practice
+  #mutate(ecoregion = factor(WSA9)) %>%
+  #mutate(ecoregion = fct_reorder(ecoregion, preds_sat)) %>%
+  ggplot( aes( x = preds_sat, group = .draw, color = .draw ) ) +
+  geom_density(show.legend = FALSE) +
+  geom_vline(xintercept = 1, color = "red") +
+  xlab(expression(N[2]*O~saturation~ratio)) +
+  xlim(0,5) + # data range is 0-600, but sample max is 30
+  facet_wrap(~WSA9) +
+  theme_bw()
+  
+# this bit fills strip with same colors used in micromap (see below)
+#https://stackoverflow.com/questions/19440069/ggplot2-facet-wrap-strip-color-based-on-variable-in-data-set
+g <- ggplot_gtable(ggplot_build(p))
+stripr <- which(grepl('strip-t', g$layout$name)) # need strip-t, not strip-r
+fills <- rep(brewer.pal(5, "Spectral")[c(1,3,5)], 3) # these are the 3 colors used in micromap
+k <- 1
+for (i in stripr) {
+  j <- which(grepl('rect', g$grobs[[i]]$grobs[[1]]$childrenOrder))
+  g$grobs[[i]]$grobs[[1]]$children[[j]]$gp$fill <- fills[k]
+  k <- k+1
+}
+grid::grid.draw(g)
+
+ggsave("output/figures/n2oSatDensitySmallRange.tiff", g)
+
+summary(dg$n2o.sat.ratio) # max value in sample is 33
+
+
+# rplot, but show full x-axis range
+# include RUG to better show extreme values
+p <- all_predictions %>%
+  filter(.draw == 1) %>% # need only one draw, otherwise RUG is misleading
+  #mutate(ecoregion = factor(WSA9)) %>%
+  #mutate(ecoregion = fct_reorder(ecoregion, preds_sat)) %>%
+  ggplot( aes( x = preds_sat ) ) +
+  geom_density(color = "blue") +
+  geom_vline(xintercept = 1, color = "red") +
+  geom_rug() +
+  xlab(expression(N[2]*O~saturation~ratio)) +
+  #xlim(0,35) + # data range is 0-600, but sample max is 30
+  facet_wrap(~WSA9, scales = "free") +
+  theme_bw()
+  
+# this bit fills strip with same colors used in micromap (see below)
+#https://stackoverflow.com/questions/19440069/ggplot2-facet-wrap-strip-color-based-on-variable-in-data-set
+g <- ggplot_gtable(ggplot_build(p))
+stripr <- which(grepl('strip-t', g$layout$name)) # need strip-t, not strip-r
+fills <- rep(brewer.pal(5, "Spectral")[c(1,3,5)], 3) # these are the 3 colors used in micromap
+k <- 1
+for (i in stripr) {
+  j <- which(grepl('rect', g$grobs[[i]]$grobs[[1]]$childrenOrder))
+  g$grobs[[i]]$grobs[[1]]$children[[j]]$gp$fill <- fills[k]
+  k <- k+1
+}
+grid::grid.draw(g)
+
+ggsave("output/figures/n2oSatDensityFullRange.tiff", g)
+
+
+
+# Take a peak at values >40 in predictions
+all_predictions %>%
+    filter(preds_sat > 40, .draw == 1) %>% # look at one draw
+  {table(.$WSA9)} # >40 is uncommon outside of CPL
+
+
+# # density plots of observed distribution
+# huge right tail
+dg %>%
+  mutate(ecoregion = factor(ag.eco9.nm)) %>%
+  mutate(ecoregion = fct_reorder(ecoregion, n2o.sat.ratio)) %>%
+  ggplot( aes( x = n2o.sat.ratio ) ) +
+  geom_density() +
+  xlab("mean N2O saturation ratio") +
+  facet_wrap(~ecoregion) +
+  theme_bw()
+
+
+
+```
+
+## N2O saturation ratio: extent estimate
+```{r}
+# EXTENT OF WATERBODIES FUNCTIONING AS SINKS BY ECOREGION
+
+# density plot
+all_predictions %>%
+  group_by(WSA9, .draw) %>%
+  # below summarise generates 500 proportions per WSA
+  summarise(prop_sat = sum(preds_sat < 1) / length(unique(.row))) %>%
+  ggplot(aes(x=prop_sat)) + 
+  geom_density() +
+  facet_wrap(~WSA9) +
+  xlab("Proportion of waterbodies functioning as N2O sinks") +
+  theme_bw()
+ggsave("output/figures/extentDensityPlot.tiff")
+  
+# point and line plot
+all_predictions %>%
+  group_by(WSA9, .draw) %>%
+  summarise(prop_sat = sum(preds_sat < 1) / length(.row)) %>% # Roy had length(unique(.row)) here, but the unique isn't necessary.  this object is grouped by WSA9
+  summarise(estimate = round(median(prop_sat), 3),
+    LCL = round(quantile(prop_sat, probs = 0.025), 3),
+    UCL = round(quantile(prop_sat, probs = 0.975), 3)) %>% 
+  mutate(ecoregion = factor(WSA9)) %>%
+  select(ecoregion, estimate, LCL, UCL) %>%
+  mutate(ecoregion = fct_reorder(ecoregion, estimate)) %>%
+  ggplot( aes( x = ecoregion, y = estimate ) ) +
+  geom_point() +
+  geom_linerange( aes( ymin = LCL, ymax = UCL )) +
+  ylab("Proportion of waterbodies functioning as N2O sinks") +
+  coord_flip() + 
+  theme_bw()
+ggsave("output/figures/extentPointLinerange.tiff")
+
+# bar and line plot
+all_predictions %>%
+  group_by(WSA9, .draw) %>%
+  summarise(prop_sat = sum(preds_sat < 1) / length(.row)) %>% # Roy had length(unique(.row)) here, but the unique isn't necessary.  this object is grouped by WSA9
+  summarise(estimate = round(median(prop_sat), 3),
+    LCL = round(quantile(prop_sat, probs = 0.025), 3),
+    UCL = round(quantile(prop_sat, probs = 0.975), 3)) %>% 
+  mutate(ecoregion = factor(WSA9)) %>%
+  select(ecoregion, estimate, LCL, UCL) %>%
+  mutate(ecoregion = fct_reorder(ecoregion, estimate)) %>%
+  ggplot( aes( x = ecoregion, y = estimate ) ) +
+  geom_bar(stat = "identity", aes(fill = ecoregion)) +
+  geom_linerange( aes( ymin = LCL, ymax = UCL )) +
+  ylab("Proportion of waterbodies functioning as N2O sinks") +
+  coord_flip() + 
+  theme_bw()  
+ggsave("output/figures/extentBar.tiff")
+```
+
+## N2O emission rate and flux
+### Calculations
+Roy predicted N2O equilibrium and concentration to the population.  I used ERA5 to calculate mean wind speed during the index period for each lake in the population.  I need to match wind speed to Roy's predictions.  Waterbodies in Roy's predictions are identified by '.row'.  There are `r all_predictions %>% distinct(.row) %>% summarize(population = n()) %>% pull()` rows.
+
+
+```{r}
+
+# Read in wind data
+# Mean index period wind speed was calculated on VM via 
+# nlaSampleFrameWind.R.  The resulting data object was written out and read in below.
+wind <- read.table(paste0(Sys.getenv("USERPROFILE"), 
+                                    "/Environmental Protection Agency (EPA)/",
+                                    "ORD NLA17 Dissolved Gas - Documents/",
+                                    "inputData/windSampleFrame.txt"))
+# print first 6 lines
+wind %>% head()
+
+# print first 6 .row values of all_predictions
+all_predictions %>%
+  filter(.row %in% 1:6) %>% # each row is a unique waterbody
+  group_by(.row) %>%
+  slice(1) # grabs first record
+  
+# Row order in wind and all_predictions is inherited from sample frame.  Thus row 1
+# of wind corresponds to .row == 1 in all_predictions.  This is a sketchy way to merge
+# things, but will do for now.
+
+# add .id to wind which is simply row number
+wind <- wind %>% mutate(.id = row_number())
+
+# Merge wind and all_predictions
+all_predictions.w <- full_join(all_predictions, wind, by = c(".row" = ".id")) # too much for laptop,30 seconds on VM
+dim(wind) # 465897
+dim(all_predictions) #232948500, 500 observations for each lake
+465897*500 #232948500
+dim(all_predictions.w) #wind.sampFr. good
+
+
+# ESTIMATE GAS EXCHANGE RATE FOR POPULATION
+
+# Using gas exchange model from:
+# Vachon, D., and Y. T. Prairie (2013), The ecosystem size and shape 
+# dependence of gas transfer velocity versus wind speed relationships in 
+# lakes, Can. J. Fish. Aquat. Sci., 70(12), 1757-1764, doi:10.1139/cjfas-2013-0241.
+# Table 2, model B.
+
+# define k600 prediction function
+pred.k600 <- function(ws, area) { 
+  # predict k600 in cm h-1
+  # ws = wind speed (m s-1)
+  # area = lake area (km2)
+  2.51 + (1.48 * ws) + (0.39 * ws * log10(area))
+}
+
+
+all_predictions.w <- all_predictions.w %>%
+  mutate(k600.cm.h = pred.k600(ws = ws, area = area_ha/100), # 100ha = 1km2
+         # 1000 L to m3. 44ng to 1nmol. ng->ug. ug->mg
+         e.n2o.mg.m2.d = (((preds_n2o - preds_n2oeq) * 1000 * 44) / (1000 * 1000)) * 
+           (k600.cm.h * (24/100)), #h->day. cm->m
+         f.n2o.Mg.y = (e.n2o.mg.m2.d * 365 * (area_ha*10000)) / # day to year. ha to m2.
+           (1000*1000*1000)) #mg-g, g-kg, kg-Mg
+
+# write reduced file to disk for less computationally intensive wrangling
+#all_predictions.w.small <- all_predictions.w %>% filter(.draw %in% 1:5)
+
+#save(all_predictions.w.small,
+#     file = paste0(Sys.getenv("USERPROFILE"), 
+#                   "/Environmental Protection Agency (EPA)/",
+#                   "ORD NLA17 Dissolved Gas - Documents/",
+#                   "inputData/all_predictions_w_small.rda"))
+```
+### compared to literature and US GHG inventory
+The distribution of N2O emission rates (mg N2O m-2 d-1) for one draw is very similar to that derived from a literature review of lake/reservoir emission rates (DelSontro et al), except for CPL which shows some exceedingly high rates.  Overall, our results look reasonable.
+
+The total N2O flux from US lakes and reservoirs is minor compared to other anthropogenic N2O sources
+```{r}
+all_predictions.w %>% 
+  filter(.draw == 1) %>% 
+  ggplot(aes(x=e.n2o.mg.m2.d)) + 
+  geom_density() +
+  geom_rug() + 
+  facet_wrap(~WSA9, scales = "free")
+
+
+knitr::include_graphics((paste0(Sys.getenv("USERPROFILE"), 
+                                    "/Environmental Protection Agency (EPA)/",
+                                    "ORD NLA17 Dissolved Gas - Documents/",
+                                    "EDA/en2oLiterature.tiff")))
+
+
+
+## Comparison to US GHG inventory
+# top sources from inventory report in kt / year
+n2o <- data.frame(kt = c(1156,88,84,66,60,34,18,14,7),
+                     source = c("Agricultural Soil Management",
+                                "Wastewater Treatment",
+                                "Stationary Combustion",
+                                "Manure Management",
+                                "Mobile Combustion",
+                                "Nitric Acid Production",
+                                "Adipid Acid Production",
+                                "N2O from Product Uses",
+                                "Composting"))
+
+n2o <- n2o %>% mutate(Mg = (kt * 1000 * 1000) / 1000,  # 1000 metric tons in a kt, 1000 kg in a metric ton, 1000 kg in a Mg
+                      Gg = Mg / 1000) 
+
+# National scale number for lakess/reservoirs (this is is Gg)
+national.lakes <- all_predictions.w %>% 
+  group_by(.draw) %>% 
+  summarise(total.n2o = sum(f.n2o.Mg.y)) %>% 
+  summarise(Gg = round(mean(total.n2o), 3) / 1000, # divide by 1000 for Mg to Gg
+            Gg_LCL = round(quantile(total.n2o, probs = 0.025), 3) / 1000, # divide by 1000 for Mg to Gg
+            Gg_UCL = round(quantile(total.n2o, probs = 0.975), 3) / 1000) %>% # divide by 1000 for Mg to Gg
+  mutate(source = "Lakes and Reservoirs")
+
+# Merge lakes and inventory category
+inventory <- full_join(n2o, national.lakes)
+inventory
+
+inventory %>% mutate(source = as.factor(source),
+                     source = reorder(source, Gg)) %>%
+  ggplot(aes(source, Gg)) +
+  geom_bar(stat = "identity", color = "orange", fill = "orange") +
+  geom_errorbar(aes(x=source, ymin = Gg_LCL, ymax = Gg_UCL), width = 0.5) +
+  coord_flip() +
+  ylab(expression(N[2]*O~flux~(Gg~year^{-1}))) +
+  theme_bw() +
+  theme(axis.title.y = element_blank())
+ggsave(filename = "output/figures/n2oInventory.tiff")
+
+tiff("output/figures/n2oInventoryPie.tiff")
+pie.labels <- c("Agricultural Soil Management",
+                "Wastewater Treatment",
+                "Stationary Combustion",
+                "Manure Management",
+                "Mobile Combustion",
+                "Nitric Acid Production",
+                NA,
+                NA,
+                NA,
+                "Lakes and Reservoirs")
+pie(inventory$Gg, labels = pie.labels, col = brewer.pal(8, "Set2"), radius = 0.6, cex = 0.9)
+dev.off()
+
+(national.lakes$Gg/sum(inventory$Gg)) * 1000 #1.6%
+```
+
+### Figures and tables
+Below is the distribution of total annual fluxes from the lakes.  This is calculated as lake area * emission rate.
+
+
+```{r}
+# density plot with RUG for one draw
+all_predictions.w %>% filter(.draw == 1) %>% ggplot(aes(x=f.n2o.Mg.y)) + geom_density() +geom_rug() + facet_wrap(~WSA9, scales = "free")
+
+# flux vs area for one draw
+all_predictions.w %>% filter(.draw == 1) %>% ggplot(aes(y=f.n2o.Mg.y, x=area_ha)) + geom_point() + facet_wrap(~WSA9, scales = "free")
+
+# bar plot by size category and ecoregion  
+all_predictions.w %>% filter(.draw == 1) %>% group_by(WSA9, size_cat2) %>% summarise(total.n2o = sum(f.n2o.Mg.y)) %>% 
+  ggplot(aes(x=size_cat2, y=total.n2o)) + geom_bar(stat = "identity") + facet_wrap(~WSA9, scales = "free")
+
+
+# bar plot by size category with error
+p <- all_predictions.w %>% 
+  group_by(WSA9, .draw, size_cat2) %>% 
+  summarise(total.n2o = sum(f.n2o.Mg.y)) %>% 
+  group_by(WSA9, size_cat2) %>%
+  summarise(post_med_fn2o = round(mean(total.n2o), 3), 
+            LCL_fn2o = round(quantile(total.n2o, probs = 0.025), 3),
+            UCL_fn2o = round(quantile(total.n2o, probs = 0.975), 3)) %>%
+  ggplot(aes(x=size_cat2, y=post_med_fn2o)) + 
+  geom_bar(stat = "identity") + 
+  geom_errorbar(aes(x=size_cat2, ymin = LCL_fn2o, ymax = UCL_fn2o)) +
+    xlab(expression(Lake~Size~Bin~(km^{2}))) +
+  ylab(expression(Mg~N[2]*O~year^{-1})) +
+  facet_wrap(~WSA9, scales = "free") +
+  theme_bw()
+
+# this bit fills strip with same colors used in micromap (see below)
+#https://stackoverflow.com/questions/19440069/ggplot2-facet-wrap-strip-color-based-on-variable-in-data-set
+g <- ggplot_gtable(ggplot_build(p))
+stripr <- which(grepl('strip-t', g$layout$name)) # need strip-t, not strip-r
+fills <- rep(brewer.pal(5, "Spectral")[c(1,3,5)], 3) # these are the 3 colors used in micromap
+k <- 1
+for (i in stripr) {
+  j <- which(grepl('rect', g$grobs[[i]]$grobs[[1]]$childrenOrder))
+  g$grobs[[i]]$grobs[[1]]$children[[j]]$gp$fill <- fills[k]
+  k <- k+1
+}
+grid::grid.draw(g)
+
+ggsave("output/figures/n2oFluxByLakeSizeWithError.tiff", g)
+
+
+
+
+
+# bar plot by size category without error
+p <- all_predictions.w %>% 
+  group_by(WSA9, .draw, size_cat2) %>% 
+  # tot x size x draw
+  summarise(total.n2o = sum(f.n2o.Mg.y),
+            obs = n()) %>% # number of lakes per WSA x size
+  group_by(WSA9, size_cat2) %>%
+  summarise(post_med_fn2o = round(mean(total.n2o), 3), # across draws
+            LCL_fn2o = round(quantile(total.n2o, probs = 0.025), 3),
+            UCL_fn2o = round(quantile(total.n2o, probs = 0.975), 3),
+            obs = mean(obs)) %>% # obs is repeated across draws.  mean gives identity
+  ggplot(aes(x=size_cat2, y=post_med_fn2o)) + 
+  geom_bar(stat = "identity") + 
+  xlab(expression(Lake~Size~Bin~(km^{2}))) +
+  ylab(expression(Mg~N[2]*O~year^{-1})) +
+  #scale_x_discrete(labels = c("min to 4", "4-10", "10-20", "20-50", ">50")) +
+  #geom_errorbar(aes(x=size_cat, ymin = LCL_fn2o, ymax = UCL_fn2o)) +
+  facet_wrap(~WSA9, scales = "free_y") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+  geom_text(aes(label = scales::comma(obs, accuracy = 1)), # comma for thousands separator, accurary for decimal points
+            vjust = -0.5, size = 3) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.2)))
+
+  
+# this bit fills strip with same colors used in micromap (see below)
+#https://stackoverflow.com/questions/19440069/ggplot2-facet-wrap-strip-color-based-on-variable-in-data-set
+g <- ggplot_gtable(ggplot_build(p))
+stripr <- which(grepl('strip-t', g$layout$name)) # need strip-t, not strip-r
+fills <- rep(brewer.pal(5, "Spectral")[c(1,3,5)], 3) # these are the 3 colors used in micromap
+k <- 1
+for (i in stripr) {
+  j <- which(grepl('rect', g$grobs[[i]]$grobs[[1]]$childrenOrder))
+  g$grobs[[i]]$grobs[[1]]$children[[j]]$gp$fill <- fills[k]
+  k <- k+1
+}
+grid::grid.draw(g)
+
+ggsave("output/figures/n2oFluxByLakeSizeNoError.tiff", g)
+
+
+```
+
+## micromap: N2O saturation ratio continuous, extent, and emission rate
+```{r}
+# summarize means by WSA9 (posterior median for mean and 95% credible intervals)
+# this is analogous to spsurvey "population estimates"
+ecoreg_stats <- all_predictions.w %>%
+  group_by(WSA9, .draw) %>%
+  summarise( mean_n2o = mean(preds_n2o),
+             mean_n2oeq = mean(preds_n2oeq),
+             mean_sat = mean(preds_sat),
+             prop_sat = sum(preds_sat < 1) / length(unique(.row)),
+             mean_en2o = mean(e.n2o.mg.m2.d),
+             fn2o_Mg = sum(f.n2o.Mg.y)) %>%
+  summarise( post_med_n2o = round(mean(mean_n2o), 1),
+             LCI_n2o = round(quantile(mean_n2o, probs = 0.025), 1),
+             UCI_n2o = round(quantile(mean_n2o, probs = 0.975), 1),
+             post_med_n2oeq = round(mean(mean_n2oeq), 2),
+             LCI_n2oeq = round(quantile(mean_n2oeq, probs = 0.025), 2),
+             UCI_n2oeq = round(quantile(mean_n2oeq, probs = 0.975), 2),
+             post_med_sat = round(mean(mean_sat), 2),
+             LCI_sat = round(quantile(mean_sat, probs = 0.025), 2),
+             UCI_sat = round(quantile(mean_sat, probs = 0.975), 2),
+             estimate = round(mean(prop_sat), 3),
+             LCL = round(quantile(prop_sat, probs = 0.025), 3),
+             UCL = round(quantile(prop_sat, probs = 0.975), 3),
+             post_med_en2o = round(mean(mean_en2o), 3),
+             LCL_en2o = round(quantile(mean_en2o, probs = 0.025), 3),
+             UCL_en2o = round(quantile(mean_en2o, probs = 0.975), 3),
+             post_med_fn2o = round(mean(fn2o_Mg), 3), 
+             LCL_fn2o = round(quantile(fn2o_Mg, probs = 0.025), 3),
+             UCL_fn2o = round(quantile(fn2o_Mg, probs = 0.975), 3),
+             n = dplyr::n())
+
+ecoreg_stats <- as.data.frame(ecoreg_stats)
+class(ecoreg_stats)
+str(ecoreg_stats) # WSA9 is a factor, but some of the stats have attribute of Named num
+
+ecoreg_stats$WSA9_NAME <- as.character(ecoreg_stats$WSA9)
+ecoreg_stats <- ecoreg_stats %>% select(-WSA9)
+str(ecoreg_stats)
+
+ecoreg_stats
+
+ecoregions <- st_read(paste0(localPath, "\\Environmental Protection Agency (EPA)\\",
+                             "ORD NLA17 Dissolved Gas - Documents\\inputData\\aggr_ecoregions_simple.shp"))
+
+wsa9names <- st_set_geometry(ecoregions, NULL) %>%
+  select(WSA9, WSA9_NAME)
+
+ecoreg_stats <- left_join(ecoreg_stats, wsa9names)
+
+ecoregions <- st_transform(ecoregions, 5070)
+# make spatial polygon dataframe need for micromap
+ecoregions_sp1 <- as(ecoregions, "Spatial")
+
+# convert to map_table for linked micromap
+ecor.polys <- create_map_table(ecoregions_sp1, 'WSA9')
+class(ecor.polys)
+str(ecor.polys, max =2) # ID is chr "CPL"...
+
+
+
+
+# N2O SATURATION AND UNDERSATURATION EXTENT
+# Full code:  Use this to produce final linked micromaps of the variables you want
+# export as pdf US letter landscape from Plots pane
+# export as PNG Width 900 Height 968, maintain aspect ratio
+
+mmplot(stat.data=ecoreg_stats,
+       map.data=ecor.polys,
+       panel.types=c('dot_legend', 'labels', 'dot_cl', 'dot_cl', 'map'),
+       panel.data=list(
+         NA,
+         'WSA9_NAME',
+         list('estimate', 'LCL', 'UCL'),
+         list('post_med_sat', 'LCI_sat', 'UCI_sat'),
+         NA),
+       ord.by = 'estimate', rev.ord = TRUE, grouping=3,
+       median.row=FALSE,
+       map.link=c('WSA9', 'ID'),
+       
+       plot.height=5, # what does this do?
+       plot.width=7, #what does this do? 
+       colors=brewer.pal(5, "Spectral"), #for journal use plot.height=9, plot.width=6.8
+       map.color2='lightgray', 
+       
+       panel.att=list(list(1, point.type=20, point.size=2,
+                           graph.border.color='white',
+                           xaxis.text.display=F, xaxis.line.display=F,
+                           graph.grid.major=F, 
+                           panel.width = 2), # added this argument to ensure the full point is shown
+                      
+                      list(2,  panel.width=2,#increased panel.width to 1.1 from .8, removed header='NARS Reporting\n Regions',
+                           align='left', text.size=0.8),#increased text.size to .8 from .6
+                      
+                      list(3, header= "Proportion undersaturated\n with 95% CI", 
+                           graph.bgcolor='lightgray',
+                           #xaxis.ticks=list(6.0, 7.0, 8.0, 9.0, 10.0),
+                           #xaxis.labels=list(6.0, 7.0, 8.0, 9.0, 10.0),
+                           xaxis.title='Proportion undersaturated', panel.width=2.3),
+                      
+                      list(4, header="N2O Saturation\n with 95% CI", #N2O Saturation\n with 95% CI
+                           graph.bgcolor='lightgray',
+                           xaxis.ticks=list(0.8, 1.0, 1.2, 1.4, 1.6),
+                           xaxis.labels=list(0.8, 1.0, 1.2, 1.4, 1.6),
+                           xaxis.title='N2O Saturation, %',panel.width=2.3),              
+                      
+                      list(5, header='Light Gray Means\n Highlighted Above',
+                           inactive.border.color=gray(.7), inactive.border.size=2,
+                           panel.width=2)),
+       
+       print.file = "output/figures/mmapSatExtent.tiff", print.res = 300)
+
+
+
+
+# N2O EMISSION AND FLUX
+# Full code:  Use this to produce final linked micromaps of the variables you want
+# export as pdf US letter landscape from Plots pane
+# export as PNG Width 900 Height 968, maintain aspect ratio
+
+ 
+mmplot(stat.data=ecoreg_stats,
+       map.data=ecor.polys,
+       panel.types=c('dot_legend', 'labels', 'dot_cl', 'dot_cl', 'map'),
+       panel.data=list(
+         NA,
+         'WSA9_NAME',
+         list('post_med_en2o', 'LCL_en2o', 'UCL_en2o'),
+         list('post_med_fn2o', 'LCL_fn2o', 'UCL_fn2o'),
+         NA),
+       ord.by = 'post_med_en2o', rev.ord = TRUE, grouping=3,
+       median.row=FALSE,
+       map.link=c('WSA9', 'ID'),
+       
+       plot.height=5, # what does this do?
+       plot.width=7, #what does this do? 
+       colors=brewer.pal(5, "Spectral"), #for journal use plot.height=9, plot.width=6.8
+       map.color2='lightgray', 
+       
+       panel.att=list(list(1, point.type=20, point.size=2,
+                           graph.border.color='white',
+                           xaxis.text.display=F, xaxis.line.display=F,
+                           graph.grid.major=F, 
+                           panel.width = 2), # added this argument to ensure the full point is shown
+                      
+                      list(2,  panel.width=2,
+                           align='left', text.size=0.8),
+                      
+                      list(3, header= "Emission rate\n with 95% CI", 
+                           graph.bgcolor='lightgray',
+                           #xaxis.ticks=list(6.0, 7.0, 8.0, 9.0, 10.0),
+                           #xaxis.labels=list(6.0, 7.0, 8.0, 9.0, 10.0),
+                           xaxis.title='Emission rate (mg m-2 d-1)', panel.width=2.3),
+                      
+                      list(4, header="N2O flux\n with 95% CI", #N2O Saturation\n with 95% CI
+                           graph.bgcolor='lightgray',
+                           #xaxis.ticks=list(0.8, 1.0, 1.2, 1.4, 1.6),
+                           #xaxis.labels=list(0.8, 1.0, 1.2, 1.4, 1.6),
+                           xaxis.title="N2O flux (Mg y-1)", panel.width=2.3),              
+                      
+                      list(5, header='Light Gray Means\n Highlighted Above',
+                           inactive.border.color=gray(.7), inactive.border.size=2,
+                           panel.width=2)),
+       
+       print.file = "output/figures/mmapEmisFlux.tiff", print.res = 300)
+```
+
+
+
