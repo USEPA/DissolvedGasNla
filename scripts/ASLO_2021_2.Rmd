@@ -89,7 +89,7 @@ ggsave("output/figures/siteMap.tiff")
 
 
 ## Population Data
-Roy Martin predicted dissolved N2O concentration (preds_n2O), dissolved equilibrium N2O concentration (preds_n2oeq), and N2O saturation ratio (preds_sat) for all waterbodies in the population.  See his .rmd for more details.  
+Roy Martin predicted dissolved N2O concentration (n2o), dissolved equilibrium N2O concentration (n2oeq), and N2O saturation ratio (n2osat) for all waterbodies in the population.  See his .rmd for more details.  
 ```{r}
 # 12/14/22 <2 minutes
 tic()
@@ -171,8 +171,8 @@ summary(dg$n2o.sat.ratio) # max value in sample is 33
 p <- all_predictions %>%
   filter(.draw == 1) %>% # need only one draw, otherwise RUG is misleading
   mutate(ecoregion = factor(WSA9)) %>%
-  mutate(ecoregion = fct_reorder(ecoregion, preds_sat)) %>%
-  ggplot( aes( x = preds_sat ) ) +
+  mutate(ecoregion = fct_reorder(ecoregion, n2osat)) %>%
+  ggplot( aes( x = n2osat ) ) +
   geom_density(color = "blue") +
   geom_vline(xintercept = 1, color = "red") +
   geom_rug() +
@@ -200,7 +200,7 @@ ggsave("output/figures/n2oSatDensityFullRange.tiff", g)
 
 
 all_predictions %>%
-    filter(preds_sat > 40, .draw == 1) %>% # look at one draw
+    filter(n2osat > 40, .draw == 1) %>% # look at one draw
   {table(.$WSA9)} # >40 is uncommon outside of CPL
 
 
@@ -227,7 +227,7 @@ dg %>%
 all_predictions %>%
   group_by(WSA9, .draw) %>%
   # below summarise generates 500 proportions per WSA
-  summarise(prop_sat = sum(preds_sat < 1) / length(unique(.row))) %>%
+  summarise(prop_sat = sum(n2osat < 1) / length(unique(.row))) %>%
   ggplot(aes(x=prop_sat)) + 
   geom_density() +
   facet_wrap(~WSA9) +
@@ -238,7 +238,7 @@ ggsave("output/figures/extentDensityPlot.tiff")
 # point and line plot
 all_predictions %>%
   group_by(WSA9, .draw) %>%
-  summarise(prop_sat = sum(preds_sat < 1) / length(.row)) %>% # Roy had length(unique(.row)) here, but the unique isn't necessary.  this object is grouped by WSA9
+  summarise(prop_sat = sum(n2osat < 1) / length(.row)) %>% # Roy had length(unique(.row)) here, but the unique isn't necessary.  this object is grouped by WSA9
   summarise(estimate = round(median(prop_sat), 3),
     LCL = round(quantile(prop_sat, probs = 0.025), 3),
     UCL = round(quantile(prop_sat, probs = 0.975), 3)) %>% 
@@ -253,23 +253,7 @@ all_predictions %>%
   theme_bw()
 ggsave("output/figures/extentPointLinerange.tiff")
 
-# bar and line plot
-all_predictions %>%
-  group_by(WSA9, .draw) %>%
-  summarise(prop_sat = sum(preds_sat < 1) / length(.row)) %>% # Roy had length(unique(.row)) here, but the unique isn't necessary.  this object is grouped by WSA9
-  summarise(estimate = round(median(prop_sat), 3),
-    LCL = round(quantile(prop_sat, probs = 0.025), 3),
-    UCL = round(quantile(prop_sat, probs = 0.975), 3)) %>% 
-  mutate(ecoregion = factor(WSA9)) %>%
-  select(ecoregion, estimate, LCL, UCL) %>%
-  mutate(ecoregion = fct_reorder(ecoregion, estimate)) %>%
-  ggplot( aes( x = ecoregion, y = estimate ) ) +
-  geom_bar(stat = "identity", aes(fill = ecoregion)) +
-  geom_linerange( aes( ymin = LCL, ymax = UCL )) +
-  ylab("Proportion of waterbodies functioning as N2O sinks") +
-  coord_flip() + 
-  theme_bw()  
-ggsave("output/figures/extentBar.tiff")
+
 ```
 
 # N2O saturation ratio: continuous and extent micromap
@@ -278,10 +262,10 @@ ggsave("output/figures/extentBar.tiff")
 # this is analogous to spsurvey "population estimates"
 ecoreg_stats <- all_predictions %>%
   group_by(WSA9, .draw) %>%
-  summarise( mean_n2o = mean(preds_n2o),
-             mean_n2oeq = mean(preds_n2oeq),
-             mean_sat = mean(preds_sat),
-             prop_sat = sum(preds_sat < 1) / length(unique(.row))) %>%
+  summarise( mean_n2o = mean(n2o),
+             mean_n2oeq = mean(n2oeq),
+             mean_sat = mean(n2osat),
+             prop_sat = sum(n2osat < 1) / length(unique(.row))) %>%
   summarise( post_med_n2o = round(mean(mean_n2o), 1),
              LCI_n2o = round(quantile(mean_n2o, probs = 0.025), 1),
              UCI_n2o = round(quantile(mean_n2o, probs = 0.975), 1),
@@ -356,15 +340,15 @@ mmplot(stat.data=ecoreg_stats,
                       
                       list(3, header= "Proportion undersaturated\n with 95% CI", 
                            graph.bgcolor='lightgray',
-                           #xaxis.ticks=list(6.0, 7.0, 8.0, 9.0, 10.0),
-                           #xaxis.labels=list(6.0, 7.0, 8.0, 9.0, 10.0),
+                           xaxis.ticks=list(0.6, 0.65, 0.7, 0.75, 0.8),
+                           xaxis.labels=list(0.6, 0.65, 0.7, 0.75, 0.8),
                            xaxis.title='Proportion undersaturated', panel.width=2.3),
                       
                       list(4, header="N2O Saturation\n with 95% CI", #N2O Saturation\n with 95% CI
                            graph.bgcolor='lightgray',
                            xaxis.ticks=list(0.8, 1.0, 1.2, 1.4, 1.6),
                            xaxis.labels=list(0.8, 1.0, 1.2, 1.4, 1.6),
-                           xaxis.title='N2O Saturation, %',panel.width=2.3),              
+                           xaxis.title='N2O Saturation',panel.width=2.3),              
                       
                       list(5, header='Light Gray Means\n Highlighted Above',
                            inactive.border.color=gray(.7), inactive.border.size=2,
