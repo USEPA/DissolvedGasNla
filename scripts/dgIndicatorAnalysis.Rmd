@@ -26,6 +26,8 @@ library(ncf) # ncf::correlogram
 library(lattice) # xyplot
 library(micromap) # linked micromaps
 library(tictoc)
+library(spmodel) # esv function
+
 
 # Identify local path for each user
 localPath <- Sys.getenv("USERPROFILE")
