@@ -1,0 +1,95 @@
+---
+title: "Explore model results"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# load the packages
+library(tidyverse)
+library(ggplot2)
+
+# Identify local path for each user
+localPath <- Sys.getenv("USERPROFILE")
+```
+
+## Population Data
+
+```{r}
+# about 15 minutes to load
+Sys.time()
+load(paste0(localPath, "\\Environmental Protection Agency (EPA)\\ORD NLA17 Dissolved Gas - Documents\\inputData\\all_predictions.rda"))
+Sys.time()
+```
+
+## Exploratory analysis
+```{r}
+
+# summarize means by WSA9 (posterior median for mean and 95% credible intervals)
+all_predictions %>%
+  group_by(WSA9, .draw) %>%
+  summarise( mean_n2o = mean(preds_n2o)) %>%
+  summarise( posterior_median = round(median(mean_n2o), 1),
+    LCI = round(quantile(mean_n2o, probs = 0.025), 1),
+    UCI = round(quantile(mean_n2o, probs = 0.975), 1))
+
+# plot N2O conc means by wsa9
+all_predictions %>%
+  group_by(WSA9, .draw) %>%
+  #group_by(.draw) %>%
+  summarise( mean_n2o = mean(preds_n2o)) %>%
+  summarise( estimate = round(median(mean_n2o), 1),
+    LCL = round(quantile(mean_n2o, probs = 0.025), 1),
+    UCL = round(quantile(mean_n2o, probs = 0.975), 1)) %>% 
+  mutate(ecoregion = factor(WSA9)) %>%
+  mutate(type = "MR") %>%
+  select(ecoregion, estimate, LCL, UCL, type) %>%
+  mutate(ecoregion = fct_reorder(ecoregion, estimate)) %>%
+  ggplot( aes( x = ecoregion, y = estimate ) ) +
+  geom_point() +
+  geom_linerange( aes( ymin = LCL, ymax = UCL )) +
+  #scale_y_continuous(limits = c(0.8, 2), breaks = seq(0.8, 2, 0.1)) +
+  ylab("mean N2O concentration") +
+  coord_flip() + 
+  theme_bw()
+
+# plot N2O sat ratio means by WSA9
+all_predictions %>%
+  group_by(WSA9, .draw) %>%
+  #group_by(.draw) %>%
+  summarise( mean_sat = mean(preds_sat)) %>%
+  summarise( estimate = round(median(mean_sat), 3),
+    LCL = round(quantile(mean_sat, probs = 0.025), 3),
+    UCL = round(quantile(mean_sat, probs = 0.975), 3)) %>% 
+  mutate(ecoregion = factor(WSA9)) %>%
+  #mutate(type = "MR") %>%
+  select(ecoregion, estimate, LCL, UCL) %>%
+  mutate(ecoregion = fct_reorder(ecoregion, estimate)) %>%
+  ggplot( aes( x = ecoregion, y = estimate ) ) +
+  geom_point() +
+  geom_linerange( aes( ymin = LCL, ymax = UCL)) +
+  geom_hline(yintercept = 1, color='blue') +
+  ylab("mean N2O saturation ratio") +
+  coord_flip() + 
+  theme_bw()
+
+# plot proportion waterbodies functioning as N2O sinks by WSA9
+all_predictions %>%
+  group_by(WSA9, .draw) %>%
+  summarise(prop_sat = sum(preds_sat < 1) / length(unique(.row))) %>%
+  summarise(estimate = round(median(prop_sat), 3),
+    LCL = round(quantile(prop_sat, probs = 0.025), 3),
+    UCL = round(quantile(prop_sat, probs = 0.975), 3)) %>% 
+  mutate(ecoregion = factor(WSA9)) %>%
+  select(ecoregion, estimate, LCL, UCL) %>%
+  mutate(ecoregion = fct_reorder(ecoregion, estimate)) %>%
+  ggplot( aes( x = ecoregion, y = estimate ) ) +
+  geom_point() +
+  geom_linerange( aes( ymin = LCL, ymax = UCL )) +
+  ylab("Proportion of waterbodies functioning as N2O sinks") +
+  coord_flip() + 
+  theme_bw()
+
+
+```

@@ -1,0 +1,399 @@
+---
+title: "ASLO 2021"
+authors: "J. Beaulieu"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    df_print: paged
+    toc: true
+    toc_float: true
+    fig_caption: yes
+    depth: 2
+    number_sections: true
+    code_folding:  hide
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r results='hide', message=FALSE, warning=FALSE}
+# load libraries
+library(sf) # spatial data
+library(gstat) # lagged scatterplot, variogram
+library(tidyverse) # dplyr, ggplot
+library(janitor) # clean names
+library(spdep) # k-NN and Moran plot
+library(ncf) # ncf::correlogram
+library(lattice) # xyplot
+library(micromap) # linked micromaps
+library(tictoc) # time operations
+
+# Identify local path for each user
+localPath <- Sys.getenv("USERPROFILE")
+
+# Define helper functions
+# standardized formatting for column names
+toEPA <- function(X1){
+  names(X1) = tolower(names(X1))
+  names(X1) = gsub(pattern = c("\\(| |#|)|/|-|\\+|:|_"), replacement = ".", x = names(X1))
+  X1
+}
+```
+
+## ASLO 2021
+
+This is a convenient place to generate the stats and figures included in the ASLO 2021 presentation.
+
+## Site Map
+```{r}
+# Load data.  Loaded object is named dg.
+ load(paste0(localPath,
+            "/Environmental Protection Agency (EPA)/",
+            "ORD NLA17 Dissolved Gas - Documents/",
+            "inputData/dg.2021-02-01.RData"))
+
+# To enable mapping the dataframe will be converted to a 'simple features' (sf) object.
+# Define coordinates
+coords <- data.frame(longitude = dg$map.lon.dd, latitude = dg$map.lat.dd)
+
+dg.sf <- st_as_sf(dg, coords = c("map.lon.dd", "map.lat.dd"), 
+                  crs = 4269) %>% # standard for lat/lon
+  st_transform(5070) # project to CONUS ALBERS for plotting
+
+# read in ecoregion polygons
+ecoR <- st_read(dsn = paste0(localPath, 
+                             "/Environmental Protection Agency (EPA)/",
+                             "ORD NLA17 Dissolved Gas - Documents/inputData"),
+                layer = "aggr_ecoregions_simple")
+
+# Check CRS
+#st_crs(ecoR) # 3857
+ecoR <- st_transform(ecoR, 5070) # convert to CONUS Albers
+#st_crs(ecoR) # 5070
+
+# Load state boundaries
+states <- USAboundaries::us_states() %>%
+  dplyr::filter(!state_name %in% c("Alaska", "District of Columbia", "Hawaii", "Puerto Rico")) %>%
+  st_transform(5070) # convert to CONUS Albers
+
+
+ggplot() +
+  geom_sf(data = ecoR, color = NA, aes(fill = WSA9_NAME)) +
+  geom_sf(data = dg.sf) +
+  geom_sf(data = states, fill = NA, color = "white", size = 0.1) +
+  theme_void() +
+  theme(legend.title = element_blank())
+
+ggsave("output/figures/siteMap.tiff")
+
+```
+
+
+## Population Data
+Roy Martin predicted dissolved N2O concentration (n2o), dissolved equilibrium N2O concentration (n2oeq), and N2O saturation ratio (n2osat) for all waterbodies in the population.  See his .rmd for more details.  
+```{r}
+# 12/14/22 <2 minutes
+tic()
+load(paste0(localPath, "\\Environmental Protection Agency (EPA)\\ORD NLA17 Dissolved Gas - Documents\\inputData\\all_predictions.rda"))
+toc()
+```
+
+
+## Explore structure of all_predictions object
+.row uniquely identifies each waterbody.  There are `r all_predictions %>% distinct(.row) %>% nrow()` waterbodies in the sample frame.  `.draw` reflects the simulation number for each waterbody. I think this is a 'draw from the posterior distribution'.  The data contains `r all_predictions %>% distinct(.draw) %>% nrow()` draws for each waterbody.
+```{r}
+head(all_predictions)
+```
+
+
+
+## N2O saturation ratio: continuous variable
+N2O saturation ratio in the sample data has a long right tail, with a maximum value of ~30.  The distribution of the values predicted to the population also has a long right tail, but features more extreme values (>600).
+```{r}
+# PLOT N2O SAT RATIO BY WSA9
+
+# point and linerange
+all_predictions %>%
+  group_by(WSA9, .draw) %>%
+  #group_by(.draw) %>%
+  summarise(mean_sat = mean(n2osat)) %>%
+  summarise(estimate = round(median(mean_sat), 3),
+    LCL = round(quantile(mean_sat, probs = 0.025), 3),
+    UCL = round(quantile(mean_sat, probs = 0.975), 3)) %>% 
+  mutate(ecoregion = factor(WSA9)) %>%
+  #mutate(type = "MR") %>%
+  select(ecoregion, estimate, LCL, UCL) %>%
+  mutate(ecoregion = fct_reorder(ecoregion, estimate)) %>%
+  ggplot( aes( x = ecoregion, y = estimate ) ) +
+  geom_point() +
+  geom_linerange( aes( ymin = LCL, ymax = UCL)) +
+  geom_hline(yintercept = 1, color='blue') +
+  ylab("mean N2O saturation ratio") +
+  coord_flip() + 
+  theme_bw() +
+  ggtitle("Mean (+/- 95% CI) predicted N2O saturation ratio")
+
+
+
+# density plots of predicted distribution
+# huge right tail
+p <- all_predictions %>%
+  #filter(.draw %in% 1:10) %>% # subset for practice
+  mutate(ecoregion = factor(WSA9)) %>%
+  mutate(ecoregion = fct_reorder(ecoregion, n2osat)) %>%
+  ggplot( aes( x = n2osat, group = .draw, color = .draw ) ) +
+  geom_density(show.legend = FALSE) +
+  geom_vline(xintercept = 1, color = "red") +
+  xlab("N2O saturation ratio") +
+  xlim(0,5) + # data range is 0-300, but sample max is 30
+  facet_wrap(~ecoregion) +
+  theme_bw()
+  
+
+#https://stackoverflow.com/questions/19440069/ggplot2-facet-wrap-strip-color-based-on-variable-in-data-set
+g <- ggplot_gtable(ggplot_build(p))
+stripr <- which(grepl('strip-t', g$layout$name)) # need strip-t, not strip-r
+fills <- rep(brewer.pal(5, "Spectral")[c(1,3,5)], 3) # these are the 3 colors used in micromap
+k <- 1
+for (i in stripr) {
+  j <- which(grepl('rect', g$grobs[[i]]$grobs[[1]]$childrenOrder))
+  g$grobs[[i]]$grobs[[1]]$children[[j]]$gp$fill <- fills[k]
+  k <- k+1
+}
+grid::grid.draw(g)
+
+ggsave("output/figures/n2oSatDensitySmallRange.tiff", g)
+
+summary(dg$n2o.sat.ratio) # max value in sample is 33
+
+
+# rplot, but show full x-axis range
+# include RUG to better show extreme values
+p <- all_predictions %>%
+  filter(.draw == 1) %>% # need only one draw, otherwise RUG is misleading
+  mutate(ecoregion = factor(WSA9)) %>%
+  mutate(ecoregion = fct_reorder(ecoregion, n2osat)) %>%
+  ggplot( aes( x = n2osat ) ) +
+  geom_density(color = "blue") +
+  geom_vline(xintercept = 1, color = "red") +
+  geom_rug() +
+  xlab("N2O saturation ratio") +
+  #xlim(0,35) + # data range is 0-600, but sample max is 30
+  facet_wrap(~ecoregion, scales = "free") +
+  theme_bw()
+  
+
+#https://stackoverflow.com/questions/19440069/ggplot2-facet-wrap-strip-color-based-on-variable-in-data-set
+g <- ggplot_gtable(ggplot_build(p))
+stripr <- which(grepl('strip-t', g$layout$name)) # need strip-t, not strip-r
+fills <- rep(brewer.pal(5, "Spectral")[c(1,3,5)], 3) # these are the 3 colors used in micromap
+k <- 1
+for (i in stripr) {
+  j <- which(grepl('rect', g$grobs[[i]]$grobs[[1]]$childrenOrder))
+  g$grobs[[i]]$grobs[[1]]$children[[j]]$gp$fill <- fills[k]
+  k <- k+1
+}
+grid::grid.draw(g)
+
+ggsave("output/figures/n2oSatDensityFullRange.tiff", g)
+
+
+
+
+all_predictions %>%
+    filter(n2osat > 40, .draw == 1) %>% # look at one draw
+  {table(.$WSA9)} # >40 is uncommon outside of CPL
+
+
+# # density plots of observed distribution
+# huge right tail
+dg %>%
+  mutate(ecoregion = factor(ag.eco9.nm)) %>%
+  mutate(ecoregion = fct_reorder(ecoregion, n2o.sat.ratio)) %>%
+  ggplot( aes( x = n2o.sat.ratio ) ) +
+  geom_density() +
+  xlab("mean N2O saturation ratio") +
+  facet_wrap(~ecoregion) +
+  theme_bw()
+
+
+
+```
+
+## N2O saturation ratio: extent estimate
+```{r}
+# EXTENT OF WATERBODIES FUNCTIONING AS SINKS BY ECOREGION
+
+# density plot
+all_predictions %>%
+  group_by(WSA9, .draw) %>%
+  # below summarise generates 500 proportions per WSA
+  summarise(prop_sat = sum(n2osat < 1) / length(unique(.row))) %>%
+  ggplot(aes(x=prop_sat)) + 
+  geom_density() +
+  facet_wrap(~WSA9) +
+  xlab("Proportion of waterbodies functioning as N2O sinks") +
+  theme_bw()
+ggsave("output/figures/extentDensityPlot.tiff")
+  
+# point and line plot
+all_predictions %>%
+  group_by(WSA9, .draw) %>%
+  summarise(prop_sat = sum(n2osat < 1) / length(.row)) %>% # Roy had length(unique(.row)) here, but the unique isn't necessary.  this object is grouped by WSA9
+  summarise(estimate = round(median(prop_sat), 3),
+    LCL = round(quantile(prop_sat, probs = 0.025), 3),
+    UCL = round(quantile(prop_sat, probs = 0.975), 3)) %>% 
+  mutate(ecoregion = factor(WSA9)) %>%
+  select(ecoregion, estimate, LCL, UCL) %>%
+  mutate(ecoregion = fct_reorder(ecoregion, estimate)) %>%
+  ggplot( aes( x = ecoregion, y = estimate ) ) +
+  geom_point() +
+  geom_linerange( aes( ymin = LCL, ymax = UCL )) +
+  ylab("Proportion of waterbodies functioning as N2O sinks") +
+  coord_flip() + 
+  theme_bw()
+ggsave("output/figures/extentPointLinerange.tiff")
+
+
+```
+
+# N2O saturation ratio: continuous and extent micromap
+```{r}
+# summarize means by WSA9 (posterior median for mean and 95% credible intervals)
+# this is analogous to spsurvey "population estimates"
+ecoreg_stats <- all_predictions %>%
+  group_by(WSA9, .draw) %>%
+  summarise( mean_n2o = mean(n2o),
+             mean_n2oeq = mean(n2oeq),
+             mean_sat = mean(n2osat),
+             prop_sat = sum(n2osat < 1) / length(unique(.row))) %>%
+  summarise( post_med_n2o = round(mean(mean_n2o), 1),
+             LCI_n2o = round(quantile(mean_n2o, probs = 0.025), 1),
+             UCI_n2o = round(quantile(mean_n2o, probs = 0.975), 1),
+             post_med_n2oeq = round(mean(mean_n2oeq), 2),
+             LCI_n2oeq = round(quantile(mean_n2oeq, probs = 0.025), 2),
+             UCI_n2oeq = round(quantile(mean_n2oeq, probs = 0.975), 2),
+             post_med_sat = round(mean(mean_sat), 2),
+             LCI_sat = round(quantile(mean_sat, probs = 0.025), 2),
+             UCI_sat = round(quantile(mean_sat, probs = 0.975), 2),
+             estimate = round(mean(prop_sat), 3),
+             LCL = round(quantile(prop_sat, probs = 0.025), 3),
+             UCL = round(quantile(prop_sat, probs = 0.975), 3),
+             n = dplyr::n())
+
+ecoreg_stats <- as.data.frame(ecoreg_stats)
+class(ecoreg_stats)
+str(ecoreg_stats) # WSA9 is a factor, but some of the stats have attribute of Named num
+
+ecoreg_stats$WSA9 <- as.character(ecoreg_stats$WSA9)
+str(ecoreg_stats)
+
+ecoreg_stats
+
+ecoregions <- st_read(paste0(localPath, "\\Environmental Protection Agency (EPA)\\",
+                             "ORD NLA17 Dissolved Gas - Documents\\inputData\\aggr_ecoregions_simple.shp"))
+
+wsa9names <- st_set_geometry(ecoregions, NULL) %>%
+  select(WSA9, WSA9_NAME)
+
+ecoreg_stats <- left_join(ecoreg_stats, wsa9names)
+
+ecoregions <- st_transform(ecoregions, 5070)
+# make spatial polygon dataframe need for micromap
+ecoregions_sp1 <- as(ecoregions, "Spatial")
+
+# convert to map_table for linked micromap
+ecor.polys <- create_map_table(ecoregions_sp1, 'WSA9')
+class(ecor.polys)
+str(ecor.polys, max =2) # ID is chr "CPL"...
+
+
+# Full code:  Use this to produce final linked micromaps of the variables you want
+# export as pdf US letter landscape from Plots pane
+# export as PNG Width 900 Height 968, maintain aspect ratio
+
+mmplot(stat.data=ecoreg_stats,
+       map.data=ecor.polys,
+       panel.types=c('dot_legend', 'labels', 'dot_cl', 'dot_cl', 'map'),
+       panel.data=list(
+         NA,
+         'WSA9_NAME',
+         list('estimate', 'LCL', 'UCL'),
+         list('post_med_sat', 'LCI_sat', 'UCI_sat'),
+         NA),
+       ord.by = 'estimate', rev.ord = TRUE, grouping=3,
+       median.row=FALSE,
+       map.link=c('WSA9', 'ID'),
+       
+       plot.height=5, # what does this do?
+       plot.width=7, #what does this do? 
+       colors=brewer.pal(5, "Spectral"), #for journal use plot.height=9, plot.width=6.8
+       map.color2='lightgray', 
+       
+       panel.att=list(list(1, point.type=20, point.size=2,
+                           graph.border.color='white',
+                           xaxis.text.display=F, xaxis.line.display=F,
+                           graph.grid.major=F, 
+                           panel.width = 2), # added this argument to ensure the full point is shown
+                      
+                      list(2,  panel.width=2,#increased panel.width to 1.1 from .8, removed header='NARS Reporting\n Regions',
+                           align='left', text.size=0.8),#increased text.size to .8 from .6
+                      
+                      list(3, header= "Proportion undersaturated\n with 95% CI", 
+                           graph.bgcolor='lightgray',
+                           xaxis.ticks=list(0.6, 0.65, 0.7, 0.75, 0.8),
+                           xaxis.labels=list(0.6, 0.65, 0.7, 0.75, 0.8),
+                           xaxis.title='Proportion undersaturated', panel.width=2.3),
+                      
+                      list(4, header="N2O Saturation\n with 95% CI", #N2O Saturation\n with 95% CI
+                           graph.bgcolor='lightgray',
+                           xaxis.ticks=list(0.8, 1.0, 1.2, 1.4, 1.6),
+                           xaxis.labels=list(0.8, 1.0, 1.2, 1.4, 1.6),
+                           xaxis.title='N2O Saturation',panel.width=2.3),              
+                      
+                      list(5, header='Light Gray Means\n Highlighted Above',
+                           inactive.border.color=gray(.7), inactive.border.size=2,
+                           panel.width=2)),
+       
+       print.file = "output/figures/mmapSatExtent.tiff", print.res = 300)
+
+
+```
+
+# N2O emission rate and flux
+Roy predicted N2O equilibrium and concentration to the population.  I used ERA5 to calculate mean wind speed during the index period for each lake in the population.  I need to match wind speed to Roy's predictions.  Waterbodies in Roy's predictions are identified by '.row'.  There are `r all_predictions %>% distinct(.row) %>% summarize(population = n()) %>% pull()` rows.
+
+
+```{r}
+
+# Read in sample frame
+sampFrm <- read.csv(file = paste0(Sys.getenv("USERPROFILE"), 
+                                    "/Environmental Protection Agency (EPA)/",
+                                    "ORD NLA17 Dissolved Gas - Documents/",
+                                    "inputData/NLA_Sample_Frame.csv"), header = TRUE,
+                    na.strings = "") %>%
+  toEPA()
+
+dim(sampFrm) # 614730, 71
+
+sampFrm <- sampFrm %>%
+  filter(nla17.sf != "Exclude2017") %>%
+  filter(nla17.sf != "Exclude2017_Include2017NH") %>%
+  filter(state != "DC") %>%
+  filter(state != "HI")
+
+dim(sampFrm) 
+
+# print first 6 lines
+sampFrm %>% select(ag.eco9, area.cat6, area.ha) %>% head()
+
+# print first 6 .row values of all_predictions
+all_predictions %>%
+  filter(.row %in% 1:6) %>%
+  group_by(.row) %>%
+  slice(1)
+  
+# OK, .row values in all_predictions match with row number in sampFrm.
+# This same order was preserved in wind data.
+
+
+```
