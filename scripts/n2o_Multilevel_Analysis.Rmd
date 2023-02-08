@@ -1,0 +1,806 @@
+---
+title: "Modeling NLA 2017 $N_2O$ Data"
+author: "Roy Martin, Jake Beaulieu, Michael McManus"
+date: "`r Sys.Date()`"
+output:
+  html_notebook: 
+    depth: 4
+    fig_caption: yes
+    number_sections: yes
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    toc: yes
+bibliography: RWM_Endnote_Library.bib
+link-citations: yes
+---
+
+<style>
+.vscroll-plot {
+    width: 800px;
+    height: 600px;
+    overflow-y: scroll;
+    overflow-x: hidden;
+}
+</style>
+
+# Background
+In this document we explore a range of models for fitting dissolved $\text{N}_2\text{O}$ data observed as part of the 2017 National Lakes Assessment (NLA).
+
+## Data description and structure
+As explained in the related document,
+(https://github.com/USEPA/DissolvedGasNla/blob/master/scripts/dgIndicatorAnalysis.html), duplicate gas samples were collected at a depth of ~0.1$\text{m}$ at designated index sites distributed across 1091 waterbodies nationwide, of which 95 were sampled twice. Gas samples were analyzed via gas chromotography and concentrations were recorded to the nearest 0.001 nmol/L.
+
+The data were collected under a stratified, unequal probability design. The observations can be thought of as hierarchically organized, such that the $N=1185$ samples ($N = \sum1,...,n$) were situated within $I=1091$ index waterbodies ($I=\sum 1,...,i$), which were situated, with unequal probability, in one of $L=5$ size categories ($L=\sum 1,...,l$; < 4$\text{ha}$, 4-10$\text{ha}$, 10-20$\text{ha}$, 20-50$\text{ha}$, and >50$\text{ha}$), which were within one of $K=48$ states ($K=\sum 1,...,k$) in the interior U.S., within one of $J=9$ aggregated, Omernik ecoregions ($J=\sum 1,...,j$; WSA9 = Xeric (XER), Western Mountain (WMT),  Northern Plains (NPL), Southern Plains (SPL), Temperate Plains (TPL), Coastal Plains (CPL), Upper Midwest (UMW), Northern Appalachian (NAP), and Southern Appalachian (SAP) regions).
+
+## Goals for modeling
+Our goals for this particular excercise include model-based inference via hierarchical modeling [e.g., @Park_etal_2004; @Ghitza_Gelman_2013] with regard to estimation of $N_2O$ concentrations from probabilistic survey. Our approach will consider the sampling design by including as predictors in our models the design factors that affected probability of inclusion [@Rubin_1976; @Rubin_1983; @Gelman_2007], which included size category, state, and ecoregion. This follows the concept that the inclusion mechanism, $I$, may be considered ignorable if its distribution, conditional on $y$, is independent of $y$, conditional on the weighting variables. All inferences will be conducted in a fully Bayesian fashion. 
+
+# Setup R
+```{r setup_1, include=FALSE, echo=FALSE}
+library(knitr)
+opts_knit$set(root.dir = "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/scripts")
+
+#set directories and R package library
+setwd("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/scripts")
+.libPaths("C:/Users/rmartin/Desktop/R/library")
+```
+
+```{r load_packages, warning=FALSE, message=FALSE}
+library(brms)
+library(bayesplot)
+library(kableExtra)
+library(tidyverse)
+library(ggplot2)
+library(ggExtra)
+library(gridExtra)
+
+options(mc.cores = parallel::detectCores())
+options( max.print = 2000 )
+```
+
+
+```{r utility_functions, include=FALSE}
+# Identify local path for each user
+localPath <- Sys.getenv("USERPROFILE")
+
+# Define helper functions
+# standardized formatting for column names
+toEPA <- function(X1){
+  names(X1) = tolower(names(X1))
+  names(X1) = gsub(pattern = c("\\(| |#|)|/|-|\\+|:|_"), replacement = ".", x = names(X1))
+  X1
+}
+
+#Calc geometric mean
+gm_mean = function(x, na.rm=TRUE, zero.propagate = FALSE){
+  if(any(x < 0, na.rm = TRUE)){
+    return(NaN)
+  }
+  if(zero.propagate){
+    if(any(x == 0, na.rm = TRUE)){
+      return(0)
+    }
+    exp(mean(log(x), na.rm = na.rm))
+  } else {
+    exp(sum(log(x[x > 0]), na.rm=na.rm) / length(x))
+  }
+}
+
+gm_sd = function(x, na.rm=TRUE, zero.propagate = FALSE){
+  if(any(x < 0, na.rm = TRUE)){
+    return(NaN)
+  }
+  if(zero.propagate){
+    if(any(x == 0, na.rm = TRUE)){
+      return(0)
+    }
+    exp(sd(log(x), na.rm = na.rm))
+  } else {
+    exp(sd(log(x[x > 0]), na.rm=na.rm) / length(x))
+  }
+}
+
+#Center and scale by (1) sd
+MyStd <- function(x){ (x-mean(x))/(sd(x)*2)}
+
+#First letter in string to uppercase
+firstup <- function(x) {
+  substr(x, 1, 1) <- toupper(substr(x, 1, 1))
+  x}
+```
+
+# Import and organize data
+
+Lets now read in the .RData file containing the NLA data, previously munged here: 
+https://github.com/USEPA/DissolvedGasNla/blob/master/scripts/dataMunge.html
+
+```{r import_data, echo=TRUE}
+load( file = paste0( localPath,
+              "/Environmental Protection Agency (EPA)/",
+              "ORD NLA17 Dissolved Gas - Documents/",
+              "inputData/dg.2019-12-19.RData")
+      )
+```
+
+
+Then, we'll create a new dataframe, including only variables we are interestd in for this exercise.
+
+```{r mod1_data_import, paged.print=TRUE}
+dg %>%
+  filter( !is.na( dissolved.n2o ) ) %>%
+  nrow() #number of observations in original n2o data
+
+model_dat <- dg %>%
+  filter( !is.na( dissolved.n2o ) ) %>%
+  mutate( WSA9 = factor( WSA9 ),
+          state = factor( state ),
+          area = AREA_HA
+          ) %>%
+  select( WSA9,
+          state,
+          area,
+          size_cat,
+          dissolved.n2o
+          ) 
+
+nrow( model_dat ) #number of observations in model data after filtering NA for various covariates
+
+#print top 50 rows
+top_n( model_dat, n = 20 )
+```
+
+
+# A general framework for model specification
+
+As we consider our own model, we'll follow the lead of others [e.g., @Webb_etal_2019] and consider a mixed model and a gamma or lognormal likelihood. In future iterations, we'll potentially consider some linear and/or smooth covariate functions as well [@Webb_etal_2019]. The general hierarchical structure will be samples (level-1) from lakes of particular size classes (level-2), within states (level-3), within ecoregions (level-4). 
+
+Specifically, considering the Gamma likelihood, the model may have the general form:
+
+$$y \sim Gamma( \mu, \phi)$$
+where $y$ represents the observed samples, which are assumed to be Gamma distributed according location parameter $\mu$ and shape parameter $\phi$.
+
+The location parameter is further parameterized, such that:
+
+$$\mu_{i,j,k,l} = \alpha + f_d(X_{i,d}) + \gamma_{i,j} + \delta_{i,j,k} + \epsilon_{i,j,k,l}$$
+In this explicit notation, each sample, $i$, within lake size class, $l$, in state, $k$, within each ecoregion, $j$, is indexed to the location parameter, $\mu_{i,j,k,l}$, and mapped to the linear predictor on the right-hand side, where $\alpha$ indexes the global intercept parameter, $f_d$ indicates the smooth or regular linear functions determining sample-level (i.e., level-1) covariate effects of $d=1,...,D$ independent variables, $x_{i,d}$; and $\gamma_{i,j}$, $\delta_{i,j,k}$, and $\epsilon_{i,j,k,l}$ are the latent, random effects coding for ecoregion, state, and size class, respectively. 
+
+# Exploration of data structure
+Before we get into our specific model parameterizations, lets explore the structure of the data a bit. First, we'll look at the overall distribution of the national dataset.
+
+```{r summary_n2o}
+summary( model_dat$dissolved.n2o )
+```
+
+From this basica summary, we can see that the data has a strong right-skew. The mean is relatively small compared to the max. However, these numbers are somewhat inline with those observed by [@Webb_etal_2019] over 101 constructed agricultural reservoirs across Saskatewan, Canada. They reported a mean of 6.55 and a range [1.14 - 110]. 
+
+Lets now take a look at the data graphically.
+
+```{r violin, fig.align='center', fig.height= 6, fig.width= 3}
+ggplot( model_dat, aes( x = NA, y = dissolved.n2o ) ) +
+  geom_violin( fill = "grey",
+               color = "black" ) +
+  geom_boxplot( width = 0.1 ) +
+  theme_bw()
+```
+
+This violin plot captures the skew pretty well. There are quite a few extreme values, though the bulk of the data seems to be in the < 15 nmol/L range.
+
+Lets look now at the same data after a log (base $e$) transformation.
+
+
+```{r violin_2, fig.align='center', fig.height= 6, fig.width= 3}
+ggplot( model_dat, aes( x = NA, y = log( dissolved.n2o ) ) ) +
+  geom_violin( fill = "grey",
+               color = "black" ) +
+  geom_boxplot( width = 0.1 ) +
+  theme_bw()
+```
+We see that the overall mean is just under 2 on the log scale and there remains a good deal of left- and right-skew.
+
+Lets look now at some of the hierarchical structure.
+
+## WSA9 ecoregion
+
+We start with examining the structure by ecoregion. Here we see again that, even on the log scale, there is a good deal of right-skew in distribution of values observed within the ecoregions. The boxplots here (within the violins) suggest that the means may be slightly different across the ecoregions, if considering the data were generated from a lognormal likelihod, but the skew should probably caution against this interpretation.
+
+```{r wsa9_violin, fig.align='center', fig.height= 6, fig.width= 8}
+ggplot( model_dat, aes( x = WSA9, y = log( dissolved.n2o ) ) ) +
+  geom_violin( fill = "grey",
+               color = "black" ) +
+  geom_boxplot( width = 0.1 ) +
+  theme_bw()
+```
+
+## States in WSA9 ecoregions
+
+Lets look now at the distribution within states (further divided within ecoregions ). Note: This is a long plot that you can scroll through on the right side. 
+
+<div class="vscroll-plot">
+```{r violin_states, fig.align='center', fig.height= 80, fig.width= 8}
+ggplot( model_dat, aes( x = WSA9, y = log( dissolved.n2o ) ) ) +
+  facet_wrap( ~ state, ncol= 1 ) +
+  geom_violin( fill = "grey",
+               color = "black" ) +
+  geom_boxplot( width = 0.1 ) +
+  theme_bw()
+```
+</div>
+
+There's not a lot to gather from this long figure, except that there is still a good bit of right-skew within most groups.
+
+## Sizes classes in states
+
+Lets look now at the distribution within size clases (within states). 
+
+<div class="vscroll-plot">
+```{r violin_sizes, fig.align='center', fig.height= 40, fig.width= 8}
+ggplot( model_dat, aes( x = size_cat, y = log( dissolved.n2o ) ) ) +
+  facet_wrap( ~ state, ncol= 2 ) +
+  geom_boxplot( width = 0.4 ) +
+  theme_bw()
+```
+</div>
+
+Here, aside from several states (e.g., IN, WI), we _maybe_ see a little less skew when broken down into size classes within groups. However, the sample sizes are also pretty small when broken down to this level. 
+
+# Model 1
+For our first model, we'll fit a GLMM with with a Gamma likelihood. We won't include any covariates. We are looking here to see whether we can model the data based only on the sampling design and likelihood. Specifically, we will eventually want to compare the estimates from these models without covariates to those made using the traditional survey method, as a sort of reality check.
+
+Because the model and data are fairly straightforward, we should be able to efficiently conduct the analysis using the $\textbf{brms}$ package [@Burkner_2017], which affords fully Bayesian inference via its interface with $\textbf{Stan}$ [@Carpenter_etal_2017], which is a $\textbf{C++}$ code package for obtaining full Bayesian inference [@Carpenter_etal_2015]. 
+
+Below, we fit our first model of the form:
+
+$$y \sim Gamma( \mu, \phi)$$
+where $y$ represents the observed samples, which are assumed to be Gamma distributed according location parameter $\mu$ and shape parameter $\phi$.
+
+The location parameter is further parameterized, such that:
+
+$$\mu_{i,j,k,l} = \alpha + \gamma_{i,j} + \delta_{i,j,k} + \epsilon_{i,j,k,l}$$
+In this explicit notation, each sample, $i$, within lake size class, $l$, in state, $k$, within each ecoregion, $j$, is indexed to the location parameter, $\mu_{i,j,k,l}$, and mapped to the linear predictor on the right-hand side, where $\alpha$ indexes the global intercept parameter, and $$\gamma_{i,j}$$, $\delta_{i,j,k}$, and $\epsilon_{i,j,k,l}$ are the latent, random effects coding for ecoregion, state, and size class, respectively. The random effects are specified as normally distributed about 0, with scale parameter $\tau$ learned from the data, such that $$\gamma_{i,j} \sim N( 0, \tau_{\gamma} )$$ 
+$$\delta_{i,j,k} \sim N( 0, \tau_{\delta} )$$ 
+$$\epsilon_{i,j,k,l} \sim N( 0, \tau_{\epsilon} )$$
+
+## Fitting
+
+```{r mod1}
+mod1 <- brm( dissolved.n2o ~ 
+               1 + ( 1 | WSA9 ) + ( 1 | WSA9:state ) + ( 1 | WSA9:state:size_cat ),
+             data = model_dat, 
+             family = Gamma( link = 'log' ),
+             prior = c( prior( normal( 2, 2 ), class = "Intercept" ),
+                        prior( gamma( 0.01, 0.01 ), class = "shape" ),
+                        prior( normal( 0, 1 ), class = 'sd' )
+                        ),
+             control = list( adapt_delta = 0.99, max_treedepth = 14 ),
+             chains=4, 
+             iter=2000, 
+             cores=4 )
+```
+
+## Fit summary
+Here, we call a summary of the fitted parameters.
+
+```{r print_mod1}
+print( mod1, prior = T )
+```
+
+We see that the intercept parameter is estimated to be about 2.1, which is coincidentally the same as estimated in [@Webb_etal_2019] ( 2.11 +/- 0.05). We also see that the variability between size classes (within states and ecoregions; $\tau_{\epsilon} = 0.29$) is estimated close to the estimate for variability between states (within ecoregions; $\tau_{\delta} = 0.28$). The variability between ecoregions is esimated to be quite small by comparison (i.e., $\tau_{\gamma} = 0.07$.
+
+Before we think too much about this summary, however, we'll do some checks to see how well the fitted model does at describing the data.
+
+## Posterior predictive checks
+
+First, we'll extract the posterior samples and assign the empirical data to an object
+```{r ppc_check_extract_mod1}
+mod1_post <- posterior_samples( mod1 )
+yrep_1 <- posterior_predict( mod1 )
+y <- model_dat$dissolved.n2o
+```
+
+Next, we'll look at density overalap check. Here, we're looking to see if the parameters fitted by the model can generate replicate datasets that look something like the empirical data. 
+
+```{r ppc_dens_overlay_mod1}
+ppc_dens_overlay( y = log( y ), yrep = log( yrep_1[ sample( seq(1 , 1000, 1 ), 50 ), ] ) )
+```
+
+Clearly, the fitted model is generating replicate datasets (blue lines) where the bulk of the data are too broadly distributed relative to the observed data (black line). There appears to be a clear misfit to the data with this model, but we'll still look at a couple of other checks. 
+
+Next, we'll look at the scatter of the log of the average of the posterior predictions vs measured; that is, the observed, $log( y_i)$ _vs_ the average of the replicate datasets at each $i$ or $log(y_{rep_i})$. Here, we see a diagonal cloud with a 1:1 slope near the mean, with increasing error as you move into the more extreme values.
+
+```{r ppc_error_scatter_avg_mod1}
+ppc_scatter_avg( y = log( y ), yrep = log( yrep_1[ sample( seq(1 , 1000, 1 ), 12 ), ] ) )
+```
+
+Next, lets see how the model does with a simple stat like the median. Here, we are checking whether replicate datasets from the fitted model generate median estimates (blue histogram) similar to the observed median (black vertical line).
+
+```{r ppc_stat_median_mod1}
+ppc_stat( y = y, yrep = yrep_1, stat = median, binwidth = 0.05 )
+```
+
+It looks like the model consistently generates datasets with medians higher than that calculated for the observed data. This is suspect, but at least in the ball park (barely). It is also to be expected after seeing the replicated densities in the figure above, where clearly the bulk of the densities from the replicated datasets are right of the observed.
+
+Lets now do this same check, but by ecoregion groupings.
+
+```{r ppc_stat_grouped_median_mod1}
+ppc_stat_grouped( y = y, yrep = yrep_1, group = model_dat$WSA9, stat = median, binwidth = 0.05 )
+```
+
+Here, we see that the model doesn't do a great job, particularly with the CPL or TPL groups when it comes to replicating the empirical medians. Aside form the NAP, NPL, and WMT, the medians are also consistently right of the observed.
+
+Lets look at another aspect of the data: skew.
+
+```{r ppc_stat_skew_mod1}
+ppc_stat( y = y, 
+          yrep = yrep_1, 
+          stat = function(x) 3 * ( mean( x ) - median( x ) ) / sd( x ), 
+          binwidth = 0.01 )
+```
+
+Here we see that the model consistently generates replicate datasets with more right-skew than the observed data. 
+
+Lets look by ecoregion next.
+
+```{r ppc_stat_grouped_skew_mod1}
+ppc_stat_grouped( y = y, 
+                  yrep = yrep_1, 
+                  stat = function(x) 3 * ( mean( x ) - median( x ) ) / sd( x ), 
+                  group = model_dat$WSA9,
+                  binwidth = 0.05 )
+```
+
+Here, it looks like the UMW skew is clearly not well replicated, but the others aren't as far off.
+
+## Leave-one-out evaluations
+Though it is obvious at this point that our model doesn't generate replicate datasets with features that resemble important aspects of the observed data, indicating that it isn't a very good approximation of the true data generating process, we'll continue with the checking process to get a better understanding of some of these methods before we move forward with different model parmeterizations. 
+
+Here we'll conduct a Bayesian leave-one-out cross validation ('LOO-CV') assessment using the $\textbf{loo}$ package in $\textbf{R}$, which implements fast and stable computations for approximate LOO-CV (and WAIC) [@Vehtari_etal_2017]. These computation methods estimate pointwise out-of-sample prediction accuracy from a fitted model by using the log-likelihood evaluated at the posterior simulations of the parameter values. Conveniently, the $\textbf{brms}$ package automatically calculates the log-likelihood for us for all relevant models, making it very convenient to use in conjunction with the $\textbf{loo}$ package. For more information on $\textbf{loo}$ and LOO-CV in general, check out the page on the $\textbf{Stan}$ website: http://mc-stan.org/loo/. For further explanation through worked examples, see: https://avehtari.github.io/modelselection/slides_model_assesment_selection.pdf.
+
+
+```{r mod1_loo}
+loo_1 <- loo( mod1, save_psis = TRUE, cores = 4 )
+psis_1 <- loo_1$psis_object
+lw_1 <- weights( psis_1 )
+
+print( loo_1 )
+```
+
+Here we have a diagnostic summary of the pareto $k$ values calculated via the `loo()` call for our model and data. Pareto-smoothed importance sampling is the method used in $\textbf{loo}$ for approximating the true leave-one-out posterior. In essesnce, we fit the model once, save the log-likelihood for each data point, and `loo()` utilizes that to re-weight and approximate the leave-one-out posterior. This is convenient because it allows us to check the model using leave-one-out methods without fitting the model $N$ times. However, the approximation can fail, and the $\textbf{loo}$ package provides some diagnostics that indicate when failure is more likely. In particular, each data point is assigned an importance ratio, $k$, which indicates how "influential" it may be. As such, too many data points with high (pareto-k > 0.7) or very high (pareto-k > 1) influence may indicate problems with the approximation. Such influential data points could have infinite variance, making smoothing problematic. When there are too many such points, it is generally recommended to either re-fit the model to each of the problematic datapoints, independently (via `reloo()` explained later), or with a more traditional leave-k-out method, such as k-fold-CV.
+
+The LOO-CV evaluation for this model found a large number of "influential" or "problematic" observations (i.e., "bad" = 20 + "very bad" = 15). Note that observations with high $k$ are only problematic in the sense of trying to approximate the leave-one-out posterior, and that there isn't necessarily anyting inherently wrong with them. Although, with this many problematic observations, it _could_ be an indication of mispecification (and likely is, as we saw from our previous checking excercises). At this point we might have wanted to try a 'reloo' or 'k-fold' cross-validation, but we are already pretty sure the model is a poor fit to important aspects of the data, or potentially mis-specified, so we're not going to waste any more time with cross-validation on this particular parameterization and fit.
+
+With regard to the other outputs from the `summary(loo)` call, the "elpd_loo" is a way to compare models. For each observation, a calculation of how "surprised" the model is to see the left-out datapoint is made based on the density at the observed value. The elpd_loo is just a sum of these individual contributions (https://mc-stan.org/loo/reference/loo-glossary.html). The p_loo, by comparision, is the difference between the elpd_loo and the non-CV log posterior predictive density, and may be interpreted as the effective number of parameters. The "looic", finally, is just $-2^{elpd_{loo}}$ to provide output on the conventional scale of "deviance" or AIC.
+
+One interesting aspect of 'p_loo' is that, when $k$ is large, as in this particular case, we can look to the p_loo estimate for additional information about the problem (https://mc-stan.org/loo/reference/loo-glossary.html). More specifically, it may be helpful to compare p_loo to the actual number of model parameters to get some sense of potential for misspecification. In our case p_loo was calculated to be 255.6, and the total number of parameters in our model, including latent parameters, was about 450. In this case, p_loo = 255.6 is considerably less than p = 450 and the model may be misspecified (e.g., likelihood) or need more structural information (e.g., covariates).
+
+# Model 2
+Since our first model didn't seem to work out well at all, we'll try a second model. This time we'll fit a similar GLMM, but this time with with a lognormal likelihood. The lognormal probably won't produce wildly different results, but we'll give it a try to see if there are any interesting differences. Again, we won't include any covariates.
+
+Below, we fit our second model of the form:
+
+$$y \sim lognormal( \mu, \sigma)$$
+where $y$ represents the observed samples, which are assumed to be lognormally distributed according location parameter $\mu$ and scale parameter $\sigma$.
+
+The location parameter is again  parameterized, such that:
+
+$$\mu_{i,j,k,l} = \alpha + \gamma_{i,j} + \delta_{i,j,k} + \epsilon_{i,j,k,l}$$
+
+with the same parameterization for the random effects as before.
+
+## Fitting
+
+```{r mod2}
+mod2 <- brm( dissolved.n2o ~ 
+               1 + ( 1 | WSA9 ) + ( 1 | WSA9:state ) + ( 1 | WSA9:state:size_cat ),
+             data = model_dat, 
+             family = lognormal(),
+             prior = c( prior( normal( 2, 2 ), class = "Intercept" ),
+                        prior( normal( 0, 1 ), class = "sigma" ),
+                        prior( normal( 0, 1 ), class = 'sd' )
+                        ),
+             control = list( adapt_delta = 0.99, max_treedepth = 12 ),
+             chains=4, 
+             iter=2000, 
+             cores=4 )
+```
+
+## Fit summary
+Here, we call a summary of the fitted parameters.
+
+```{r print_mod2}
+print( mod2, prior = T )
+```
+
+We see that the intercept parameter is estimated to be about 2.03. In contrast with our first model, we see that the variability between size classes (within states and ecoregions) is estimated to be a good deal smaller than variability between states (within ecoregions). The variability between ecoregions is, again, esimated to be very small by comparison. In this lognormal model, we also have an estimate of within size-class (within states and ecoregions) variability (also residual error), which is estimated to be larger than variability between classes within any of the levels above. 
+
+Again, we'll do some checks to see how well the fitted model does at describing the data.
+
+## Posterior predictive checks
+
+First, we'll extract the posterior samples and assign the empirical data to an object
+```{r ppc_check_extract_mod2}
+mod2_post <- posterior_samples( mod2 )
+yrep_2 <- posterior_predict( mod2 )
+```
+
+Next, we'll look at a density overaly.  
+
+```{r ppc_dens_overlay_mod2}
+ppc_dens_overlay( y = log( y ), yrep = log( yrep_2[ sample( seq(1 , 1000, 1 ), 100 ), ] ) )
+```
+
+Again, the fitted model is generating replicate datasets (blue lines) where the bulk of the data are too broadly distributed relative to the observed data (black line). The extremes in the right tail are particularly well replicated either. So, again, there appears to be a clear misfit to the data with this model, but we'll still look at a couple of other checks. 
+
+Next, we'll look at the scatter of the (log) average predictions _vs._ log(observed). 
+
+```{r ppc_error_scatter_avg_mod2}
+ppc_scatter_avg( y = log( y ), yrep = log( yrep_2[ sample( seq(1 , 1000, 1 ), 12 ), ] ) )
+```
+
+Next, lets see how the model does with the median. 
+
+```{r ppc_stat_median_mod2}
+ppc_stat( y = y, yrep = yrep_2, stat = median, binwidth = 0.02 )
+```
+
+Again, it looks like the model consistently generates datasets with medians higher than that calculated for the observed data. 
+
+Lets now do this check, but by ecoregion groupings.
+
+```{r ppc_stat_grouped_median_mod2}
+ppc_stat_grouped( y = y, yrep = yrep_2, group = model_dat$WSA9, stat = median, binwidth = 0.05 )
+```
+
+Here, we see that the model maybe doesn't do a great job; with the CPL or TPL groups, especially. Overall, the median again seem to be consistently overestimated across groups, excepting maybe two or three (e.g., WMT, NPL).
+
+Lets look at the skew.
+
+```{r ppc_stat_skew_mod2}
+ppc_stat( y = y, 
+          yrep = yrep_2, 
+          stat = function(x) 3 * ( mean( x ) - median( x ) ) / sd( x ), 
+          binwidth = 0.01 )
+```
+
+Here we see that the model consistently generates replicate datasets with more right-skew than the observed data. 
+
+Lets look by ecoregion next.
+
+```{r ppc_stat_grouped_skew_mod2}
+ppc_stat_grouped( y = y, 
+                  yrep = yrep_2, 
+                  stat = function(x) 3 * ( mean( x ) - median( x ) ) / sd( x ), 
+                  group = model_dat$WSA9,
+                  binwidth = 0.05 )
+```
+
+Here, it looks like the skew for some groups is maybe not well replicated, but we're at least somewhere in the ballpark, by comparison to the first model.
+
+## Leave-one-out evaluations
+We'll continue with the LOO-CV assessment.
+
+```{r mod2_loo}
+loo_2 <- loo( mod2, save_psis = TRUE, cores = 4 )
+psis_2 <- loo_2$psis_object
+lw_2 <- weights( psis_2 )
+
+print( loo_2 )
+```
+
+Compared to our first model, the LOO-CV evaluation for this model resulted in fewer "problematic" observations (i.e., "bad/very bad" = 7 ). Since this isn't a very large number, we'll take the advice noted in the warning, and use the `reloo()` function, which calculates the "true" leave-one-out posterior for the problematic points only, and then uses the approximation for the remaining observations. 
+
+```{r mod2_reloo}
+reloo_2 <- reloo( mod2, loo_2 )#loo( mod2, reloo = TRUE, reloo_args = list( save_psis = TRUE), cores = 4 )
+print( reloo_2 )
+```
+
+The `reloo()` result suggests that the issue with potentially problematic observations can be cautiously ignored; and we could proceed forward with this "reloo" result for model checking or model comparisons. However, our other posterior predictive checks, again, suggested a poor fit, so there isn't much gained in moving forward with this model for now. We will utilize the 'loo' output to do one more check below though, just to further illustrate the potential utility.
+
+To examine the calibration of predictions, we can look at the LOO-CV predictive cumulative density function values, which are asymptotically uniform if the model is well calibrated. The below plot compares the density of the computed LOO probability integral transforms (dark line) _vs._ 100 simulated datasets from the standard uniform distribution (blue lines). 
+
+```{r mod2_ppc_loo_pit_overlay}
+ppc_loo_pit_overlay( y = y,
+                     yrep = yrep_2,
+                     lw = weights( reloo_2$psis_object ),
+                     samples = 100 )
+```
+
+From this check, it is fairly clear that there is some miscalibration, in that the hump/frown-shape indicates that the univariate predictive distributions are too broad compared to the observed data (see also earlier PPCs), suggesting that further modeling (e.g., including additional structure/covariates) will be needed to more accurately reflect uncertainty [@Gabry_etal_2019]. 
+
+## Check _vs._ survey estimates 
+Although our model appears to be pretty poor again, lets go ahead and check some estimates against those provided by the traditional survey method, which have already been applied and discussed in a previous document: https://github.com/USEPA/DissolvedGasNla/blob/master/scripts/dgIndicatorAnalysis.html. The estimates we'll compare are the mean estimates (and uncertainty) for dissolved $N_2O$ by ecoregion and nationally.
+
+First, we'll manually enter the survey estimates (means, lower and upper 95% CI by ecoregion) into an object.
+
+```{r survey_ests}
+#make a dataframe object
+
+survey_ests <- data.frame( 
+  ecoregion = c( "CPL", "NAP", "NPL", "SAP", "SPL", "TPL", "UMW", "WMT", "XER", "US" ), 
+  estimate = c( 8.4, 7.7, 6.9, 7.1, 6.5, 7.8, 10.8, 7.8, 10.6, 8.1 ),
+  LCL = c( 5.1, 7.2, 6.4, 5.9, 4.9, 5.9, 6.4, 7.1, 7.5, 7.0 ),
+  UCL = c( 11.7, 8.1, 7.4, 8.2, 8.1, 9.6, 15.2, 8.4, 13.7, 9.1 )
+) %>%
+  mutate( ecoregion = factor( ecoregion, 
+                              levels = c( "CPL", "NAP", "NPL", "SAP", "SPL", "TPL", "UMW", "WMT", "XER", "US" ) ) ) #relevel for ggplot so not alphabetical, but original order
+
+print( survey_ests )
+```
+
+Lets make a plot as well, if only as a check on our data entry.
+
+```{r survey_ests_plot, fig.align = "center"}
+ggplot( survey_ests, aes( x = ecoregion, y = estimate ) ) +
+  geom_point() +
+  geom_linerange( aes( ymin = LCL, ymax = UCL ) ) +
+  coord_flip()
+```
+
+This plot for the survey estimates looks about right, so we'll move to constructing the estimates for the means from our model.
+
+With our hierarchical model specification, we should be able to get the ecoregion mean estimates by utilizing the intercept parameter estimate, $\alpha$, along with the latent hierarchical effects estimates for the ecoregion intercepts, $\gamma_{i, j}$. However, because we have a lognormal likelihood, we'l have to do some transformations. If we add the intercept estimate to the random effects estimates, we get an estimate for the log-scale means. If we exponentiate that, we get an estimate for the geometric means on the data scale. To get the mean estimates on the data scale, we have to apply a transformation, such that: $$E( \theta ) = exp( \mu + 0.5 \sigma^2)$$
+
+So, lets get our model estimates for the means on the data scale. We'll utilize the full posterior extracted above, and create an object for each ecoregion ( and US ) containing the posterior distributions for the means.
+
+```{r mod2_ests}
+CPL <- exp( mod2_post$b_Intercept + mod2_post$`r_WSA9[CPL,Intercept]` + ( 0.5 * mod2_post$sigma ^ 2 ) )
+NAP <- exp( mod2_post$b_Intercept + mod2_post$`r_WSA9[NAP,Intercept]` + ( 0.5 * mod2_post$sigma ^ 2 ) )
+NPL <- exp( mod2_post$b_Intercept + mod2_post$`r_WSA9[NPL,Intercept]` + ( 0.5 * mod2_post$sigma ^ 2 ) )
+SAP <- exp( mod2_post$b_Intercept + mod2_post$`r_WSA9[SAP,Intercept]` + ( 0.5 * mod2_post$sigma ^ 2 ) )
+SPL <- exp( mod2_post$b_Intercept + mod2_post$`r_WSA9[SPL,Intercept]` + ( 0.5 * mod2_post$sigma ^ 2 ) )
+TPL <- exp( mod2_post$b_Intercept + mod2_post$`r_WSA9[TPL,Intercept]` + ( 0.5 * mod2_post$sigma ^ 2 ) )
+UMW <- exp( mod2_post$b_Intercept + mod2_post$`r_WSA9[UMW,Intercept]` + ( 0.5 * mod2_post$sigma ^ 2 ) )
+WMT <- exp( mod2_post$b_Intercept + mod2_post$`r_WSA9[WMT,Intercept]` + ( 0.5 * mod2_post$sigma ^ 2 ) )
+XER <- exp( mod2_post$b_Intercept + mod2_post$`r_WSA9[XER,Intercept]` + ( 0.5 * mod2_post$sigma ^ 2 ) )
+US <- exp( mod2_post$b_Intercept + ( 0.5 * mod2_post$sigma ^ 2 ) )
+
+mod2_ests <- data.frame( 
+  ecoregion = c( "CPL", "NAP", "NPL", "SAP", "SPL", "TPL", "UMW", "WMT", "XER", "US" ),
+  estimate = c( mean( CPL ), mean( NAP ), mean( NPL ), mean( SAP ), mean( SPL ), 
+                mean( TPL ), mean( UMW ), mean( WMT ), mean( XER ), mean( US ) ),
+  LCL = c( quantile( CPL , 0.025 ), quantile( NAP , 0.025 ), quantile( NPL , 0.025 ), 
+           quantile( SAP , 0.025 ), quantile( SPL , 0.025 ), quantile( TPL , 0.025 ), 
+           quantile( UMW , 0.025 ), quantile( WMT , 0.025 ), quantile( XER , 0.025 ), 
+           quantile( US , 0.025 ) ),
+  UCL = c( quantile( CPL , 0.975 ), quantile( NAP , 0.975 ), quantile( NPL , 0.975 ), 
+           quantile( SAP , 0.975 ), quantile( SPL , 0.975 ), quantile( TPL , 0.975 ), 
+           quantile( UMW , 0.975 ), quantile( WMT , 0.975 ), quantile( XER , 0.975 ), 
+           quantile( US , 0.975 ) )
+  ) %>%
+  mutate( estimate = round( estimate, 1 ), # round to nearest tenth
+          LCL = round( LCL, 1 ),
+          UCL = round( UCL, 1 )
+  )  %>%
+  mutate( ecoregion = factor( ecoregion, #relevel for ggplot so not alphabetical, but original order
+                              levels = c( "CPL", "NAP", "NPL", "SAP", "SPL", "TPL", "UMW", "WMT", "XER", "US" ) ) ) 
+
+rm( CPL, NAP, NPL, SAP, SPL, TPL, UMW, WMT, XER, US ) #clean up workspace
+print( mod2_ests )
+```
+
+Lets combine our estimates into one dataframe now.
+
+```{r combine_ests_mod2}
+mod2_ests <- data.frame( rbind( survey_ests, mod2_ests ) ) %>%
+  mutate( model = factor( c( rep( "survey", 10 ), rep( "mod2", 10 ) ) ) )
+
+print( mod2_ests )
+```
+
+Now lets plot these estimates alongside the ones from the survey. 
+
+```{r survey_mod2_ests_plot, fig.align = "center"}
+dodge <- position_dodge(width=0.5) # so lines and points don't overlap on graph
+
+ggplot( mod2_ests, aes( x = ecoregion, y = estimate, group = model ) ) +
+  geom_point( aes(colour = model ) , position=dodge ) +
+  geom_linerange( aes( ymin = LCL, ymax = UCL , color = model ) , position=dodge ) +
+  scale_colour_manual(values = c("black", "darkgray") ) +
+  coord_flip() +
+  theme_bw()
+```
+
+Though our model doesn't look like a good fit at all, the means estimates maybe aren't _terribly_ far off. In all cases, the uncertainty intervals at least overlap with the 95% confidence intervals on the survey estimates. We can also see that, for the most part, the hierarchical model estimates have much greater certainty, as expected due to partial pooling of information across groups. Likewise, as the estimate for between-ecoregion variance indicated for this model, these estimates don't suggest much variability in the means from one ecoregion to the next.
+
+Lets move on and see if we can get a better fitting model now.
+
+# Model 3
+It is maybe a bit surprising that neither of the relatively straightforward Gamma or lognormal models seemed to provide a good fit. Here we'll try a third model that should provide more flexibility. Specifically, we'll fit another lognormal GLMM, but this time we're going to incorporate a model for the residual variance. The model will again be hierarchical, such that we model it as a function of the size_class within states stucture.
+
+Below, we fit our third model of the form:
+
+$$y \sim log-N( \mu, \sigma)$$
+The location parameter is again  parameterized, such that:
+
+$$\mu_{i,j,k,l} = \alpha + \gamma_{i,j} + \delta_{i,j,k} + \epsilon_{i,j,k,l}$$
+
+This time, however, we have a model for $\sigma$, such that:
+
+$$\sigma \sim log-N( \mu_{sigma}, \nu_{sigma})$$
+
+where $\mu_{sigma}$ is an intercept parameter capturing the (log-scale) mean residual variation and $\nu_{sigma}$ is the scale parameter describing variation in $\sigma$ by size-class, which is estimated from the data. 
+
+## Fitting
+
+```{r mod3}
+mod3 <- brm( bf( dissolved.n2o ~ 
+               1 + ( 1 | WSA9 ) + ( 1 | WSA9:state ) + ( 1 | WSA9:state:size_cat ), 
+               sigma ~ ( 1 | WSA9:state:size_cat ) ),
+             data = model_dat, 
+             family = lognormal(),
+             prior = c( prior( normal( 2, 2 ), class = "Intercept" ),
+                        prior( normal( 0, 1 ), class = "Intercept", dpar = "sigma" ),
+                        prior( normal( -0.5, 1 ), class = "sd", dpar = "sigma" ),
+                        prior( normal( 0, 1 ), class = "sd" )
+                       ),
+             control = list( adapt_delta = 0.90, max_treedepth = 12 ),
+             #sample_prior = "only",
+             chains=4, 
+             iter=2000, 
+             cores=4 )
+```
+
+## Fit summary
+Here, we call a summary of the fitted parameters.
+
+```{r print_mod3}
+print( mod3, prior = T )
+```
+
+We see that the intercept parameter is estimated to be about 1.95. In contrast with our last model, we see that the variability between size classes (within states and ecoregions) is estimated to be a great deal larger than variability between states (within ecoregions), which is estimated to be simlar to variability within ecoregions. In this model, our residual error estimate is a little trickier because we've actually allowed it to vary, in a hierarchical fashion (i.e., partially pooled ) among size-categories within states and ecoregions. The intercept for this parameter, "sigma_Intercept", indicates that the (geometric) mean of the residual variation was around $exp( -1.41) = 0.24 ), but that this varied considerably among groups (i.e., "sd(sigma_Intercept)" = 0.82). To put into perspective, a rough calculation of the central 95% interval on a lognormal variate with location = -1.4 and scale = 0.82 results in a range of standard deviations from 0.05 to 1.2. This is a pretty wide range and seems like a pretty nutty parameterization that would be prone to overfitting, but we'll go ahead and continue to analyze this model below. 
+
+## Posterior predictive checks
+
+First, we'll extract the posterior samples and assign the empirical data to an object
+```{r ppc_check_extract_mod3}
+mod3_post <- posterior_samples( mod3 )
+yrep_3 <- posterior_predict( mod3 )
+```
+
+Next, we'll look at a density overaly. Here, we're looking to see if the parameters fitted by the model can generate replicate datasets that look something like the empirical data. 
+
+```{r ppc_dens_overlay_mod3}
+ppc_dens_overlay( y = log( y ), yrep = log( yrep_3[ sample( seq(1 , 1000, 1 ), 100 ), ] ) ) 
+```
+
+This is actually the closest we've gotten so far with this check. It looks like the replicates are still a little too broadly distributed relative to the data, but this a far sight better than the other two models.
+
+Next, we'll look at the scatter of the (log) average predictive errors.
+
+```{r ppc_scatter_avg_mod3}
+ppc_scatter_avg( y = log( y ), yrep = log( yrep_3[ sample( seq(1 , 1000, 1 ), 12 ), ] ) )
+```
+
+Next, lets see how the model does with the median.
+
+```{r ppc_stat_median_mod3}
+ppc_stat( y = y, yrep = yrep_3, stat = median, binwidth = 0.02 )
+```
+
+It looks like the model consistently generates datasets with medians similar to the observed data. Again, this is looking much better.
+
+Lets now do this check, but by ecoregion groupings.
+
+```{r ppc_stat_grouped_median_mod3}
+ppc_stat_grouped( y = y,
+                  yrep = yrep_3, 
+                  group = model_dat$WSA9, 
+                  stat = median, 
+                  binwidth = 0.1)
+```
+
+Again, looking much better this time. All of the observed medians appear to be pretty well replicated for each group.
+
+Lets look at the skew.
+
+```{r ppc_stat_skew_mod3}
+ppc_stat( y = log( y ), 
+          yrep = yrep_3, 
+          stat = function(x) 3 * ( mean( x ) - median( x ) ) / sd( x ), 
+          binwidth = 0.01 )
+```
+
+This is a fairly strange looking plot with the abrupt shoulder on the lower end, but it does seem like we're capturing the skew pretty well overall. 
+
+Lets look by ecoregion next.
+
+```{r ppc_stat_grouped_skew_mod3}
+ppc_stat_grouped( y = log( y ), 
+                  yrep = yrep_3, 
+                  stat = function(x) 3 * ( mean( x ) - median( x ) ) / sd( x ), 
+                  group = model_dat$WSA9,
+                  binwidth = 0.05 )
+```
+
+Here, it looks like the CPL skew is pretty far off, and that this ecoregion is maybe the source of the weird left tail. Maybe there is something wrong with my calculation. For now, though, we'll just move forward, but we should check this eventually.
+
+## Leave-one-out evaluations
+Here' we'll again conduct a Bayesian leave-one-out cross validation ('LOO-CV') assessment.
+
+```{r mod3_loo}
+loo_3 <- loo( mod3, save_psis = TRUE, cores = 4 )
+psis_3 <- loo_3$psis_object
+lw_3 <- weights( psis_3 )
+
+print( loo_3 )
+```
+
+Compared to our last models, the LOO-CV evaluation for this model resulted in _many_ "problematic" observations. Since we have such a very large number, we'll not use `reloo()` this time, but we'll take the advise from the generated warning and try a kfold-CV. 
+
+```{r mod3_reloo}
+kfold_3 <- kfold( mod3, K = 10, save_fits = TRUE )
+print( kfold_3 )
+```
+
+We can now use this k_fold estimate of the elpd to compare to the other models.
+
+```{r mod3_compare}
+loo_compare( loo_1, loo_2, kfold_3 )
+```
+
+This model is clearly better than the other two by this metric. And the posterior predictive checks above were also much better. Perhaps we're getting closer. 
+
+## Check _vs._ survey estimates 
+Lets go ahead and check some estimates against those provided by the traditional survey method and our last model.
+
+So, lets get our model estimates for the means on the data scale. We'll again utilize the full posterior extracted above, and create an object for each ecoregion ( and US ) containing the posterior distributions for the means.
+
+```{r mod3_ests}
+CPL <- exp( mod3_post$b_Intercept + mod3_post$`r_WSA9[CPL,Intercept]` + ( 0.5 * exp( mod3_post$b_sigma_Intercept ) ^ 2 ) )
+NAP <- exp( mod3_post$b_Intercept + mod3_post$`r_WSA9[NAP,Intercept]` + ( 0.5 * exp( mod3_post$b_sigma_Intercept ) ^ 2 ) )
+NPL <- exp( mod3_post$b_Intercept + mod3_post$`r_WSA9[NPL,Intercept]` + ( 0.5 * exp( mod3_post$b_sigma_Intercept ) ^ 2 ) )
+SAP <- exp( mod3_post$b_Intercept + mod3_post$`r_WSA9[SAP,Intercept]` + ( 0.5 * exp( mod3_post$b_sigma_Intercept ) ^ 2 ) )
+SPL <- exp( mod3_post$b_Intercept + mod3_post$`r_WSA9[SPL,Intercept]` + ( 0.5 * exp( mod3_post$b_sigma_Intercept ) ^ 2 ) )
+TPL <- exp( mod3_post$b_Intercept + mod3_post$`r_WSA9[TPL,Intercept]` + ( 0.5 * exp( mod3_post$b_sigma_Intercept ) ^ 2 ) )
+UMW <- exp( mod3_post$b_Intercept + mod3_post$`r_WSA9[UMW,Intercept]` + ( 0.5 * exp( mod3_post$b_sigma_Intercept ) ^ 2 ) )
+WMT <- exp( mod3_post$b_Intercept + mod3_post$`r_WSA9[WMT,Intercept]` + ( 0.5 * exp( mod3_post$b_sigma_Intercept ) ^ 2 ) )
+XER <- exp( mod3_post$b_Intercept + mod3_post$`r_WSA9[XER,Intercept]` + ( 0.5 * exp( mod3_post$b_sigma_Intercept ) ^ 2 ) )
+US <- exp( mod3_post$b_Intercept + ( 0.5 * exp( mod3_post$b_sigma_Intercept ) ^ 2 ) )
+
+mod3_ests <- data.frame( 
+  ecoregion = c( "CPL", "NAP", "NPL", "SAP", "SPL", "TPL", "UMW", "WMT", "XER", "US" ),
+  estimate = c( mean( CPL ), mean( NAP ), mean( NPL ), mean( SAP ), mean( SPL ), 
+                mean( TPL ), mean( UMW ), mean( WMT ), mean( XER ), mean( US ) ),
+  LCL = c( quantile( CPL , 0.025 ), quantile( NAP , 0.025 ), quantile( NPL , 0.025 ), 
+           quantile( SAP , 0.025 ), quantile( SPL , 0.025 ), quantile( TPL , 0.025 ), 
+           quantile( UMW , 0.025 ), quantile( WMT , 0.025 ), quantile( XER , 0.025 ), 
+           quantile( US , 0.025 ) ),
+  UCL = c( quantile( CPL , 0.975 ), quantile( NAP , 0.975 ), quantile( NPL , 0.975 ), 
+           quantile( SAP , 0.975 ), quantile( SPL , 0.975 ), quantile( TPL , 0.975 ), 
+           quantile( UMW , 0.975 ), quantile( WMT , 0.975 ), quantile( XER , 0.975 ), 
+           quantile( US , 0.975 ) )
+  ) %>%
+  mutate( estimate = round( estimate, 1 ), # round to nearest tenth
+          LCL = round( LCL, 1 ),
+          UCL = round( UCL, 1 )
+  )  %>%
+  mutate( ecoregion = factor( ecoregion, #relevel for ggplot so not alphabetical, but original order
+                              levels = c( "CPL", "NAP", "NPL", "SAP", "SPL",
+                                          "TPL", "UMW", "WMT", "XER", "US" ) ) ) %>%
+  mutate( model = "mod3" )
+
+rm( CPL, NAP, NPL, SAP, SPL, TPL, UMW, WMT, XER, US ) #clean up workspace
+print( mod3_ests )
+```
+
+Lets combine our estimates from the survey, mod2, and now mod3 into one dataframe.
+
+```{r combine_ests_mod3}
+mod3_ests <- data.frame( rbind( mod2_ests, mod3_ests ) ) 
+print( mod3_ests )
+```
+
+Finally, lets plot these estimates alongside the ones from the survey and mod2. 
+
+```{r survey_mod3_ests_plot, fig.align = "center"}
+ggplot( mod3_ests, aes( x = ecoregion, y = estimate, group = model ) ) +
+  geom_point( aes(colour = model ) , position=dodge ) +
+  geom_linerange( aes( ymin = LCL, ymax = UCL , color = model ) , position=dodge ) +
+  scale_colour_manual( values = c( "gray55", "black", "gray85" ) ) +
+  coord_flip() +
+  theme_bw()
+```
+
+In all cases, the uncertainty intervals for mod3 are much narrower than those for mod2. They are also narrower than the estimates from the survey-based method, except for the NPL where the intervals were still pretty similar in width. Likewise, these estimates don't suggest a ton of variability in the means from one ecoregion to the next. However, because they have greater certainty, we might be able to distinguish some differences in means for a few ecoregions (e.g., CPL _vs._ NAP ). 
+
+# References
