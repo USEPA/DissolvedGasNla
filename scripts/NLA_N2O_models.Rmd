@@ -3,6 +3,9 @@ title: "Bayesian models for NLA 2017 $N_2O$ survey data"
 author: "Roy Martin, Jake Beaulieu, Michael McManus"
 date: "`r Sys.Date()`"
 output:
+  pdf_document:
+    toc: yes
+    toc_depth: '4'
   html_notebook:
     toc: yes
     toc_depth: 4
