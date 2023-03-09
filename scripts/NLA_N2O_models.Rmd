@@ -4,8 +4,6 @@ author: "Roy Martin, Jake Beaulieu, Michael McManus"
 date: "`r Sys.Date()`"
 output:
   github_document:
-    toc: TRUE
-    toc_depth: 4
     number_sections: TRUE
     df_print: "tibble"
     math_method: 
@@ -204,7 +202,7 @@ save(df_model, file = "C:/Users/rmartin/OneDrive - Environmental Protection Agen
 nrow(df_model) # number of obs after filtering
 
 df_model %>%
-  print()
+  head(10)
 ```
 
 A second dataframe, including only the second visit observations, was constructed below. These data were later used as a "test set" to assess the out-of-sample fit of the model developed on the first-visit or training data.
@@ -290,7 +288,7 @@ save(df_test, file = "C:/Users/rmartin/OneDrive - Environmental Protection Agenc
 nrow(df_test) # number of obs after filtering for probability samples, first visits, and removing one site missing ecoregion (WSA9) info.
 
 df_test %>%
-  print()
+  head(10)
 ```
 
 ## Target population
@@ -334,7 +332,7 @@ rm(df_pop)
 save(sframe, file = "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/sframe.rda") 
 
 sframe %>%
-  print()
+  head(10)
 ```
 
 The resulting target population above included a total of 465,897 waterbodies.
@@ -347,7 +345,7 @@ sframe %>%
   group_by(WSA9, state) %>%
   summarise(n = n(), .groups = "drop") %>%
   spread(state, n) %>%
-  print()
+  head(10)
 ```
 
 Likewise, lake size category was nested in state (which was nested in ecoregion). That is, not every ecoregion:state in the population of interest contained every size category (below).
@@ -358,7 +356,7 @@ sframe %>%
   group_by(WSA9, state, size_cat) %>%
   summarise(n = n(), .groups = "drop") %>%
   spread(size_cat, n) %>%
-  print()
+  head(10)
 ```
 
 Below, the sampling frame was selected down to create a post-stratification table. Some of the variables were renamed to match the naming conventions used in the observational data above. There were 536 types of lakes in the population of interest with respect to the sampling design. The counts of those lake types (n_lakes) and their proportions relative to the total population of lakes in the sampling frame (prop_cell) are indicated below.
@@ -376,7 +374,7 @@ pframe <- sframe %>%
 save(pframe, file = "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/pframe.rda")
 
 pframe %>%
-  print()
+  head(10)
 ```
 
 ## Sample vs. population
@@ -395,7 +393,7 @@ samp_props <- df_model %>%
 save(samp_props, file = "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/samp_props.rda")
 
 samp_props %>%
-  print()
+  head(10)
 ```
 
 Below, a graphical comparison was constructed to depict the distribution of cells in the population of interest _versus_ those in the sample.
@@ -954,10 +952,10 @@ The $\textbf{brms}$ package [@Burkner_2017] for $\textbf{R}$ [@R_Core_Team_2021]
 
 $$\sim 1 + (1|WSA9) + (1|WSA9:state) + (1|WSA9:state:size)$$
 
-In the $\textbf{brms}$ package, there is additionaly functionality and syntax for multivariate responses and for allowing the varying intercepts in a multivariate model to be correlated, e.g.,:
+In the $\textbf{brms}$ package, there is functionality and syntax for multivariate responses and for allowing the varying intercepts in a multivariate model to be correlated, e.g.,:
 
-$$ N_2O_{diss}\sim 1 + (1|a|WSA9) + (1|b|WSA9:state) + (1|c|WSA9:state:size) \\ 
-N_2O_{equi}\sim 1 + (1|a|WSA9) + (1|b|WSA9:state) + (1|c|WSA9:state:size)$$
+$$N_2O_{diss} \sim 1 + (1|a|WSA9) + (1|b|WSA9:state) + (1|c|WSA9:state:size) \\\ 
+N_2O_{equi} \sim 1 + (1|a|WSA9) + (1|b|WSA9:state) + (1|c|WSA9:state:size)$$
 
 The above syntax would indicate that the linear predictor for both responses in the multivariate model have the same group-level varying effects, and that each of those effects are allowed to be correlated between responses. 
 
@@ -3107,18 +3105,18 @@ annotate_figure(plt, top = text_grob(expression(paste("Equilibrium N2O: covariat
 ## A Final Model
 As demonstrated above, models excluding the NO3 covariate consistently resulted in poorer fits to to the observed dissolved N2O data. Including surface temperature and elevation in the equilibrium N2O part of the model resulted in substantially improved replication of key aspects of the observed data. Likewise, added flexibility in the distributional terms for both dissolved and equilibrium N2O led to improvements. 
 
-To make inferences from this model for N2O in the population of interest, however, the included covariates needed to be (1) fully observed across that population or (2) their missingness needed to be modeled. For the lake area and elevation covariates, data _was_ available for all lakes from previously compiled geospatial databases. However, neither surface temperature or NO3 were observed for lakes outside of the sample. They were partially observed with respect to the target population. Their missingness needed to be accounted for in a model. Therefore, a more complex model was constructed below that included surface temperature and NO3 as additional responses conditioned on the survey design variables and fully observed covariates. This approach to inference for N2O was similar to a Bayesian structural equation model [@Merkle_etal_2021; @Merkle_Rosseel_2018]. The main details of the logical dependence structure could be characterized as:
+To make inferences from this model for N2O in the population of interest, however, the included covariates needed to be (1) fully observed across that population or (2) their missingness needed to be modeled. For the lake area and elevation covariates, data _was_ available for all lakes from previously compiled geospatial databases. However, neither surface temperature or NO3 were observed for lakes outside of the sample. They were partially observed with respect to the target population. Their missingness needed to be accounted for in a model. Therefore, a more complex model was constructed below that included surface temperature and NO3 as additional responses conditioned on the survey design variables and fully observed covariates. This approach to inference for N2O was similar to a Bayesian structural equation model [@Merkle_etal_2021; @Merkle_Rosseel_2018]. The logical dependence structure could be characterized as:
 
 $$\begin{align} 
-\color{#1F449C}{\boldsymbol{N_2O_{diss}}} \sim Survey + Area + \color{#F05039}{\boldsymbol{NO_3}} + \color{#EEBAB4}{\boldsymbol{Temp}} \\ 
-\color{#A8B6CC}{\boldsymbol{N_2O_{equil}}} \sim Survey + Elev  + \color{#EEBAB4}{\boldsymbol{Temp}}\\
-\color{#F05039}{\boldsymbol{NO_3}} \sim Survey + Area + \color{#EEBAB4}{\boldsymbol{Temp}} \\ 
-\color{#EEBAB4}{\boldsymbol{Temp}} \sim Survey + Lat + Elev + Day
+{\boldsymbol{N_2O_{diss}}} &\sim Survey + Area + {\boldsymbol{NO_3}} + {\boldsymbol{Temp}} \\ 
+{\boldsymbol{N_2O_{equil}}} &\sim Survey + Elev  + {\boldsymbol{Temp}}\\
+{\boldsymbol{NO_3}} &\sim Survey + Area + {\boldsymbol{Temp}} \\ 
+{\boldsymbol{Temp}} &\sim Survey + Lat + Elev + Day
 \end{align}$$
 
-Variables in color text above were treated as partially observed with respect to the population of interest (i.e., observed only in the sample), whereas variables in black text were considered fully observed. The partially observed variables, being dissolved and equilibrium N2O, NO3, and surface temperature, were each modeled conditional on the survey design variables and other partially and/or fully observed covariates. This structural equation approach requires a more complex set of post-processing steps compared to a typical MRP analysis. In order to propagate estimates and uncertainty through the dependency structure and make inferences, the fitted model was used to first predict surface temperature in the target population, since it depended only on the fully observed covariates. That predictive distribution was then used alongside the relevant fully observed covariates to predict NO3 in the target population. Finally, the predictive distributions for termperature and NO3 were used to predict the N2O responses. These steps were carried out in the "Predict to population" section to follow.
+Variables in bold text above were treated as partially observed with respect to the population of interest (i.e., observed only in the sample), whereas variables not in bold were considered fully observed. The partially observed variables, being dissolved and equilibrium N2O, NO3, and surface temperature, were each modeled conditional on the survey design variables and other partially and/or fully observed covariates. This structural equation approach requires a more complex set of post-processing steps compared to a typical MRP analysis. In order to propagate estimates and uncertainty through the dependency structure and make inferences, the fitted model was used to first predict surface temperature in the target population, since it depended only on the fully observed covariates. That predictive distribution was then used alongside the relevant fully observed covariates to predict NO3 in the target population. Finally, the predictive distributions for temperature and NO3 were used to predict the N2O responses. These steps were carried out in the "Predict to population" section to follow.
 
-In the final model below, the submodel for surface temperature assumed a Gamma distributed error distribution and the linear predictor included the survey design variables, latitude, elevation, and julian date. The shape parameter was also modeled as a function of latitude to address increasing response variance along the latitudinal gradient. The NO3 submodel was a cumulative logit formulation and the linear predictor included all of the survey factors as well as surface temperature and lake area. 
+In the final model below, the sub-model for surface temperature assumed a Gamma distributed error distribution and the linear predictor included the survey design variables, latitude, elevation, and Julian date. The shape parameter was also modeled as a function of latitude to address increasing response variance along the latitudinal gradient. The NO3 sub-model was a cumulative logit formulation and the linear predictor included all of the survey factors as well as surface temperature and lake area. 
 
 The N2O and N2O-eq responses were each modeled with Gamma distributed errors, but with the same covariate structure as in model 5. The same structure was also employed for the shape terms in these responses, corresponding to the $\sigma$ terms in the previous model. Though not shown in this document, the Gamma error structure appeared to result in slightly better performance in the predictive checks compared to the Gaussian errors in previous models. This was primarily apparent in the saturation ratio checks, which may have been more sensitive to model performance in the tails of the N2O responses. Others have also indicated that the Gamma error distribution can work well for dissolved N2O data [@Webb_etal_2019].
 
