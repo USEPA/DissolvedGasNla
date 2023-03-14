@@ -2321,11 +2321,10 @@ ggsave("output/figures/siteMap.tiff")
 ## Population Data
 
 ```{r}
-# about 15 minutes to load first time
-# 6/7/21 <2 minutes
-Sys.time()
+# 2/8/2023 75sec on VM
+tic()
 load(paste0(localPath, "\\Environmental Protection Agency (EPA)\\ORD NLA17 Dissolved Gas - Documents\\inputData\\all_predictions.rda"))
-Sys.time()
+toc()
 ```
 
 
@@ -2355,8 +2354,8 @@ all_predictions %>%
 Lets create a new size category with more even surface area distributions.
 
 ```{r}
-# 11 minutes on VM!
-tic() # 7 minutes on laptop
+# 4 minutes on VM. pushes memory up to 65GB [2/8/2023]
+tic()
 all_predictions <- all_predictions %>%
   #filter(.draw == 1) %>% # testing
   mutate(area_km2 = area_ha / 100, # this works
@@ -2365,7 +2364,7 @@ all_predictions <- all_predictions %>%
                             ifelse(area_km2 >= 0.1 & area_km2 < 1,
                                    "0.1 - 1",
                                    ifelse(area_km2 >=1 & area_km2 <10,
-                                          "0.1 - 1",
+                                          "1 - 10",
                                           ifelse(area_km2 >=10 & area_km2 <100,
                                                  "10 - 100",
                                                  ifelse(area_km2 >=100, 
@@ -2375,7 +2374,7 @@ all_predictions <- all_predictions %>%
                             levels = c("<0.1", "0.1 - 1", "1 - 10", "10 - 100", ">100"))) %>%
   select(-area_km2)
 toc()
-gc() # this pushed memory up to 57.7 GB!  gc drops it to 32GB
+gc() 
 
 # total area by size_cat2 bar chart
 all_predictions %>%
@@ -2465,7 +2464,7 @@ N2O saturation ratio in the sample data has a long right tail, with a maximum va
 # PLOT N2O SAT RATIO BY WSA9------------------
 
 
-# point and linerange
+# point and linerange: mean +/- 95%CI
 all_predictions %>%
   group_by(WSA9, .draw) %>% # group by iteration
   #group_by(.draw) %>%
@@ -2486,6 +2485,87 @@ all_predictions %>%
   coord_flip() + 
   theme_bw()
 ggsave("output/figures/n2oSatRatioByEco.tiff")
+
+# Box and whisker
+all_predictions %>%
+  filter(.draw == 1) %>%
+  ggplot( aes( x = WSA9, y = n2osat ) ) +
+  geom_boxplot() +
+  ylab("mean N2O saturation ratio") +
+  coord_flip() + 
+  theme_bw()
+ggsave("output/figures/n2oSatRatioByEcoBoxWhisker.tiff")
+
+
+# point and linerange: mean AND MEDIAN.+/- 95%CI
+all_predictions %>%
+  group_by(WSA9, .draw) %>% # group by iteration
+  #group_by(.draw) %>%
+  summarise(mean_sat = mean(n2osat),
+            median_sat = median(n2osat)) %>% # 500 means for each WSA9
+  # now summarize to 1 statistic per WSA9
+  summarise(estimate = round(median(mean_sat), 3), 
+            LCL = round(quantile(mean_sat, probs = 0.025), 3),
+            UCL = round(quantile(mean_sat, probs = 0.975), 3),
+            estimate_md = round(median(median_sat), 3), 
+            LCL_md = round(quantile(median_sat, probs = 0.025), 3),
+            UCL_md = round(quantile(median_sat, probs = 0.975), 3)) %>% 
+  mutate(ecoregion = factor(WSA9)) %>%
+  #mutate(type = "MR") %>%
+  #select(ecoregion, estimate, LCL, UCL) %>%
+  mutate(ecoregion = fct_reorder(ecoregion, estimate)) %>%
+  ggplot(aes( x = ecoregion, y = estimate )) +
+  geom_point(color = "blue") +
+  geom_linerange( aes( ymin = LCL, ymax = UCL), color = "blue") +
+  geom_point(aes(x = ecoregion, y = estimate_md), color = "red") +
+  geom_linerange( aes( ymin = LCL_md, ymax = UCL_md), color = "red") +
+  geom_hline(yintercept = 1, linetype = "dashed") +
+  ylab("mean N2O saturation ratio") +
+  coord_flip() + 
+  theme_bw()
+ggsave("output/figures/n2oSatRatioByEcoMedianAndMean.tiff")
+
+
+
+# density plots of predicted distribution, mean, and median
+# using xlim to zoom in on values close to 1
+
+dummy <- all_predictions %>%
+  group_by(WSA9) %>%
+  summarize(mean = mean(n2osat),
+            median = median(n2osat)) %>%
+  mutate(dens.med = c(2, 2.5, 2.3, 2.05, 1.75, 2.15, 2.2, 1.9, 1.9),
+         dens.mean = c(.4, 1.9, 2, .6, .65, .45, 1.5, 1.45, 0.9),
+         .draw = 1) # needed to match grouping aesthetic in ggplot call
+
+tic() # 40 seconds for 100 draws
+all_predictions %>%
+  filter(.draw %in% 1:100) %>% # subset for practice
+  #mutate(ecoregion = factor(WSA9)) %>%
+  #mutate(ecoregion = fct_reorder(ecoregion, preds_sat)) %>%
+  ggplot(aes(x = n2osat, group = .draw, color = .draw ) ) +
+  geom_density(show.legend = FALSE) +
+  geom_vline(xintercept = 1, color = "red") +
+  geom_segment(data = dummy,
+               aes(x = mean, xend = mean, y = 0,
+                   yend = dens.mean),
+               linetype = "solid") +
+  geom_segment(data = dummy,
+               aes(x = median, xend = median, y = 0,
+                   yend = dens.med),
+               linetype = "dashed") +
+  ylab ("density") + 
+  xlab(expression(N[2]*O~saturation~ratio)) +
+  xlim(0,3) + # data range is 0-600, but sample max is 30
+  facet_wrap(~WSA9) +
+  theme_bw() +
+  theme(legend.position = "none")
+toc()
+ggsave("output/figures/n2oSatRatioDensityByEcoWithMeanMedian.tiff", width = 8.5, height = 5)
+
+
+
+
 
 
 # density plots of predicted distribution
@@ -2589,29 +2669,7 @@ all_predictions %>%
   theme_bw() 
 ggsave("output/figures/n2oSatRatioByEco.tiff")
 
-
-# PLOT N2O* BY SIZE------------------
-# point and linerange
-all_predictions %>%
-  mutate(n2ostar = abs(n2o - n2oeq)) %>%
-  group_by(size_cat, .draw) %>% # group by iteration
-  #group_by(.draw) %>%
-  summarise(mean_star = mean(n2ostar)) %>% # 500 means for each WSA9
-  # now summarize to 1 statistic per WSA9
-  summarise( estimate = round(median(mean_star), 3), 
-    LCL = round(quantile(mean_star, probs = 0.025), 3),
-    UCL = round(quantile(mean_star, probs = 0.975), 3)) %>% 
-  ggplot( aes( x = size_cat, y = estimate ) ) +
-  geom_point() +
-  geom_linerange( aes( ymin = LCL, ymax = UCL)) +
-  ylab("absolute[mean N2O - equilibrium N2O] (nmol/L)") +
-  coord_flip() + 
-  theme_bw() 
-ggsave("output/figures/n2oStarBySize.tiff")
-
-
 # PLOT N2O SAT RATIO BY WSA9 AND SIZE------------------
-
 # point and linerange
 all_predictions %>%
   group_by(WSA9, size_cat, .draw) %>% # group by iteration
@@ -2634,6 +2692,29 @@ all_predictions %>%
   theme_bw() +
   facet_wrap(~ecoregion)
 ggsave("output/figures/n2oSatRatioByEcoAndSize.tiff")
+
+
+# PLOT N2O* BY SIZE------------------
+# point and linerange
+all_predictions %>%
+  mutate(n2ostar = abs(n2o - n2oeq)) %>%
+  group_by(size_cat, .draw) %>% # group by iteration
+  #group_by(.draw) %>%
+  summarise(mean_star = mean(n2ostar)) %>% # 500 means for each WSA9
+  # now summarize to 1 statistic per WSA9
+  summarise( estimate = round(median(mean_star), 3), 
+    LCL = round(quantile(mean_star, probs = 0.025), 3),
+    UCL = round(quantile(mean_star, probs = 0.975), 3)) %>% 
+  ggplot( aes( x = size_cat, y = estimate ) ) +
+  geom_point() +
+  geom_linerange( aes( ymin = LCL, ymax = UCL)) +
+  ylab("absolute[mean N2O - equilibrium N2O] (nmol/L)") +
+  coord_flip() + 
+  theme_bw() 
+ggsave("output/figures/n2oStarBySize.tiff")
+
+
+
 
 
 
@@ -2707,7 +2788,7 @@ all_predictions %>%
 wind <- wind %>% mutate(.id = row_number())
 
 # Merge wind and all_predictions
-tic() # 33 seconds
+tic() # 21 seconds on VM
 all_predictions <- full_join(all_predictions, wind, by = c(".row" = ".id")) # 40 seconds on laptop
 toc()
 dim(wind) # 465897
@@ -2741,21 +2822,21 @@ all_predictions <- all_predictions %>%
          f.n2o.Mg.y = (e.n2o.mg.m2.d * 365 * (area_ha*10000)) / # day to year. ha to m2.
            (1000*1000*1000)) #mg-g, g-kg, kg-Mg
 
-# write reduced file to disk for less computationally intensive wrangling
-all_predictions.w.small <- all_predictions.w %>% filter(.draw %in% 1:5)
-
-save(all_predictions.w.small,
-     file = paste0(Sys.getenv("USERPROFILE"),
-                   "/Environmental Protection Agency (EPA)/",
-                   "ORD NLA17 Dissolved Gas - Documents/",
-                   "inputData/all_predictions_w_small.rda"))
+# # write reduced file to disk for less computationally intensive wrangling
+# all_predictions.w.small <- all_predictions %>% filter(.draw %in% 1:5)
+# 
+# save(all_predictions.w.small,
+#      file = paste0(Sys.getenv("USERPROFILE"),
+#                    "/Environmental Protection Agency (EPA)/",
+#                    "ORD NLA17 Dissolved Gas - Documents/",
+#                    "inputData/all_predictions_w_small.rda"))
 ```
 ### compared to literature and US GHG inventory
 The distribution of N2O emission rates (mg N2O m-2 d-1) for one draw is very similar to that derived from a literature review of lake/reservoir emission rates (DelSontro et al), except for CPL which shows some exceedingly high rates.  Overall, our results look reasonable.
 
 The total N2O flux from US lakes and reservoirs is minor compared to other anthropogenic N2O sources
 ```{r}
-all_predictions.w %>% 
+all_predictions %>% 
   filter(.draw == 1) %>% 
   ggplot(aes(x=e.n2o.mg.m2.d)) + 
   geom_density() +
@@ -2786,7 +2867,7 @@ n2o <- data.frame(kt = c(1156,88,84,66,60,34,18,14,7),
 n2o <- n2o %>% mutate(Mg = (kt * 1000 * 1000) / 1000,  # 1000 metric tons in a kt, 1000 kg in a metric ton, 1000 kg in a Mg
                       Gg = Mg / 1000) 
 
-# National scale number for lakess/reservoirs (this is is Gg)
+# National scale number for lakes/reservoirs (this is is Gg)
 national.lakes <- all_predictions %>% 
   group_by(.draw) %>% 
   summarise(total.n2o = sum(f.n2o.Mg.y)) %>% 
@@ -2826,7 +2907,7 @@ pie.labels <- c("Agricultural Soil Management",
 pie(inventory$Gg, labels = pie.labels, col = brewer.pal(8, "Set2"), radius = 0.6, cex = 0.9)
 dev.off()
 
-(national.lakes$Gg/sum(inventory$Gg)) * 1000 #0.7%
+(national.lakes$Gg/sum(inventory$Gg)) * 100 #0.07%
 ```
 
 ### Figures and tables
@@ -2834,15 +2915,113 @@ Below is the distribution of total annual fluxes from the lakes.  This is calcul
 
 
 ```{r}
-# density plot with RUG for one draw
-all_predictions %>% filter(.draw == 1) %>% ggplot(aes(x=f.n2o.Mg.y)) + geom_density() +geom_rug() + facet_wrap(~WSA9, scales = "free")
+# EMISSION RATES---------
+# density plot by ecoregion
+all_predictions %>%
+  filter(.draw %in% 1:10) %>% # subset for practice
+  #mutate(ecoregion = factor(WSA9)) %>%
+  #mutate(ecoregion = fct_reorder(ecoregion, preds_sat)) %>%
+  ggplot(aes(x = e.n2o.mg.m2.d, group = .draw, color = .draw )) +
+  geom_density(show.legend = FALSE) +
+  #geom_vline(xintercept = 0, color = "red") +
+  xlab(expression("N"[2]*"O"~ "emission"~ "rate" ~ "(mg" ~ N[2]*O ~ m^-2 ~ d^-1 ~ ")")) +
+  #xlim(0,5) + # data range is 0-600, but sample max is 30
+  facet_wrap(~WSA9, scales = "free") +
+  theme_bw()
 
+# density plot with RUG for one draw
+all_predictions %>% 
+  filter(.draw == 1) %>% 
+  ggplot(aes(x=f.n2o.Mg.y)) + 
+  geom_density() +
+  geom_rug() + 
+  facet_wrap(~WSA9, scales = "free")
+
+# point and line range by size and ecoregion
+all_predictions %>%
+  group_by(WSA9, size_cat, .draw) %>% # group by iteration
+  #group_by(.draw) %>%
+  summarise(mean_e.n2o.mg.m2.d = mean(e.n2o.mg.m2.d)) %>% # 500 means for each WSA9 x size cat
+  # now summarize to 1 statistic per WSA9
+  summarise( estimate = round(median(mean_e.n2o.mg.m2.d), 3), 
+    LCL = round(quantile(mean_e.n2o.mg.m2.d, probs = 0.025), 3),
+    UCL = round(quantile(mean_e.n2o.mg.m2.d, probs = 0.975), 3)) %>% 
+  mutate(ecoregion = factor(WSA9)) %>%
+  #mutate(type = "MR") %>%
+  #select(ecoregion, estimate, LCL, UCL) %>%
+  mutate(ecoregion = fct_reorder(ecoregion, estimate)) %>%
+  ggplot( aes( x = size_cat, y = estimate ) ) +
+  geom_point() +
+  geom_linerange( aes( ymin = LCL, ymax = UCL)) +
+  geom_hline(yintercept = 0, color='blue') +
+  ylab("mean N2O emission rate") +
+  coord_flip() + 
+  theme_bw() +
+  facet_wrap(~ecoregion)
+ggsave("output/figures/n2oEmissionRateBySizeEco.tiff", width = 7)
+
+# FLUX-------------
 # flux vs area for one draw
-all_predictions.w %>% filter(.draw == 1) %>% ggplot(aes(y=f.n2o.Mg.y, x=area_ha)) + geom_point() + facet_wrap(~WSA9, scales = "free")
+all_predictions %>% 
+  filter(.draw == 1) %>% 
+  ggplot(aes(y=f.n2o.Mg.y, x=area_ha)) + 
+  geom_point() + 
+  facet_wrap(~WSA9, scales = "free")
+
+# flux by ecoregion
+# point and linerange
+all_predictions %>%
+  group_by(WSA9, .draw) %>% # group by iteration
+  #group_by(.draw) %>%
+  summarise(mean_f = mean(f.n2o.Mg.y)) %>% # 500 means for each WSA9
+  # now summarize to 1 statistic per WSA9
+  summarise( estimate = round(median(mean_f), 3), 
+    LCL = round(quantile(mean_f, probs = 0.025), 3),
+    UCL = round(quantile(mean_f, probs = 0.975), 3)) %>% 
+  mutate(ecoregion = factor(WSA9)) %>%
+  #mutate(type = "MR") %>%
+  select(ecoregion, estimate, LCL, UCL) %>%
+  mutate(ecoregion = fct_reorder(ecoregion, estimate)) %>%
+  ggplot( aes( x = ecoregion, y = estimate ) ) +
+  geom_point() +
+  geom_linerange( aes( ymin = LCL, ymax = UCL)) +
+  geom_hline(yintercept = 0, color='blue') +
+  ylab("mean N2O saturation ratio") +
+  coord_flip() + 
+  theme_bw()
+ggsave("output/figures/n2oSatRatioByEco.tiff")
+
+# point and line range by size and ecoregion
+all_predictions %>%
+  group_by(WSA9, size_cat, .draw) %>% # group by iteration
+  #group_by(.draw) %>%
+  summarise(mean_f.n2o.Mg.y = mean(f.n2o.Mg.y)) %>% # 500 means for each WSA9 x size cat
+  # now summarize to 1 statistic per WSA9
+  summarise( estimate = round(median(mean_f.n2o.Mg.y), 3), 
+    LCL = round(quantile(mean_f.n2o.Mg.y, probs = 0.025), 3),
+    UCL = round(quantile(mean_f.n2o.Mg.y, probs = 0.975), 3)) %>% 
+  mutate(ecoregion = factor(WSA9)) %>%
+  #mutate(type = "MR") %>%
+  #select(ecoregion, estimate, LCL, UCL) %>%
+  mutate(ecoregion = fct_reorder(ecoregion, estimate)) %>%
+  ggplot( aes( x = size_cat, y = estimate ) ) +
+  geom_point() +
+  geom_linerange( aes( ymin = LCL, ymax = UCL)) +
+  geom_hline(yintercept = 0, color='blue') +
+  ylab("mean N2O flux") +
+  coord_flip() + 
+  theme_bw() +
+  facet_wrap(~ecoregion, scales = "free")
+ggsave("output/figures/n2oFluxBySizeEco.tiff", height = 5.4, width = 9.6)
 
 # bar plot by size category and ecoregion  
-all_predictions.w %>% filter(.draw == 1) %>% group_by(WSA9, size_cat2) %>% summarise(total.n2o = sum(f.n2o.Mg.y)) %>% 
-  ggplot(aes(x=size_cat2, y=total.n2o)) + geom_bar(stat = "identity") + facet_wrap(~WSA9, scales = "free")
+all_predictions %>% 
+  filter(.draw == 1) %>% 
+  group_by(WSA9, size_cat2) %>% 
+  summarise(total.n2o = sum(f.n2o.Mg.y)) %>% 
+  ggplot(aes(x=size_cat2, y=total.n2o)) + 
+  geom_bar(stat = "identity") + 
+  facet_wrap(~WSA9, scales = "free")
 
 
 # bar plot by size category with error
@@ -2859,7 +3038,8 @@ p <- all_predictions %>%
     xlab(expression(Lake~Size~Bin~(km^{2}))) +
   ylab(expression(Mg~N[2]*O~year^{-1})) +
   facet_wrap(~WSA9, scales = "free") +
-  theme_bw()
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90))
 
 # this bit fills strip with same colors used in micromap (see below)
 #https://stackoverflow.com/questions/19440069/ggplot2-facet-wrap-strip-color-based-on-variable-in-data-set
@@ -2874,14 +3054,14 @@ for (i in stripr) {
 }
 grid::grid.draw(g)
 
-ggsave("output/figures/n2oFluxByLakeSizeWithError.tiff", g)
+ggsave("output/figures/n2oFluxByLakeSizeWithError.tiff", g, width = 9.6, height = 5.4)
 
 
 
 
 
 # bar plot by size category without error
-p <- all_predictions.w %>% 
+p <- all_predictions %>% 
   group_by(WSA9, .draw, size_cat2) %>% 
   # tot x size x draw
   summarise(total.n2o = sum(f.n2o.Mg.y),
@@ -2957,7 +3137,7 @@ ecoreg_stats <- all_predictions %>%
 
 ecoreg_stats <- as.data.frame(ecoreg_stats)
 class(ecoreg_stats)
-str(ecoreg_stats) # WSA9 is a factor, but some of the stats have attribute of Named num
+str(ecoreg_stats) # WSA9 is a factor
 
 ecoreg_stats$WSA9_NAME <- as.character(ecoreg_stats$WSA9)
 ecoreg_stats <- ecoreg_stats %>% select(-WSA9)
@@ -3091,4 +3271,13 @@ mmplot(stat.data=ecoreg_stats,
 ```
 
 
+# Manuscript
 
+
+Results and Discussion
+In this study we present the first national-scale survey of N2O concentrations and emissions from lakes,  reservoirs, and ponds, hereafter referred to as waterbodies, in the conterminous U.S. (CONUS).  A generalized random-tessellation survey design (Stevens and Olsen, 2004) was used to select a spatially-balanced and representative sample of `r dg %>% distinct(site.id) %>% summarize(n = n()) %>% pull()` [weird, I have 1090, but NLA17 report says 1,005?] sites from CONUS waterbodies that are least 1 hectare in area, at least 1 meter deep, have at least 0.1 hectare of open water, and have a minimum residence time of one week (Figure 1).   Sample sites were distributed across all nine major CONUS ecoregions and varied widely in water chemistry, morphometry, watershed land-use, and climate (See NLA website for all data?). `r round(((dg %>% dplyr::filter(n2o.src.snk == "sink") %>% {nrow(.)} / dg %>% distinct(site.id) %>% {nrow(.)}) * 100), 1)` percent of the sampled waterbodies were undersaturated in N2O and were therefore functioning as N2O sinks.  We modeled the data using a bayesion hierchical approach and predicted the dissolved N2O concentration for all  224,916 CONUS waterbodies in the target population.  At the population level, `r all_predictions %>% group_by(.draw) %>% summarise(prop_sat = sum(n2osat < 1) / length(.row)) %>% summarise(estimate = round(median(prop_sat), 3) * 100) %>% pull()` percent (95% CI: `r all_predictions %>% group_by(.draw) %>% summarise(prop_sat = sum(n2osat < 1) / length(.row)) %>% summarise(LCL = round(quantile(prop_sat, probs = 0.025), 3) * 100) %>% pull()` - `r all_predictions %>% group_by(.draw) %>% summarise(prop_sat = sum(n2osat < 1) / length(.row)) %>% summarise(UCL = round(quantile(prop_sat, probs = 0.975), 3) * 100) %>% pull()`) of CONUS waterbodies were functioning as N2O sink.  The Western Mountains ecoregion had the smallest proportion of waterbodies functioning as N2O sinks (mean = `r all_predictions %>% group_by(WSA9, .draw) %>% summarise(prop_sat = sum(n2osat < 1) / length(.row)) %>% summarise(estimate = round(median(prop_sat), 3) * 100) %>% filter(WSA9 == "WMT") %>% select(estimate) %>% pull()`%, 95% CI: `r all_predictions %>% group_by(WSA9, .draw) %>% summarise(prop_sat = sum(n2osat < 1) / length(.row)) %>% summarise(LCL = round(quantile(prop_sat, probs = 0.025), 3) * 100) %>% filter(WSA9 == "WMT") %>% pull()` - `r all_predictions %>% group_by(WSA9, .draw) %>% summarise(prop_sat = sum(n2osat < 1) / length(.row)) %>% summarise(UCL = round(quantile(prop_sat, probs = 0.975), 3) * 100) %>% filter(WSA9 == "WMT") %>% pull()`) and the Northern Plains had the greatest (mean = `r all_predictions %>% group_by(WSA9, .draw) %>% summarise(prop_sat = sum(n2osat < 1) / length(.row)) %>% summarise(estimate = round(median(prop_sat), 3) * 100) %>% filter(WSA9 == "NPL") %>% select(estimate) %>% pull()`%, 95% CI: `r all_predictions %>% group_by(WSA9, .draw) %>% summarise(prop_sat = sum(n2osat < 1) / length(.row)) %>% summarise(LCL = round(quantile(prop_sat, probs = 0.025), 3) * 100) %>% filter(WSA9 == "NPL") %>% pull()` - `r all_predictions %>% group_by(WSA9, .draw) %>% summarise(prop_sat = sum(n2osat < 1) / length(.row)) %>% summarise(UCL = round(quantile(prop_sat, probs = 0.975), 3) * 100) %>% filter(WSA9 == "NPL") %>% pull()`)).      
+
+
+
+
+This survey design allows for extrapolation of the measurement results to all 224,916 CONUS waterbodies (this is from the 2017 NLA web report) in the target population. 

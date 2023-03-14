@@ -1,0 +1,44 @@
+---
+title: "Widespread nitrous oxide undersaturation in U.S. lakes and reservoirs"
+output: word_document
+date: "2023-03-08"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# Specify paths-----
+# local path for each user.
+localPath <- Sys.getenv("USERPROFILE")
+
+
+# Libraries-----
+# load libraries needed to run scripts in this .Rmd
+# libraries loaded by sourcing an external script don't seem to
+# be loaded into the global knitr environment
+library(tidyverse) # dplyr, ggplot
+
+# Working directory------
+# wd is set to root of RStudio project via options under Knitr drop-down
+# menu above.
+
+
+# source scripts------
+# some libraries are called within this script.  Not sure if that is necessary
+# if libraries are also called above.  Thus far I'm including necessary
+# library calls in external script.
+# see above for .Rmd working directory
+source("manuscript/manuscript_support.R") 
+```
+
+## Introduction
+
+## Results and Discussion
+
+In this study we present the first national-scale survey **kasdflkjldfj** of N~2~O concentrations and emissions from lakes, reservoirs, and ponds, hereafter referred to as waterbodies, in the conterminous U.S. (CONUS). A generalized random-tessellation survey design (Stevens and Olsen, 2004) was used to select a spatially-balanced and representative sample of `r dg %>% distinct(site.id) %>% summarize(n = n()) %>% pull()` **[weird, I have 1090, but NLA17 report says 1,005?]** sites from CONUS waterbodies that are least 1 hectare in area, at least 1 meter deep, have at least 0.1 hectare of open water, and have a minimum residence time of one week (Figure 1). Sample sites were distributed across all nine major CONUS ecoregions and varied widely in water chemistry, morphometry, watershed land-use, and climate (See NLA website for all data?). `r round(((dg %>% dplyr::filter(n2o.src.snk == "sink") %>% {nrow(.)} / dg %>% distinct(site.id) %>% {nrow(.)}) * 100), 1)` percent of the sampled waterbodies were undersaturated in N2O and were therefore functioning as N2O sinks. We modeled the data using a bayesion hierchical approach and predicted the dissolved N2O concentration for all 224,916 CONUS waterbodies in the target population. At the population level, `r all_predictions %>% group_by(.draw) %>% summarise(prop_sat = sum(n2osat < 1) / length(.row)) %>% summarise(estimate = round(median(prop_sat), 3) * 100) %>% pull()` percent (95% CI: `r all_predictions %>% group_by(.draw) %>% summarise(prop_sat = sum(n2osat < 1) / length(.row)) %>% summarise(LCL = round(quantile(prop_sat, probs = 0.025), 3) * 100) %>% pull()` - `r all_predictions %>% group_by(.draw) %>% summarise(prop_sat = sum(n2osat < 1) / length(.row)) %>% summarise(UCL = round(quantile(prop_sat, probs = 0.975), 3) * 100) %>% pull()`) of CONUS waterbodies were functioning as N2O sink. The Western Mountains ecoregion had the smallest proportion of waterbodies functioning as N2O sinks (mean = `r all_predictions %>% group_by(WSA9, .draw) %>% summarise(prop_sat = sum(n2osat < 1) / length(.row)) %>% summarise(estimate = round(median(prop_sat), 3) * 100) %>% filter(WSA9 == "WMT") %>% select(estimate) %>% pull()`%, 95% CI: `r all_predictions %>% group_by(WSA9, .draw) %>% summarise(prop_sat = sum(n2osat < 1) / length(.row)) %>% summarise(LCL = round(quantile(prop_sat, probs = 0.025), 3) * 100) %>% filter(WSA9 == "WMT") %>% pull()` - `r all_predictions %>% group_by(WSA9, .draw) %>% summarise(prop_sat = sum(n2osat < 1) / length(.row)) %>% summarise(UCL = round(quantile(prop_sat, probs = 0.975), 3) * 100) %>% filter(WSA9 == "WMT") %>% pull()`) and the Northern Plains had the greatest (mean = `r all_predictions %>% group_by(WSA9, .draw) %>% summarise(prop_sat = sum(n2osat < 1) / length(.row)) %>% summarise(estimate = round(median(prop_sat), 3) * 100) %>% filter(WSA9 == "NPL") %>% select(estimate) %>% pull()`%, 95% CI: `r all_predictions %>% group_by(WSA9, .draw) %>% summarise(prop_sat = sum(n2osat < 1) / length(.row)) %>% summarise(LCL = round(quantile(prop_sat, probs = 0.025), 3) * 100) %>% filter(WSA9 == "NPL") %>% pull()` - `r all_predictions %>% group_by(WSA9, .draw) %>% summarise(prop_sat = sum(n2osat < 1) / length(.row)) %>% summarise(UCL = round(quantile(prop_sat, probs = 0.975), 3) * 100) %>% filter(WSA9 == "NPL") %>% pull()`)).
+
+```{r echo=FALSE, fig.cap= "Location of sampling sites.  Color of the points indicates whether the waterbody was functioning as a source or sink of nitrous oxide (N~2~O).  Point size indicates the dissolved N~2~O concentration"}
+
+# [3/9/2023] knitr can only find the file if placed in the root of the RStudio project.  Why can't it pull the figure from the manuscript_figures folder?
+knitr::include_graphics("figure1.png")
+```

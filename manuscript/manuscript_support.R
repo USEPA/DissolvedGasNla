@@ -1,0 +1,111 @@
+## This script generates data to be referenced in inline-code in the manuscript.
+## This makes the inline code more succint and the .Rmd easier to read.
+
+
+# SETUP----------------------
+# load libraries-----------------
+library(sf) # spatial data
+library(tidyverse) # dplyr, ggplot
+library(janitor) # clean names
+library(USAboundaries) # state boundaries
+library(tictoc) # processing time
+
+# Identify local path for each user
+localPath <- Sys.getenv("USERPROFILE")
+
+
+# DATA---------------
+#### load sample data (dg object)
+load(paste0(localPath,  # object name dg
+            "/Environmental Protection Agency (EPA)/",
+            "ORD NLA17 Dissolved Gas - Documents/",
+            "inputData/dg.2021-02-01.RData"))
+
+# To enable spatial analysis of the data, the dataframe will be converted to a 'simple features' (sf) object.
+# Define coordinates
+coords <- data.frame(longitude = dg$map.lon.dd, latitude = dg$map.lat.dd)
+
+dg.sf <- st_as_sf(dg, coords = c("map.lon.dd", "map.lat.dd"), 
+                  crs = 4269) %>% # standard for lat/lon
+  st_transform(5070) # project to CONUS ALBERS for plotting
+
+
+##### load ecoregions
+# read in ecoregion polygons
+ecoR <- st_read(dsn = paste0(localPath, 
+                             "/Environmental Protection Agency (EPA)/",
+                             "ORD NLA17 Dissolved Gas - Documents/inputData"),
+                layer = "aggr_ecoregions_simple")
+
+# Check CRS
+st_crs(ecoR) # 3857
+ecoR <- st_transform(ecoR, 5070) # convert to CONUS Albers
+st_crs(ecoR) # 5070
+
+# SET UP CUSTOM COLORS FOR ECOREGIONS---------
+# Custom color pallette for ecoregion polygons. Attempted to mirror
+# https://www.epa.gov/national-aquatic-resource-surveys/
+# ecoregional-results-national-lakes-assessment-2012
+cols <- c("Coastal Plains" = "orange1",
+          "Northern Appalachians" = "lightpink1",
+          "Northern Plains" = "darksalmon",
+          "Southern Appalachians" = "mediumturquoise",
+          "Southern Plains" = "khaki4",
+          "Temperate Plains" = "forestgreen", 
+          "Upper Midwest" = "deepskyblue4",
+          "Western Mountains" = "saddlebrown",
+          "Xeric" = "lightskyblue4")
+
+
+#### Load state boundaries
+states <- USAboundaries::us_states() %>%
+  dplyr::filter(!state_name %in% c("Alaska", "District of Columbia", "Hawaii", "Puerto Rico")) %>%
+  st_transform(5070) # convert to CONUS Albers
+
+
+### load population data
+tic()
+load(paste0(localPath, "\\Environmental Protection Agency (EPA)\\ORD NLA17 Dissolved Gas - Documents\\inputData\\all_predictions.rda"))
+toc()
+
+
+# FIGURES-----------------
+# eliminate black points from with WSA9_NAME legend
+# rename WSA9_NAME legend to Ecoregions
+
+
+ggplot() +
+  geom_sf(data = ecoR, color = NA, aes(fill = WSA9_NAME)) +
+  geom_sf(data = dg.sf %>% filter(!is.na(n2o.src.snk)), 
+          aes(size = dissolved.n2o.nmol, color = n2o.src.snk),
+          show.legend = "point") +
+  geom_sf(data = states, fill = NA, color = "cornsilk3", size = 0.1) +
+  # guide argument below removes points from the boxes in the ecoregion legend
+  # https://aosmith.rbind.io/2020/07/09/ggplot2-override-aes/
+  scale_fill_manual("Ecoregion", values = cols, 
+                    guide = guide_legend(override.aes = list(shape = NA))) +
+  scale_color_manual(values = c("white", "black"), name = "source/sink") +
+  scale_size(name = expression(N[2]*O~(nM)),
+             range = c(0.1, 10), # custom size range
+             breaks = c(1, 10, 25, 50, 100)) + # custom breaks
+  theme(legend.key.size = unit(0.4, "cm"), # size of boxes in legend
+        legend.title = element_text(size = 8))
+ggsave("manuscript/manuscript_figures/figure1.png", width = 8, height = 4, units = "in")
+
+
+
+# MANUSCRIPT DATA-----
+
+all_predictions %>%
+  group_by(WSA9, .draw) %>% # group by iteration
+  summarise(n2o = mean(n2o), # 500 means for each WSA9
+            sat = mean(n2osat),
+            n2o_d = mean(n2o - n2oeq)) %>% # 500 means for each WSA9
+  # now summarize to 1 statistic per WSA9
+  summarise(across(contains("mean"), list(estimate = ~ round(median(.x), 3),
+                                          LCL = ~round(quantile(.x, probs = 0.025), 3),
+                                          UCL = ~ round(quantile(.x, probs = 0.975), 3))))
+                     
+                     estimate = round(median(mean_n2o), 3), 
+             LCL = round(quantile(mean_n2o, probs = 0.025), 3),
+             UCL = round(quantile(mean_n2o, probs = 0.975), 3))
