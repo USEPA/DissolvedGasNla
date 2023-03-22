@@ -3103,7 +3103,9 @@ ggsave("output/figures/n2oFluxByLakeSizeNoError.tiff", g)
 
 ```
 
-## micromap: N2O saturation ratio continuous, extent, and emission rate
+## MICROMAP: N2O saturation ratio continuous, extent, and emission rate
+   
+### Set up data
 ```{r}
 # summarize means by WSA9 (posterior median for mean and 95% credible intervals)
 # this is analogous to spsurvey "population estimates"
@@ -3139,8 +3141,7 @@ ecoreg_stats <- as.data.frame(ecoreg_stats)
 class(ecoreg_stats)
 str(ecoreg_stats) # WSA9 is a factor
 
-ecoreg_stats$WSA9_NAME <- as.character(ecoreg_stats$WSA9)
-ecoreg_stats <- ecoreg_stats %>% select(-WSA9)
+ecoreg_stats$WSA9 <- as.character(ecoreg_stats$WSA9)
 str(ecoreg_stats)
 
 ecoreg_stats
@@ -3162,10 +3163,11 @@ ecor.polys <- create_map_table(ecoregions_sp1, 'WSA9')
 class(ecor.polys)
 str(ecor.polys, max =2) # ID is chr "CPL"...
 
+```
 
 
-
-# N2O SATURATION AND UNDERSATURATION EXTENT
+### N2O SATURATION AND UNDERSATURATION EXTENT
+```{r}
 # Full code:  Use this to produce final linked micromaps of the variables you want
 # export as pdf US letter landscape from Plots pane
 # export as PNG Width 900 Height 968, maintain aspect ratio
@@ -3214,11 +3216,12 @@ mmplot(stat.data=ecoreg_stats,
                            panel.width=2)),
        
        print.file = "output/figures/mmapSatExtent.tiff", print.res = 300)
+```
 
 
 
-
-# N2O EMISSION AND FLUX
+### N2O EMISSION AND FLUX
+```{r}
 # Full code:  Use this to produce final linked micromaps of the variables you want
 # export as pdf US letter landscape from Plots pane
 # export as PNG Width 900 Height 968, maintain aspect ratio
