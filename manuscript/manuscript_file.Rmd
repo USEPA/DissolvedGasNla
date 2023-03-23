@@ -1,7 +1,9 @@
 ---
 title: "Widespread nitrous oxide undersaturation in U.S. lakes and reservoirs"
-output: word_document
 date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: word_document
+bibliography: references.bib
+link-citations: yes
 ---
 
 ```{r setup, include=FALSE}
@@ -31,18 +33,16 @@ library(tidyverse) # dplyr, ggplot
 source("manuscript/manuscript_support.R") 
 ```
 
-## Introduction
+# Introduction
 
-## Results and Discussion
+# Results and Discussion
 
 In this study we present the first national-scale survey of N~2~O concentrations and emissions from lakes, reservoirs, and ponds, hereafter referred to as waterbodies, in the conterminous U.S. (CONUS). A generalized random-tessellation survey design (Stevens and Olsen, 2004) was used to select a spatially-balanced and representative sample of `r dg %>% distinct(site.id) %>% summarize(n = n()) %>% pull()` **[weird, I have 1090, but NLA17 report says 1,005?]** sites from CONUS waterbodies that are least 1 hectare in area, at least 1 meter deep, have at least 0.1 hectare of open water, and have a minimum residence time of one week (Figure 1). Sample sites were distributed across all nine major CONUS ecoregions and varied widely in water chemistry, morphometry, watershed land-use, and climate (See NLA website for all data?). `r undersatN2oPercent` percent of the sampled waterbodies were undersaturated in N2O and were therefore functioning as N~2~O sinks (Figure 1). We modeled the data using a bayesion hierchical approach and predicted the dissolved N~2~O concentration for all 224,916 CONUS waterbodies in the target population. At the population level, `r propN2oSinkMean` percent (95% CI: `r propN2oSinkLower` - `r propN2oSinkUpper`) of CONUS waterbodies were functioning as N~2~O sinks. The Western Mountains ecoregion had the smallest proportion of waterbodies functioning as N~2~O sinks (mean = `r propN2oSinkMeanWM`%, 95% CI: `r propN2oSinkLowerWM` - `r propN2oSinkUpperWM`) and the Northern Plains had the greatest (mean = `r propN2oSinkMeanNPL`%, 95% CI: `r propN2oSinkLowerNPL` - `r propN2oSinkUpperNPL`).
 
-```{r echo=FALSE, fig.cap= "Location of sampling sites.  Color of the points indicates whether the waterbody was functioning as a source or sink of nitrous oxide (N~2~O).  Point size indicates the dissolved N~2~O concentration"}
+![Location of sampling sites.  Color of the points indicates whether the waterbody was functioning as a source or sink of nitrous oxide (N~2~O).  Point size indicates the dissolved N~2~O concentration.](manuscript_figures/figure1.png)
 
-# [3/9/2023] knitr can only find the file if placed in the root of the RStudio project.  Why can't it pull the figure from the manuscript_figures folder?
-#knitr::include_graphics("manuscript_figures/figure1.png")
-```
+Here is a citation example: Multilevel models are useful for survey inference [@Kennedy_Gelman_2021]. This paper by @Kennedy_Gelman_2021 provides a nice worked example.
 
-
+# References
 
 
