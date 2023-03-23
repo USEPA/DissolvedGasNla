@@ -10,7 +10,7 @@ link-citations: yes
 # Specify paths-----
 # local path for each user.
 localPath <- Sys.getenv("USERPROFILE")
-knitr::opts_knit$set(root.dir = "../")
+knitr::opts_knit$set(root.dir = "../") # set wd to root of RStudio project
 
 
 # Libraries-----
@@ -19,12 +19,6 @@ knitr::opts_knit$set(root.dir = "../")
 # be loaded into the global knitr environment
 library(tidyverse) # dplyr, ggplot
 
-# Working directory------
-# wd is set to root of RStudio project via options under Knitr drop-down
-# menu above.
-
-
- 
 ```
 
 ```{r source_scripts, echo=FALSE, warning=FALSE, message=FALSE}
@@ -73,8 +67,12 @@ Here is a citation example: Multilevel models are useful for survey inference [@
 #### Distribution
 Despite widespread N~2~O undersaturation in CONUS waterbodies, the mean N~2~O saturation ratio (ratio of measured to equilibrium concentration) was equal to or greater than 1 in seven of the nine ecoregions (Table 1, Figure 2), suggesting that, on average, waterbodies in these ecoregions were supersatured with N~2~O and therefore functioning as a source of N~2~O.  The apparent contradiction between widespread N~2~O undersaturation throughout the CONUS and average dissolved N~2~O concentrations that exceed equilibrium in most ecoregions can be attributed to the distribution of dissolved N~2~O concentrations across the population of CONUS waterbodies (Figure 2).  Across the CONUS, and within each of the nine major ecoregions, the distribution of N~2~O saturation ratios had median values that were less than 1, indicating undersaturation, but a long right tail composed of relatively rare waterbodies with levels of N~2~O supersaturation that are sufficiently high to drive the population mean to values close to, or even greater than 1.  Thus most waterbodies in the CONUS are functioning as N~2~O sinks, but a few function as strong N~2~O sources.
 
-### Controls on N~2~O saturation
-N~2~O saturation was related to waterbody size in several ecoregions, but the direction of the relationship varied.  For example, N~2~O saturation increased with waterbody size in the Northern Plains, Upper Midwest, Northern Appalachians, and Western Mountain ecoregions, but decreased with increasing size in the Coastal and Southern Plains (Figure 3).  A pattern common to many of the ecoregions, regardless of the direction of the relationship between N~2~O saturation and waterbody size, is that N~2~O saturation deviates from equilibrium most strongly in the smallest waterbody size class.  When pooled across all ecoregions, the absolute magnitude of the difference beween the measured and equilibrium N~2~O concentration, known as delta N~2~O 
+![Distribution of N~2~O saturation values for the population of waterbodies in the nine major ecoregions.  Vertical black dashed and solid lines indicated median and mean, respectively.  Vertical red line indicates a saturation ratio of 1.](manuscript_figures/figure2.tiff)
+
+#### Controls on N~2~O saturation
+N~2~O saturation was related to waterbody size in several ecoregions, but the direction of the relationship varied.  For example, N~2~O saturation increased with waterbody size in the Northern Plains, Upper Midwest, Northern Appalachians, and Western Mountain ecoregions, but decreased with increasing size in the Coastal and Southern Plains (Figure 3).  A pattern common to many of the ecoregions, regardless of the direction of the relationship between N~2~O saturation and waterbody size, is that N~2~O saturation deviates from equilibrium most strongly in the smallest waterbody size class.  When pooled across all ecoregions, the absolute magnitude of the difference between the measured and equilibrium N~2~O concentration, known as delta N~2~O, decreases linearly with increasing waterbody size class.
+
+NEED TO ADD THE POOLED FIGURE
 
 
 

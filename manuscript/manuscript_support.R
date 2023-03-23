@@ -207,7 +207,7 @@ national_stats <- all_predictions %>%
 
 
 # FIGURES-----------------
-<<<<<<< HEAD
+
 # The images are written to manuscript/manuscript_figures/...
 # the first time these scripts are run.  Unless the code has changed,
 # there is no need to run the scripts again.  Commenting out the script
@@ -278,30 +278,7 @@ if(!("figure2.tiff" %in% list.files("manuscript/manuscript_figures"))) {
   ggsave("manuscript/manuscript_figures/figure2.tiff", width = 8.5, height = 5)
   
 }
-=======
 
-
-# # Figure 1
-# # Commented to expedite script
- ggplot() +
-   geom_sf(data = ecoR, color = NA, aes(fill = WSA9_NAME)) +
-   geom_sf(data = dg.sf %>% filter(!is.na(n2o.src.snk)), 
-           aes(size = dissolved.n2o.nmol, color = n2o.src.snk),
-           show.legend = "point") +
-   geom_sf(data = states, fill = NA, color = "cornsilk3", size = 0.1) +
-   # guide argument below removes points from the boxes in the ecoregion legend
-   # https://aosmith.rbind.io/2020/07/09/ggplot2-override-aes/
-   scale_fill_manual("Ecoregion", values = cols, 
-                     guide = guide_legend(override.aes = list(shape = NA))) +
-   scale_color_manual(values = c("white", "black"), name = "source/sink") +
-   scale_size(name = expression(N[2]*O~(nM)),
-              range = c(0.1, 10), # custom size range
-              breaks = c(1, 10, 25, 50, 100)) + # custom breaks
-   theme(legend.key.size = unit(0.4, "cm"), # size of boxes in legend
-         legend.title = element_text(size = 8))
- ggsave("manuscript/manuscript_figures/figure1.png", width = 8, height = 4, units = "in")
-
->>>>>>> e42d262904b8409cff9d0f19a94d7534ecfdbf87
 
 
 # MANUSCRIPT DATA-----
