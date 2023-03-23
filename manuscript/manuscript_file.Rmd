@@ -5,11 +5,10 @@ date: "`r format(Sys.time(), '%d %B, %Y')`"
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-
 # Specify paths-----
 # local path for each user.
 localPath <- Sys.getenv("USERPROFILE")
+knitr::opts_knit$set(root.dir = "../")
 
 
 # Libraries-----
@@ -23,25 +22,62 @@ library(tidyverse) # dplyr, ggplot
 # menu above.
 
 
+ 
+```
+
+```{r source_scripts, echo=FALSE, warning=FALSE, message=FALSE}
+# currently knitting messages and warnings into .docx.  hopefully warning and
+# message setting above will fix
+
+
 # source scripts------
 # some libraries are called within this script.  Not sure if that is necessary
 # if libraries are also called above.  Thus far I'm including necessary
 # library calls in external script.
 # see above for .Rmd working directory
-source("manuscript/manuscript_support.R") 
+source("manuscript/manuscript_support.R", local = knitr::knit_global())
 ```
+
 
 ## Introduction
 
 ## Results and Discussion
+  
+### N~2~O undersaturation extent  
+In this study we present the first national-scale survey of N~2~O concentrations and emissions from lakes, reservoirs, and ponds, hereafter referred to as waterbodies, in the conterminous U.S. (CONUS). A generalized random-tessellation survey design (Stevens and Olsen, 2004) was used to select a spatially-balanced and representative sample of `r dg %>% distinct(site.id) %>% summarize(n = n()) %>% pull()` **[weird, I have 1090, but NLA17 report says 1,005?]** sites from CONUS waterbodies that are least 1 hectare in area, at least 1 meter deep, have at least 0.1 hectare of open water, and have a minimum residence time of one week (Figure 1). Sample sites were distributed across all nine major CONUS ecoregions and varied widely in water chemistry, morphometry, watershed land-use, and climate (See NLA website for all data?). `r undersatN2oPercent` percent of the sampled waterbodies were undersaturated in N~2~O and were therefore functioning as N~2~O sinks (Figure 1). We modeled the data using a bayesion hierchical approach and predicted the dissolved N~2~O concentration for all 224,916 CONUS waterbodies in the target population. At the population level, `r propN2oSinkMean` percent (95% CI: `r propN2oSinkLower` - `r propN2oSinkUpper`) of CONUS waterbodies were functioning as N~2~O sinks. The Western Mountains ecoregion had the smallest proportion of waterbodies functioning as N~2~O sinks (mean = `r propN2oSinkMeanWM`%, 95% CI: `r propN2oSinkLowerWM` - `r propN2oSinkUpperWM`), the Northern Plains had the greatest (mean = `r propN2oSinkMeanNPL`%, 95% CI: `r propN2oSinkLowerNPL` - `r propN2oSinkUpperNPL`), and >65% of the waterbodies in every ecoregion were undersaturated (Table 1).  
+  
+The extent of N~2~O undersaturation in CONUS waterbodies is surprisingly high, particularly for waterbodies in nitrogen rich ecoregions that are managed for agricultural production.  This finding  runs counter to the long standing paradigm that nitrogen rich surface waters are a source of N~2~O to the atmosphere (Mosier et al. 1998) and joins other recent reports that lentic waterbodies can function as an N~2~O sink.  Webb et al. (2019) found that 67% of sampled reservoirs in an agricultural region of Canada were undersaturated with N~2~O during the summer months and Soued et al (2015) report that 40% of rivers, lakes, and ponds sampled during the summer in a boreal region of Quebec, Canada were functioning as N~2~O sinks.  While these latter surveys were conducted at regional scales, the national-scale results presented here provide the strongest evidence to date that most lentic waterbodies function as N~2~O sinks during the summer months.  This pattern holds across all 9 major ecoregions in the CONUS, despite the tremendous variation in climate, geology, waterbody morphology, and land use across the continental U.S..
 
-In this study we present the first national-scale survey of N~2~O concentrations and emissions from lakes, reservoirs, and ponds, hereafter referred to as waterbodies, in the conterminous U.S. (CONUS). A generalized random-tessellation survey design (Stevens and Olsen, 2004) was used to select a spatially-balanced and representative sample of `r dg %>% distinct(site.id) %>% summarize(n = n()) %>% pull()` **[weird, I have 1090, but NLA17 report says 1,005?]** sites from CONUS waterbodies that are least 1 hectare in area, at least 1 meter deep, have at least 0.1 hectare of open water, and have a minimum residence time of one week (Figure 1). Sample sites were distributed across all nine major CONUS ecoregions and varied widely in water chemistry, morphometry, watershed land-use, and climate (See NLA website for all data?). `r undersatN2oPercent` percent of the sampled waterbodies were undersaturated in N2O and were therefore functioning as N~2~O sinks (Figure 1). We modeled the data using a bayesion hierchical approach and predicted the dissolved N~2~O concentration for all 224,916 CONUS waterbodies in the target population. At the population level, `r propN2oSinkMean` percent (95% CI: `r propN2oSinkLower` - `r propN2oSinkUpper`) of CONUS waterbodies were functioning as N~2~O sinks. The Western Mountains ecoregion had the smallest proportion of waterbodies functioning as N~2~O sinks (mean = `r propN2oSinkMeanWM`%, 95% CI: `r propN2oSinkLowerWM` - `r propN2oSinkUpperWM`) and the Northern Plains had the greatest (mean = `r propN2oSinkMeanNPL`%, 95% CI: `r propN2oSinkLowerNPL` - `r propN2oSinkUpperNPL`).
+```{r figure1, echo=FALSE, fig.cap= "Location of sampling sites.  Color of the points indicates whether the waterbody was functioning as a source or sink of nitrous oxide (N~2~O).  Point size indicates the dissolved N~2~O concentration"}
 
-```{r echo=FALSE, fig.cap= "Location of sampling sites.  Color of the points indicates whether the waterbody was functioning as a source or sink of nitrous oxide (N~2~O).  Point size indicates the dissolved N~2~O concentration"}
 
 # [3/9/2023] knitr can only find the file if placed in the root of the RStudio project.  Why can't it pull the figure from the manuscript_figures folder?
-#knitr::include_graphics("manuscript_figures/figure1.png")
+knitr::include_graphics("manuscript/manuscript_figures/figure1.png")
 ```
+
+```{r table1, echo = FALSE}
+rbind(national_stats %>% 
+        select(WSA9, estimate, LCL, UCL, post_med_sat, LCI_sat, UCI_sat, post_med_en2o, LCL_en2o, UCL_en2o),
+      ecoreg_stats %>% 
+        select(WSA9, estimate, LCL, UCL, post_med_sat, LCI_sat, UCI_sat, post_med_en2o, LCL_en2o, UCL_en2o)) %>%
+  mutate('N2O undersaturation extent' = paste0(estimate*100, " (", LCL*100, "-", UCL*100, ")"),
+         'N2O saturation ratio' = paste0(post_med_sat, " (", LCI_sat, "-", UCI_sat, ")"),
+         'N2O emission rate' = paste0(post_med_en2o, " (", LCL_en2o, "-", UCL_en2o, ")")) %>% 
+  select(WSA9, 'N2O undersaturation extent', 'N2O saturation ratio', 'N2O emission rate') %>%
+  rename('spatial domain' = WSA9) %>%
+knitr::kable(caption = "Mean and 95% confidence interval of N2O undersaturation extent, saturation ratio, and emission rate at the national and ecoregional scales")
+
+```
+
+
+### N~2~O saturation ratio
+#### Distribution
+Despite widespread N~2~O undersaturation in CONUS waterbodies, the mean N~2~O saturation ratio (ratio of measured to equilibrium concentration) was equal to or greater than 1 in seven of the nine ecoregions (Table 1, Figure 2), suggesting that, on average, waterbodies in these ecoregions were supersatured with N~2~O and therefore functioning as a source of N~2~O.  The apparent contradiction between widespread N~2~O undersaturation throughout the CONUS and average dissolved N~2~O concentrations that exceed equilibrium in most ecoregions can be attributed to the distribution of dissolved N~2~O concentrations across the population of CONUS waterbodies (Figure 2).  Across the CONUS, and within each of the nine major ecoregions, the distribution of N~2~O saturation ratios had median values that were less than 1, indicating undersaturation, but a long right tail composed of relatively rare waterbodies with levels of N~2~O supersaturation that are sufficiently high to drive the population mean to values close to, or even greater than 1.  Thus most waterbodies in the CONUS are functioning as N~2~O sinks, but a few function as strong N~2~O sources.
+
+### Controls on N~2~O saturation
+N~2~O saturation was related to waterbody size in several ecoregions, but the direction of the relationship varied.  For example, N~2~O saturation increased with waterbody size in the Northern Plains, Upper Midwest, Northern Appalachians, and Western Mountain ecoregions, but decreased with increasing size in the Coastal and Southern Plains (Figure 3).  A pattern common to many of the ecoregions, regardless of the direction of the relationship between N~2~O saturation and waterbody size, is that N~2~O saturation deviates from equilibrium most strongly in the smallest waterbody size class.  When pooled across all ecoregions, the absolute magnitude of the difference beween the measured and equilibrium N~2~O concentration, known as delta N~2~O 
+
+
 
 
 

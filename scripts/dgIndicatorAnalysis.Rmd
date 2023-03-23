@@ -2762,7 +2762,7 @@ ggsave("output/figures/extentPointLinerange.tiff")
 Roy predicted N2O equilibrium and concentration to the population.  I used ERA5 to calculate mean wind speed during the index period for each lake in the population.  I need to match wind speed to Roy's predictions.  Waterbodies in Roy's predictions are identified by '.row'.  There are `r all_predictions %>% distinct(.row) %>% summarize(population = n()) %>% pull()` rows.
 
 
-```{r}
+```{r calculate_emissions}
 
 # Read in wind data
 # Mean index period wind speed was calculated on VM via 
@@ -2814,7 +2814,7 @@ pred.k600 <- function(ws, area) {
 }
 
 
-all_predictions <- all_predictions %>%
+all_data <- all_predictions %>%
   mutate(k600.cm.h = pred.k600(ws = ws, area = area_ha/100), # 100ha = 1km2
          # 1000 L to m3. 44ng to 1nmol. ng->ug. ug->mg
          e.n2o.mg.m2.d = (((n2o - n2oeq) * 1000 * 44) / (1000 * 1000)) * 
@@ -2822,14 +2822,8 @@ all_predictions <- all_predictions %>%
          f.n2o.Mg.y = (e.n2o.mg.m2.d * 365 * (area_ha*10000)) / # day to year. ha to m2.
            (1000*1000*1000)) #mg-g, g-kg, kg-Mg
 
-# # write reduced file to disk for less computationally intensive wrangling
-# all_predictions.w.small <- all_predictions %>% filter(.draw %in% 1:5)
-# 
-# save(all_predictions.w.small,
-#      file = paste0(Sys.getenv("USERPROFILE"),
-#                    "/Environmental Protection Agency (EPA)/",
-#                    "ORD NLA17 Dissolved Gas - Documents/",
-#                    "inputData/all_predictions_w_small.rda"))
+ 
+
 ```
 ### compared to literature and US GHG inventory
 The distribution of N2O emission rates (mg N2O m-2 d-1) for one draw is very similar to that derived from a literature review of lake/reservoir emission rates (DelSontro et al), except for CPL which shows some exceedingly high rates.  Overall, our results look reasonable.
