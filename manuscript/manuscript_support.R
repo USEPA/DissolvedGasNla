@@ -207,7 +207,7 @@ national_stats <- all_predictions %>%
 
 
 # FIGURES-----------------
-<<<<<<< HEAD
+
 # The images are written to manuscript/manuscript_figures/...
 # the first time these scripts are run.  Unless the code has changed,
 # there is no need to run the scripts again.  Commenting out the script
@@ -278,7 +278,7 @@ if(!("figure2.tiff" %in% list.files("manuscript/manuscript_figures"))) {
   ggsave("manuscript/manuscript_figures/figure2.tiff", width = 8.5, height = 5)
   
 }
-=======
+
 
 
 # # Figure 1
@@ -300,8 +300,6 @@ if(!("figure2.tiff" %in% list.files("manuscript/manuscript_figures"))) {
    theme(legend.key.size = unit(0.4, "cm"), # size of boxes in legend
          legend.title = element_text(size = 8))
  ggsave("manuscript/manuscript_figures/figure1.png", width = 8, height = 4, units = "in")
-
->>>>>>> e42d262904b8409cff9d0f19a94d7534ecfdbf87
 
 
 # MANUSCRIPT DATA-----

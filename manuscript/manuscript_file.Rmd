@@ -6,6 +6,7 @@ bibliography: references.bib
 link-citations: yes
 ---
 
+
 ```{r setup, include=FALSE}
 # Specify paths-----
 # local path for each user.
@@ -26,6 +27,7 @@ library(tidyverse) # dplyr, ggplot
 
  
 ```
+
 
 ```{r source_scripts, echo=FALSE, warning=FALSE, message=FALSE}
 # source scripts------
@@ -48,7 +50,6 @@ In this study we present the first national-scale survey of N~2~O concentrations
 ![Location of sampling sites.  Color of the points indicates whether the waterbody was functioning as a source or sink of nitrous oxide (N~2~O).  Point size indicates the dissolved N~2~O concentration.](manuscript_figures/figure1.png)
   
 The extent of N~2~O undersaturation in CONUS waterbodies is surprisingly high, particularly for waterbodies in nitrogen rich ecoregions that are managed for agricultural production.  This finding  runs counter to the long standing paradigm that nitrogen rich surface waters are a source of N~2~O to the atmosphere (Mosier et al. 1998) and joins other recent reports that lentic waterbodies can function as an N~2~O sink.  Webb et al. (2019) found that 67% of sampled reservoirs in an agricultural region of Canada were undersaturated with N~2~O during the summer months and Soued et al (2015) report that 40% of rivers, lakes, and ponds sampled during the summer in a boreal region of Quebec, Canada were functioning as N~2~O sinks.  While these latter surveys were conducted at regional scales, the national-scale results presented here provide the strongest evidence to date that most lentic waterbodies function as N~2~O sinks during the summer months.  This pattern holds across all 9 major ecoregions in the CONUS, despite the tremendous variation in climate, geology, waterbody morphology, and land use across the continental U.S..
-
 
 
 ```{r table1, echo = FALSE}
