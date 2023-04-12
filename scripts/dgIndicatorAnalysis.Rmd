@@ -2814,7 +2814,7 @@ pred.k600 <- function(ws, area) {
 }
 
 
-all_data <- all_predictions %>%
+all_predictions <- all_predictions %>%
   mutate(k600.cm.h = pred.k600(ws = ws, area = area_ha/100), # 100ha = 1km2
          # 1000 L to m3. 44ng to 1nmol. ng->ug. ug->mg
          e.n2o.mg.m2.d = (((n2o - n2oeq) * 1000 * 44) / (1000 * 1000)) * 
