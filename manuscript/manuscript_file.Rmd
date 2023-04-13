@@ -4,6 +4,7 @@ date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: word_document
 bibliography: references.bib
 link-citations: yes
+csl: nature-geoscience.csl
 ---
 
 
@@ -32,22 +33,24 @@ library(tidyverse) # dplyr, ggplot
 source("manuscript/manuscript_support.R", local = knitr::knit_global())
 ```
 
+
 ## NOTES
 * Table and figure captions should specify if displaying sample vs population estimates.
 
-## Introduction
+# Introduction
 
-## Results and Discussion
+# Results and Discussion
   
-### N~2~O undersaturation extent  
-In this study we present the first national-scale survey of N~2~O concentrations and emissions from lakes, reservoirs, and ponds, hereafter referred to as waterbodies, in the conterminous U.S. (CONUS). A generalized random-tessellation survey design (Stevens and Olsen, 2004) was used to select a spatially-balanced and representative sample of `r dg %>% distinct(site.id) %>% summarize(n = n()) %>% pull()` **[weird, I have 1090, but NLA17 report says 1,005?]** sites from CONUS waterbodies that are least 1 hectare in area, at least 1 meter deep, have at least 0.1 hectare of open water, and have a minimum residence time of one week (Figure 1). Sample sites were distributed across all nine major CONUS ecoregions and varied widely in water chemistry, morphometry, watershed land-use, and climate (See NLA website for all data?). `r undersatN2oPercent` percent of the sampled waterbodies were undersaturated in N~2~O and were therefore functioning as N~2~O sinks (Figure 1). We modeled the data using a bayesion hierchical approach and predicted the dissolved N~2~O concentration for all 224,916 CONUS waterbodies in the target population. At the population level, `r propN2oSinkMean` percent (95% CI: `r propN2oSinkLower` - `r propN2oSinkUpper`) of CONUS waterbodies were functioning as N~2~O sinks. The Western Mountains ecoregion had the smallest proportion of waterbodies functioning as N~2~O sinks (mean = `r propN2oSinkMeanWM`%, 95% CI: `r propN2oSinkLowerWM` - `r propN2oSinkUpperWM`), the Northern Plains had the greatest (mean = `r propN2oSinkMeanNPL`%, 95% CI: `r propN2oSinkLowerNPL` - `r propN2oSinkUpperNPL`), and >65% of the waterbodies in every ecoregion were undersaturated (Table 1).  
+## N~2~O undersaturation extent
+
+In this study we present the first national-scale survey of N~2~O concentrations and emissions from lakes, reservoirs, and ponds, hereafter referred to as waterbodies, in the conterminous U.S. (CONUS). A generalized random-tessellation survey design [@Stevens_Olsen_2004] was used to select a spatially-balanced and representative sample of `r dg %>% distinct(site.id) %>% summarize(n = n()) %>% pull()` **[weird, I have 1090, but NLA17 report says 1,005?]** sites from CONUS waterbodies that were least 1 hectare in area, at least 1 meter deep, had at least 0.1 hectare of open water, and had a minimum residence time of one week (Figure 1)[@USEPA_NLA17_2022]. Sample sites were distributed across all nine major CONUS ecoregions, which vary widely in water chemistry, morphometry, watershed land-use, and climate [@Omernik_1987; @Omernik_Griffith_2014]. `r undersatN2oPercent` percent of the sampled waterbodies were undersaturated in N~2~O and were therefore functioning as N~2~O sinks (Figure 1). We modeled the data using a Bayesian hierarchical approach and predicted the dissolved and equilibrium N~2~O concentrations for all 224,916 CONUS waterbodies in the target population. At the population level, `r propN2oSinkMean` percent (95% CI: `r propN2oSinkLower` - `r propN2oSinkUpper`) of CONUS waterbodies were functioning as N~2~O sinks. The Western Mountains ecoregion had the smallest proportion of waterbodies functioning as N~2~O sinks (mean = `r propN2oSinkMeanWM`%, 95% CI: `r propN2oSinkLowerWM` - `r propN2oSinkUpperWM`), the Northern Plains had the greatest (mean = `r propN2oSinkMeanNPL`%, 95% CI: `r propN2oSinkLowerNPL` - `r propN2oSinkUpperNPL`), and >65% of the waterbodies in every ecoregion were undersaturated (Table 1).  
 
 ![Figure 1. Location of sampling sites.  Color of the points indicates whether the waterbody was functioning as a source or sink of nitrous oxide (N~2~O).  Point size indicates the dissolved N~2~O concentration.](manuscript_figures/figure1.png)
   
-The extent of N~2~O undersaturation in CONUS waterbodies is surprisingly high, particularly for waterbodies in nitrogen rich ecoregions that are managed for agricultural production.  This finding  runs counter to the long standing paradigm that nitrogen rich surface waters are a source of N~2~O to the atmosphere (Mosier et al. 1998) and joins other recent reports that lentic waterbodies can function as an N~2~O sink.  Webb et al. (2019) found that 67% of sampled reservoirs in an agricultural region of Canada were undersaturated with N~2~O during the summer months and Soued et al (2015) report that 40% of rivers, lakes, and ponds sampled during the summer in a boreal region of Quebec, Canada were functioning as N~2~O sinks **[29% of lakes in Finland (kortelainen et al 2020)  but kortelainen and Soued are mostly pristine lakes]**.  While these latter surveys were conducted at regional scales, the national-scale results presented here provide the strongest evidence to date that most lentic waterbodies function as N~2~O sinks during the summer months.  This pattern holds across all 9 major ecoregions in the CONUS, despite the tremendous variation in climate, geology, waterbody morphology, and land use across the continental U.S..
+The extent of N~2~O undersaturation in CONUS waterbodies is surprisingly high, particularly for waterbodies in nitrogen rich ecoregions that are managed for agricultural production.  This finding  runs counter to the long standing paradigm that nitrogen rich surface waters are a source of N~2~O to the atmosphere [@Mosier_etal_1998] and joins other recent reports that lentic waterbodies can function as an N~2~O sink.  Webb et al. [@Webb_etal_2019] found that 67% of sampled reservoirs in an agricultural region of Canada were undersaturated with N~2~O during the summer months and Soued et al [@Soued_etal_2016] report that 40% of rivers, lakes, and ponds sampled during the summer in a boreal region of Quebec, Canada were functioning as N~2~O sinks **[29% of lakes in Finland (kortelainen et al 2020)  but kortelainen and Soued are mostly pristine lakes]**.  While these latter surveys were conducted at regional scales, the national-scale results presented here provide the strongest evidence to date that most lentic waterbodies function as N~2~O sinks during the summer months.  This pattern holds across all 9 major ecoregions in the CONUS, despite the tremendous variation in climate, geology, waterbody morphology, and land use across the continental U.S..
 
 
-```{r table1, echo = FALSE}
+```{r table1, echo = FALSE, cache=TRUE}
 rbind(national_stats %>% 
         select(WSA9, estimate, LCL, UCL, post_med_sat, LCI_sat, UCI_sat, post_med_en2o, LCL_en2o, UCL_en2o),
       ecoreg_stats %>% 
@@ -62,12 +65,14 @@ knitr::kable(caption = "Table 1. Mean and 95% confidence interval of N2O undersa
 ```
 
 
-Here is a citation example: Multilevel models are useful for survey inference [@Kennedy_Gelman_2021]. This paper by @Kennedy_Gelman_2021 provides a nice worked example.
+Here is a citation example: Multilevel models are useful for survey inference [@Gelman_Little_1997; @Park_etal_2004; @Kennedy_Gelman_2021; @ Zachmann_etal_2022].
 
 
 ### N~2~O saturation ratio
+
 #### Distribution
-Despite widespread N~2~O undersaturation in CONUS waterbodies, the mean N~2~O saturation ratio (ratio of measured to equilibrium concentration) was equal to or greater than 1 in seven of the nine ecoregions (Table 1, Figure 2), suggesting that, on average, waterbodies in these ecoregions were supersatured with N~2~O and therefore functioning as a source of N~2~O.  The apparent contradiction between widespread N~2~O undersaturation throughout the CONUS and average dissolved N~2~O concentrations that exceed equilibrium in most ecoregions can be attributed to the distribution of dissolved N~2~O concentrations across the population of CONUS waterbodies (Figure 2).  Across the CONUS, and within each of the nine major ecoregions, the distribution of N~2~O saturation ratios had median values that were less than 1, indicating undersaturation, but a long right tail composed of relatively rare waterbodies with levels of N~2~O supersaturation that are sufficiently high to drive the population mean to values close to, or even greater than 1.  Thus most waterbodies in the CONUS are functioning as N~2~O sinks, but a few function as strong N~2~O sources.
+
+Despite widespread N~2~O undersaturation in CONUS waterbodies, the mean N~2~O saturation ratio (ratio of measured to equilibrium concentration) was equal to or greater than 1 in seven of the nine ecoregions (Table 1, Figure 2), suggesting that, on average, waterbodies in these ecoregions were supersatured with N~2~O and therefore functioning as a source of N~2~O.  The apparent contradiction between widespread N~2~O undersaturation throughout the CONUS and average dissolved N~2~O concentrations that exceed equilibrium in most ecoregions can be attributed to the distribution of dissolved N~2~O concentrations across the population of CONUS waterbodies (Figure 2).  Across the CONUS, and within each of the nine major ecoregions, the distribution of N~2~O saturation ratios had median values that were less than 1, indicating undersaturation, but a long right tail composed of relatively rare waterbodies with levels of N~2~O supersaturation that were sufficiently high to drive the population mean to values close to, or even greater than 1.  Thus most waterbodies in the CONUS are functioning as N~2~O sinks, but a few function as strong N~2~O sources.
 
 ![Figure 2. Distribution of N~2~O saturation values for the population of waterbodies in the nine major ecoregions.  Each blue line (n=500) represents the distribution of values from a single realization of the posterior prediction.  Vertical black dashed and solid lines indicated median and mean, respectively.  Vertical red line indicates a saturation ratio of 1.](manuscript_figures/figure2.tiff)
 
@@ -89,12 +94,45 @@ While previous surveys have documented relationships between lake size and disso
 
 
 
-
-
-
-
-
 # References
 
+<div id="refs"></div>
 
+# Methods
 
+## Survey design
+
+The population of interest (POI) for the 2017 NLA survey was CONUS waterbodies of at least 1 hectare in area, at least 1 meter deep, with at least 0.1 hectare of open water, and a minimum residence time of one week (Figure 1)[@USEPA_NLA17_2022]. The POI was sampled according to a generalized random-tessellation design with stratification [@Stevens_Olsen_2004; USEPA_NLA17_2020]. The design prescribed a spatially balanced, probabilistic sample with stratification along three factors: surface area (hectares; 5 ordered levels), ecoregion [@Omernik_1987; @Herlihy_etal_2008; @Omernik_Griffith_2014] (9 levels), and US state (excluding AK and HI; 48 levels). The size categories were sampled with unequal probability, such that larger lakes were over-sampled relative to smaller lakes. 
+
+## Data collection
+
+Samples were collected at each of 1091 index waterbodies across the US during the summer index period. In addition, 95 of those waterbodies were re-visited for a second sample. This subset of revisit sites was used for assessing model fit and out-of-sample model performance.
+
+### Gas samples
+
+Duplicate dissolved N~2~O samples were collected from each waterbody at a depth of ~0.1m. Gas samples were analyzed via gas chromotography and concentrations were recorded to the nearest 0.001 nmol/L. 
+
+## Statistical inference
+
+The survey samples were a randomly selected subset of the complete POI, but with a pattern of "missingess" prescribed by the survey selection algorithm [@Gelman_etal_2014; @Zachmann_etal_2022]. Therefore, to make inferences from the sample to the POI, the sample was statistically adjusted in order to account for the selection mechanism. We used a model-based approach, described as multilevel regression with poststratification (MRP)[@Gelman_Little_1997; @Park_etal_2004; @Gelman_etal_2020], to make adjustments.  This procedure prescribes conditioning the response variables (_i.e._, N~2~O) in the sample data on the survey design variables (_i.e._, ecoregion, state, size) in a multilevel regression model; and then "poststratifying" or re-weighting estimates based the known or assumed distribution of waterbodies within the survey design groupings in the POI [@Gelman_Little_1997; @Park_etal_2004; @Gelman_etal_2020; @Kennedy_Gelman_2021; @Zachmann_etal_2022]. Multilevel models are often recommended because they can provide regularized estimates along the design groupings, which can improve out-of-sample inferences [e.g., @Gelman_Little_1997; @Kennedy_Gelman_2021]. Estimates for group levels that may be missing from the sample, but are part of the population of interest, are also straightforward using this approach [@Gelman_etal_2020 Ch. 17; @McElreath_2020]. The poststratification step typically entails using the fitted model to predict to a corresponding summary of the design groupings in the POI and then simply normalizing the estimates by the proportional distribution of units in the POI [@Kennedy_Gelman_2021]. However, because N~2~O flux was to be calculated in this study as a function of waterbody-level properties (_i.e._, surface area), instead of predicting to a poststratification table of summarized population groupings, predictions were instead made to each of 465,897 individual waterbodies in the POI. For inferences, the waterbody-level predictions across the POI were readily summarized along the relevant groupings (_e.g._, ecoregion). The multilevel regression models were implemented using the Bayesian mode of inference, which made propagation of uncertainty from the waterbody-level predictions to group level summaries straightforward. Predictions were assumed relevant to the POI for average conditions during the biological index period of 2017. 
+
+The final Bayesian model resulted in predictions for (1) dissolved and equilibrium N2O concentrations; (2) the N2O saturation ratio; and (3) the proportion of under-saturated water bodies (_i.e._, saturation ratio < 1). Saturation ratio is calculated as the ratio of dissolved to equilibrium N~2~O. Because dissolved and equilibrium N~2~O were observed on the same sample units (lake sites), their joint distribution was modeled to account for any potential statistical dependencies between the N~2~O responses due to, for example, common dependencies on geography. The model response variable was, therefore, multivariate. Although predictions of the mean marginal probabilities from separate models may have provided comparable estimates, a joint model allowing correlated errors was expected to better capture uncertainty and potentially improve out-of-sample predictions, should the variables be conditionally correlated [@Warton_etal_2015; @Poggiato_etal_2021].  Therefore, the saturation ratio was was not predicted directly, but as a _post hoc_ or "derived" parameter [@Link_Barker_2010; @Gelman_etal_2014; @McElreath_2020] by dividing the posterior predictive distribution (PPD) for dissolved N~2~O by the PPD for equilibrium N~2~O. Similarly, the proportion of under-saturated waterbodies was derived as the proportion of the _post-hoc_ PPD for the ratio that was larger than 1. All of the models were fit using the `brms` [@Burkner_2017] package in `R` [@R_Core_Team] as an interface to Stan [@Stan_Development_Team], a software for fitting fully Bayesian models via Hamiltonian Monte Carlo. 
+
+Models excluding the NO3 covariate consistently resulted in poorer fits to to the observed dissolved N2O data and potentially strongly biased estimates of the saturation ratio. Including surface temperature and elevation in the equilibrium N2O part of the model also resulted in substantially improved replication of key aspects of the observed data. Likewise, added flexibility in the distributional terms for both dissolved and equilibrium N2O led to improvements. 
+
+To make inferences to the population of interest from a model including these covariates, however, the covariates needed to be (1) fully observed across that population or (2) their missingness needed to be modeled. For the lake area and elevation covariates, data was available for all lakes from previously compiled geospatial databases. However, neither surface temperature or NO3 were observed for lakes outside of the sample. That is, they were partially observed with respect to the target population. Therefore, a more complex model was constructed below that included surface temperature and NO3 as additional responses conditioned on the survey design variables and fully observed covariates. This approach to inference for N2O was similar to Bayesian structural equation modeling approaches [@Merkle_etal_2021; @Merkle_Rosseel_2018]. The logical dependence structure could be characterized as:
+
+$$\begin{aligned} 
+{\boldsymbol{N_2O_{diss}}} &\sim Survey + Area + {\boldsymbol{NO_3}} + {\boldsymbol{Temp}} \\ 
+{\boldsymbol{N_2O_{equil}}} &\sim Survey + Elev  + {\boldsymbol{Temp}}\\
+{\boldsymbol{NO_3}} &\sim Survey + Area + {\boldsymbol{Temp}} \\ 
+{\boldsymbol{Temp}} &\sim Survey + Lat + Elev + Day
+\end{aligned}$$
+
+Variables in bold text above were treated as partially observed with respect to the population of interest (i.e., observed only in the sample), whereas variables not in bold were considered fully observed. The partially observed variables, being dissolved and equilibrium N2O, NO3, and surface temperature, were each modeled conditional on the survey design variables and other partially and/or fully observed covariates. This piece-wise approach required a more complex set of post-processing steps compared to a typical MRP analysis. In order to propagate estimates and uncertainty through the dependency structure and make inferences, the fitted model was used to first predict surface temperature in the target population, since it depended only on the fully observed covariates. That predictive distribution was then used alongside the relevant fully observed covariates to predict NO3 in the target population. Finally, the predictive distributions for temperature and NO3 were used to predict the N2O responses. These steps were carried out in the "Predict to population" section to follow.
+
+In the final model below, the sub-model for surface temperature assumed a Gamma distributed error distribution and the linear predictor included the survey design variables, latitude, elevation, and Julian date. The shape parameter was also modeled as a function of latitude to address increasing response variance along the latitudinal gradient. The NO3 sub-model was a cumulative logit model and the linear predictor included all of the survey factors as well as surface temperature and lake area. 
+
+The dissolved and equilibrium N2O responses were each modeled with Gamma distributed errors, but with the same covariate structure as in model 5. The same structure was also employed for the shape terms in these responses, corresponding to the $\sigma$ terms in the previous models. Though not shown in this document, the Gamma error structure appeared to result in slightly better performance in the predictive checks compared to the Gaussian errors in previous models. This was primarily apparent in the saturation ratio checks, which may have been more sensitive to model performance in the tails of the N2O responses. Others have also indicated that the Gamma error distribution can work well for dissolved N2O data [@Webb_etal_2019].
+
+Note that there was no observation-level residual correlation term for this model, since the residuals are undefined for the Gamma and cumulative logit models. Dropping the observation-level residual correlation term was deemed a reasonable compromise that enabled the inclusion of NO3 as a covariate on dissolved N2O. The random intercepts, however, still allowed for potential correlations between the four responses at the group levels.
