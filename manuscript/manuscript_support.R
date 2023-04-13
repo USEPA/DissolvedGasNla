@@ -213,7 +213,7 @@ national_stats <- all_predictions %>%
 # there is no need to run the scripts again.  Commenting out the script
 # will expedite knitting of manuscript_file.Rmd
 
-## Figure 1----
+## Figure 1: site map----
 # if the image is already on computer, then nothing, else create image
 if(!("figure1.png" %in% list.files("manuscript/manuscript_figures"))) {
 ggplot() +
@@ -236,7 +236,7 @@ ggsave("manuscript/manuscript_figures/figure1.png", width = 8, height = 4, units
 }
 
 
-## Figure 2----
+## Figure 2: N2O saturation ratio density plot----
 # code taken from dgIndicatorAnalysis.Rmd, "N2O saturation ratio: continuous variable
 # if the image is already on computer, then nothing, else create image
 if(!("figure2.tiff" %in% list.files("manuscript/manuscript_figures"))) {
@@ -279,6 +279,67 @@ if(!("figure2.tiff" %in% list.files("manuscript/manuscript_figures"))) {
   
 }
 
+## Figure 3: delta N2O by waterbody size----
+# See 'N2O saturation ratio: continuous variable' section of dgIndicatorAnalysis.Rmd
+# if the image is already on computer, then nothing, else create image
+if(!("figure3.tiff" %in% list.files("manuscript/manuscript_figures"))) {
+  
+# PLOT N2O* BY SIZE
+# point and linerange
+p1 <- all_predictions %>%
+  mutate(n2ostar = abs(n2o - n2oeq)) %>%
+  group_by(size_cat, .draw) %>% # group by iteration
+  #group_by(.draw) %>%
+  summarise(mean_star = mean(n2ostar)) %>% # 500 means for each WSA9
+  # now summarize to 1 statistic per WSA9
+  summarise( estimate = round(median(mean_star), 3), 
+             LCL = round(quantile(mean_star, probs = 0.025), 3),
+             UCL = round(quantile(mean_star, probs = 0.975), 3)) %>% 
+  ggplot( aes( x = size_cat, y = estimate ) ) +
+  geom_point() +
+  geom_linerange( aes( ymin = LCL, ymax = UCL)) +
+  ylab(expression("["*Delta~N[2]*O*"]")) +
+  xlab("size category (ha)") +
+  coord_flip() + 
+  theme_bw() 
+#ggsave("output/figures/n2oStarBySize.tiff")
+
+
+# PLOT N2O SAT RATIO BY WSA9 AND SIZE
+# point and linerange
+p2.data <- all_predictions %>%
+  group_by(WSA9, size_cat, .draw) %>% # group by iteration
+  summarise(mean_sat = mean(n2osat)) %>% # 500 means for each WSA9
+  # now summarize to 1 statistic per WSA9
+  summarise( estimate = round(median(mean_sat), 3), 
+             LCL = round(quantile(mean_sat, probs = 0.025), 3),
+             UCL = round(quantile(mean_sat, probs = 0.975), 3)) %>% 
+  mutate(ecoregion = factor(WSA9)) %>%
+  mutate(ecoregion = fct_reorder(ecoregion, estimate)) 
+
+# data fpr arrow segment.  Only smallest size category
+p2.data.arrow <- p2.data %>%
+  filter(size_cat == "min_4")
+
+p2 <- p2.data %>%
+  ggplot(aes(x=estimate, y=size_cat)) +
+  geom_point() +
+  geom_linerange( aes( xmin = LCL, xmax = UCL)) +
+  geom_vline(xintercept = 1, color='blue') +
+  geom_segment(data = p2.data.arrow, 
+               aes(x=1, y = "min_4", xend = estimate, yend = "min_4"),
+               arrow = arrow(length = unit(0.2, "cm")),
+               color = "red") +
+  xlab(expression(mean~N[2]*O~saturation~ratio)) +
+  theme_bw() +
+  theme(axis.title.y = element_blank()) +
+  facet_wrap(~ecoregion)
+
+
+ggpubr::ggarrange(p1, p2, ncol=2,nrow = 1, widths = c(0.3, 0.7), labels = c("A", "B"))
+
+ggsave("manuscript/manuscript_figures/figure3.tiff", width = 8.5, height = 5)
+}
 
 
 # MANUSCRIPT DATA-----
