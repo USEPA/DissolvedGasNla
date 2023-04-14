@@ -298,9 +298,10 @@ p1.data <- all_predictions %>%
   mutate(ecoregion = factor(WSA9)) %>%
   mutate(ecoregion = fct_reorder(ecoregion, estimate)) 
 
-# data fpr arrow segment.  Only smallest size category
+# data fpr arrow segment.  Only smallest size category.  Only CPL and NPL.
 p1.data.arrow <- p1.data %>%
-  filter(size_cat == "min_4")
+  filter(size_cat == "min_4",
+         WSA9 %in% c("CPL", "NPL"))
 
 p1 <- p1.data %>%
   ggplot(aes(x=estimate, y=size_cat)) +
@@ -314,6 +315,7 @@ p1 <- p1.data %>%
   xlab(expression(mean~N[2]*O~saturation~ratio)) +
   ylab("waterbody size category (ha)") +
   theme_bw() +
+  theme(axis.title.y = element_blank()) +
   facet_wrap(~ecoregion)
 
 
@@ -332,12 +334,13 @@ p2 <- all_predictions %>%
   geom_point() +
   geom_linerange( aes( xmin = LCL, xmax = UCL)) +
   xlab(expression("["*Delta~N[2]*O*"]"~"("*nmol~L^{-1}*")")) +
+  ylab("waterbody size category (ha)") +
   #coord_flip() + 
-  theme_bw() +
-  theme(axis.title.y = element_blank())
+  theme_bw() 
+
 #ggsave("output/figures/n2oStarBySize.tiff")
 
-ggpubr::ggarrange(p1, p2, ncol=2, nrow = 1, widths = c(0.7, 0.3), labels = c("A", "B"))
+ggpubr::ggarrange(p2, p1, ncol=2, nrow = 1, widths = c(0.3, 0.7), labels = c("A", "B"))
 
 ggsave("manuscript/manuscript_figures/figure3.tiff", width = 8.5, height = 5)
 }
