@@ -104,7 +104,7 @@ While previous surveys have documented relationships between lake size and disso
 # EMISSION RATES
 Despite widespread N2O undersaturation in CONUS waterbodies, the national average N2O emission rate was `r national_stats$post_med_en2o` (95% CI: `r national_stats$LCL_en2o` - `r national_stats$UCL_en2o` mg N2O m^-2^ d^-1^ and only the Northern Appalachians and Northern Plains ecoregions had mean emission rates less than 0 (Table 1).  This is accordance with the distribution on N2O saturation values where relatively rare, but highly supersatured, waterbodies pull the mean to a value that far exceeds the median.    ecoregional means range from `r ecoreg_stats %>% slice_min(n = 1, post_med_en2o) %>% select(post_med_en2o) %>% pull()` to `r ecoreg_stats %>% slice_max(n = 1, post_med_en2o) %>% select(post_med_en2o) %>% pull()` mg N2O m^-2^ d^-1^ (Table 1).  
 
-
+emission rates seem way too low.  Need to double check k600 calculation
 
 
 # References
