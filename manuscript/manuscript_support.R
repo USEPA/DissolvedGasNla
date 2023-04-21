@@ -140,11 +140,11 @@ pred.k600 <- function(ws, area) {
 ### calculate emission and flux----
 all_predictions <- all_predictions %>%
   mutate(k600.cm.h = pred.k600(ws = ws, area = area_ha/100), # 100ha = 1km2
-         # 1000 L to m3. 44ng to 1nmol. ng->ug. ug->mg
-         e.n2o.mg.m2.d = (((n2o - n2oeq) * 1000 * 44) / (1000 * 1000)) * 
+         # 1000 L to m3. 44ng to 1nmol. ng->ug.
+         e.n2o.ug.m2.d = (((n2o - n2oeq) * 1000 * 44) / (1000)) * 
            (k600.cm.h * (24/100)), #h->day. cm->m
-         f.n2o.Mg.y = (e.n2o.mg.m2.d * 365 * (area_ha*10000)) / # day to year. ha to m2.
-           (1000*1000*1000)) #mg-g, g-kg, kg-Mg
+         f.n2o.Mg.y = (e.n2o.ug.m2.d * 365 * (area_ha*10000)) / # day to year. ha to m2.
+           (1000*1000*1000*1000)) #ug-mg, mg-g, g-kg, kg-Mg
 
 
 ## ecoregion and national means----
@@ -154,7 +154,7 @@ ecoreg_stats <- all_predictions %>%
              mean_n2oeq = mean(n2oeq),
              mean_sat = mean(n2osat),
              prop_sat = sum(n2osat < 1) / length(unique(.row)),
-             mean_en2o = mean(e.n2o.mg.m2.d),
+             mean_en2o = mean(e.n2o.ug.m2.d),
              fn2o_Mg = sum(f.n2o.Mg.y)) %>%
   summarise( post_med_n2o = round(mean(mean_n2o), 1),
              LCI_n2o = round(quantile(mean_n2o, probs = 0.025), 1),
@@ -174,7 +174,8 @@ ecoreg_stats <- all_predictions %>%
              post_med_fn2o = round(mean(fn2o_Mg), 3), 
              LCL_fn2o = round(quantile(fn2o_Mg, probs = 0.025), 3),
              UCL_fn2o = round(quantile(fn2o_Mg, probs = 0.975), 3),
-             n = dplyr::n())
+             n = dplyr::n()) %>%
+  ungroup()
 
 national_stats <- all_predictions %>%
   group_by(.draw) %>%
@@ -182,7 +183,7 @@ national_stats <- all_predictions %>%
              mean_n2oeq = mean(n2oeq),
              mean_sat = mean(n2osat),
              prop_sat = sum(n2osat < 1) / length(unique(.row)),
-             mean_en2o = mean(e.n2o.mg.m2.d),
+             mean_en2o = mean(e.n2o.ug.m2.d),
              fn2o_Mg = sum(f.n2o.Mg.y)) %>%
   summarise( post_med_n2o = round(mean(mean_n2o), 1),
              LCI_n2o = round(quantile(mean_n2o, probs = 0.025), 1),
@@ -298,9 +299,10 @@ p1.data <- all_predictions %>%
   mutate(ecoregion = factor(WSA9)) %>%
   mutate(ecoregion = fct_reorder(ecoregion, estimate)) 
 
-# data fpr arrow segment.  Only smallest size category
+# data fpr arrow segment.  Only smallest size category.  Only CPL and NPL.
 p1.data.arrow <- p1.data %>%
-  filter(size_cat == "min_4")
+  filter(#size_cat == "min_4", # keep all size categories
+         WSA9 %in% c("CPL", "NPL")) # only for CPL and NPL
 
 p1 <- p1.data %>%
   ggplot(aes(x=estimate, y=size_cat)) +
@@ -308,12 +310,13 @@ p1 <- p1.data %>%
   geom_linerange( aes( xmin = LCL, xmax = UCL)) +
   geom_vline(xintercept = 1, color='blue') +
   geom_segment(data = p1.data.arrow, 
-               aes(x=1, y = "min_4", xend = estimate, yend = "min_4"),
+               aes(x=1, y = size_cat, xend = estimate, yend = size_cat),
                arrow = arrow(length = unit(0.2, "cm")),
                color = "red") +
   xlab(expression(mean~N[2]*O~saturation~ratio)) +
   ylab("waterbody size category (ha)") +
   theme_bw() +
+  theme(axis.title.y = element_blank()) +
   facet_wrap(~ecoregion)
 
 
@@ -332,12 +335,13 @@ p2 <- all_predictions %>%
   geom_point() +
   geom_linerange( aes( xmin = LCL, xmax = UCL)) +
   xlab(expression("["*Delta~N[2]*O*"]"~"("*nmol~L^{-1}*")")) +
+  ylab("waterbody size category (ha)") +
   #coord_flip() + 
-  theme_bw() +
-  theme(axis.title.y = element_blank())
+  theme_bw() 
+
 #ggsave("output/figures/n2oStarBySize.tiff")
 
-ggpubr::ggarrange(p1, p2, ncol=2, nrow = 1, widths = c(0.7, 0.3), labels = c("A", "B"))
+ggpubr::ggarrange(p2, p1, ncol=2, nrow = 1, widths = c(0.3, 0.7), labels = c("A", "B"))
 
 ggsave("manuscript/manuscript_figures/figure3.tiff", width = 8.5, height = 5)
 }
