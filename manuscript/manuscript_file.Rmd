@@ -35,7 +35,8 @@ source("manuscript/manuscript_support.R", local = knitr::knit_global())
 
 
 ## NOTES
-* Table and figure captions should specify if displaying sample vs population estimates.
+* Table and figure captions should specify if displaying sample vs population estimates.  "posterior predictive distribution"
+* Note that right tail is truncated in figure 2.
 
 # Introduction
 
