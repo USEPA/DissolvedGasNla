@@ -6,7 +6,6 @@ bibliography: references.bib
 link-citations: yes
 ---
 
-
 ```{r setup, include=FALSE}
 # Specify paths-----
 # local path for each user.
@@ -19,9 +18,9 @@ knitr::opts_knit$set(root.dir = "../") # set wd to root of RStudio project
 # libraries loaded by sourcing an external script don't seem to
 # be loaded into the global knitr environment
 library(tidyverse) # dplyr, ggplot
+library(flextable)
 
 ```
-
 
 ```{r source_scripts, echo=FALSE, warning=FALSE, message=FALSE}
 # source scripts------
@@ -33,82 +32,129 @@ source("manuscript/manuscript_support.R", local = knitr::knit_global())
 ```
 
 ## NOTES
-* Table and figure captions should specify if displaying sample vs population estimates.  "posterior predictive distribution"
-* Note that right tail is truncated in figure 2.
+
+-   Table and figure captions should specify if displaying sample vs population estimates. "posterior predictive distribution"
+-   Note that right tail is truncated in figure 2.
 
 ## Introduction
 
 ## Results and Discussion
-  
-### N~2~O undersaturation extent  
-In this study we present the first national-scale survey of N~2~O concentrations and emissions from lakes, reservoirs, and ponds, hereafter referred to as waterbodies, in the conterminous U.S. (CONUS). A generalized random-tessellation survey design (Stevens and Olsen, 2004) was used to select a spatially-balanced and representative sample of `r dg %>% distinct(site.id) %>% summarize(n = n()) %>% pull()` **[weird, I have 1090, but NLA17 report says 1,005?]** sites from CONUS waterbodies that are least 1 hectare in area, at least 1 meter deep, have at least 0.1 hectare of open water, and have a minimum residence time of one week (Figure 1). Sample sites were distributed across all nine major CONUS ecoregions and varied widely in water chemistry, morphometry, watershed land-use, and climate (See NLA website for all data?). `r undersatN2oPercent` percent of the sampled waterbodies were undersaturated in N~2~O and were therefore functioning as N~2~O sinks (Figure 1). We modeled the data using a bayesion hierchical approach and predicted the dissolved N~2~O concentration for all 224,916 CONUS waterbodies in the target population **[where did I get 224,916, Roy has 465,897]**. At the population level, `r propN2oSinkMean` percent (95% CI: `r propN2oSinkLower` - `r propN2oSinkUpper`) of CONUS waterbodies were functioning as N~2~O sinks. The Western Mountains ecoregion had the smallest proportion of waterbodies functioning as N~2~O sinks (mean = `r propN2oSinkMeanWM`%, 95% CI: `r propN2oSinkLowerWM` - `r propN2oSinkUpperWM`), the Northern Plains had the greatest (mean = `r propN2oSinkMeanNPL`%, 95% CI: `r propN2oSinkLowerNPL` - `r propN2oSinkUpperNPL`), and >65% of the waterbodies in every ecoregion were undersaturated (Table 1).  
 
-![Figure 1. Location of sampling sites.  Color of the points indicates whether the waterbody was functioning as a source or sink of nitrous oxide (N~2~O).  Point size indicates the dissolved N~2~O concentration.](manuscript_figures/figure1.png)
-  
-The extent of N~2~O undersaturation in CONUS waterbodies is surprisingly high, particularly for waterbodies in nitrogen rich ecoregions that are managed for agricultural production.  This finding  runs counter to the long standing paradigm that nitrogen rich surface waters are a source of N~2~O to the atmosphere (Mosier et al. 1998) and joins other recent reports that lentic waterbodies can function as an N~2~O sink.  Webb et al. (2019) found that 67% of sampled reservoirs in an agricultural region of Canada were undersaturated with N~2~O during the summer months and Soued et al (2015) report that 40% of rivers, lakes, and ponds sampled during the summer in a boreal region of Quebec, Canada were functioning as N~2~O sinks **[29% of lakes in Finland (kortelainen et al 2020)  but kortelainen and Soued are mostly pristine lakes]**.  While these latter surveys were conducted at regional scales, the national-scale results presented here provide the strongest evidence to date that most lentic waterbodies function as N~2~O sinks during the summer months.  This pattern holds across all 9 major ecoregions in the CONUS, despite the tremendous variation in climate, geology, waterbody morphology, and land use across the continental U.S..
+### N~2~O undersaturation extent
 
+In this study we present the first national-scale survey of N~2~O concentrations and emissions from lakes, reservoirs, and ponds, hereafter referred to as waterbodies, in the conterminous U.S. (CONUS). A generalized random-tessellation survey design (Stevens and Olsen, 2004) was used to select a spatially-balanced and representative sample of `r dg %>% distinct(site.id) %>% summarize(n = n()) %>% pull()` **[weird, I have 1090, but NLA17 report says 1,005? compare my sample IDs to NLA IDs]** sites from CONUS waterbodies that are least 1 hectare in area, at least 1 meter deep, have at least 0.1 hectare of open water, and have a minimum residence time of one week (Figure 1). Sample sites were distributed across all nine major CONUS ecoregions and varied widely in water chemistry, morphometry, watershed land-use, and climate (See NLA website for all data?). `r undersatN2oPercent` percent of the sampled waterbodies were undersaturated in N~2~O and were therefore functioning as N~2~O sinks (Figure 1). We modeled the data using a bayesion hierchical approach and predicted the dissolved N~2~O concentration for all 224,916 CONUS waterbodies in the target population **[where did I get 224,916, Roy has 465,897. See technical support document]**. At the population level, `r propN2oSinkMean` percent (95% CI: `r propN2oSinkLower` - `r propN2oSinkUpper`) of CONUS waterbodies were functioning as N~2~O sinks. The Western Mountains ecoregion had the smallest proportion of waterbodies functioning as N~2~O sinks (mean = `r propN2oSinkMeanWM`%, 95% CI: `r propN2oSinkLowerWM` - `r propN2oSinkUpperWM`), the Northern Plains had the greatest (mean = `r propN2oSinkMeanNPL`%, 95% CI: `r propN2oSinkLowerNPL` - `r propN2oSinkUpperNPL`), and \>65% of the waterbodies in every ecoregion were undersaturated (Table 1).
+
+![Figure 1. Location of sampling sites. Color of the points indicates whether the waterbody was functioning as a source or sink of nitrous oxide (N~2~O). Point size indicates the dissolved N~2~O concentration.](manuscript_figures/figure1.png)
+
+The extent of N~2~O undersaturation in CONUS waterbodies is surprisingly high, particularly for waterbodies in nitrogen rich ecoregions that are managed for agricultural production. This finding runs counter to the long standing paradigm that surface waters are a source of N~2~O to the atmosphere (@mosier_etal_1998) and joins other recent reports that lentic waterbodies can function as an N~2~O sink. @Webb_etal_2019 found that 67% of sampled reservoirs in an agricultural region of Canada were undersaturated with N~2~O during the summer months and @Soued_etal_2016 report that 40% of rivers, lakes, and ponds sampled during the summer in a boreal region of Quebec, Canada were functioning as N~2~O sinks **[29% of lakes in Finland (kortelainen et al 2020) but kortelainen and Soued are mostly pristine lakes]**. While these latter surveys were conducted at regional scales, the national-scale results presented here provide the strongest evidence to date that most lentic waterbodies function as N~2~O sinks during the summer months. This pattern holds across all 9 major ecoregions in the CONUS, despite the tremendous variation in climate, geology, waterbody morphology, and land use across the continental U.S..
 
 ```{r table1, echo = FALSE}
-rbind(national_stats %>% 
-        select(WSA9, estimate, LCL, UCL, post_med_sat, LCI_sat, UCI_sat, post_med_en2o, LCL_en2o, UCL_en2o),
+# Set up data
+table1_dat <- rbind(national_stats %>% 
+        select(WSA9_NAME, 
+               total_sa,
+               estimate, LCL, UCL, 
+               post_med_sat, LCI_sat, UCI_sat, 
+               post_med_en2o, LCL_en2o, UCL_en2o, 
+               post_med_fn2o, LCL_fn2o, UCL_fn2o),
       ecoreg_stats %>% 
-        select(WSA9, estimate, LCL, UCL, post_med_sat, LCI_sat, UCI_sat, post_med_en2o, LCL_en2o, UCL_en2o)) %>%
-  mutate('N2O undersaturation extent' = paste0(estimate*100, " (", LCL*100, "-", UCL*100, ")"),
-         'N2O saturation ratio' = paste0(post_med_sat, " (", LCI_sat, "-", UCI_sat, ")"),
-         'N2O emission rate' = paste0(round(post_med_en2o, digits = 1), " (", round(LCL_en2o, digits = 1), "-", round(UCL_en2o, digits = 1), ")")) %>% 
-  select(WSA9, 'N2O undersaturation extent', 'N2O saturation ratio', 'N2O emission rate') %>%
-  rename('spatial domain' = WSA9) %>%
-knitr::kable(caption = "Table 1. Mean and 95% confidence interval of N2O undersaturation extent, saturation ratio, and emission rate at the national and ecoregional scales")
+        select(WSA9_NAME, 
+               total_sa,
+               estimate, LCL, UCL, 
+               post_med_sat, LCI_sat, UCI_sat, 
+               post_med_en2o, LCL_en2o, UCL_en2o,
+               post_med_fn2o, LCL_fn2o, UCL_fn2o)) %>%
+  mutate('N2O undersaturation extent' = paste0(estimate*100, " (", LCL*100, " - ", UCL*100, ")"),
+         'N2O saturation ratio' = paste0(post_med_sat, " (", LCI_sat, " - ", UCI_sat, ")"),
+         'N2O emission rate' = paste0(round(post_med_en2o, digits = 3), " (", round(LCL_en2o, digits = 3), " - ", round(UCL_en2o, digits = 3), ")"),
+         'N2O flux' = paste0(round(post_med_fn2o, digits = 0), " (", round(LCL_fn2o, digits = 0), " - ", round(UCL_fn2o, digits = 0), ")")) %>% 
+  select(WSA9_NAME, total_sa, 'N2O undersaturation extent', 'N2O saturation ratio', 'N2O emission rate', 'N2O flux') %>%
+  rename('spatial domain' = WSA9_NAME,
+         'waterbody surface area' = total_sa)
+
+# create flextable
+flextable(table1_dat) %>%
+  set_header_labels('waterbody surface area' = "waterbody surface area\n(hectares)",
+                    'N2O undersaturation extent' = "N2O undersaturation extent\n(% waterbodies)",
+                    'N2O emission rate' = "N2O emission rate\n(mg N2O m-2 d-1)",
+                    'N2O flux' = "N2O flux\n(Mg N2O y-1)") %>%
+  align(j=c(2:6), align = "center", part = "all") %>% # center align columns 2:4
+  valign(valign = "top", part = "header") %>% # top align column names
+  # caption doesn't show in .Rmd viewer, but renders correctly in .docx
+  set_caption(
+    caption = as_paragraph( # allows for formatting
+      as_chunk("Table 1. Mean and 95% confidence interval of N2O undersaturation extent, saturation ratio, emission rate, and flux at the national and ecoregional scales", 
+               props = fp_text_default(bold = TRUE) # here is where we specify formatting (font, size, bold, etc)
+      )
+    ),
+    align_with_table = FALSE) %>% # table is center aligned, ignore that and apply default left align to caption
+  autofit() %>% # convenient column spacing
+  fontsize(size = 8, part = "all") # doesn't apply to caption when as_paragraph is invoked.
+
+
 
 ```
 
 
-Here is a citation example: Multilevel models are useful for survey inference [@Kennedy_Gelman_2021]. This paper by @Kennedy_Gelman_2021 provides a nice worked example.
-
-
 ### N~2~O saturation ratio
-#### Distribution
-Despite widespread N~2~O undersaturation in CONUS waterbodies, the mean N~2~O saturation ratio (ratio of measured to equilibrium concentration) was equal to or greater than 1 in seven of the nine ecoregions (Table 1, Figure 2), suggesting that, on average, waterbodies in these ecoregions were supersatured with N~2~O and therefore functioning as a source of N~2~O.  The apparent contradiction between widespread N~2~O undersaturation throughout the CONUS and average dissolved N~2~O concentrations that exceed equilibrium in most ecoregions can be attributed to the distribution of dissolved N~2~O concentrations across the population of CONUS waterbodies (Figure 2).  Across the CONUS, and within each of the nine major ecoregions, the distribution of N~2~O saturation ratios had median values that were less than 1, indicating undersaturation, but a long right tail composed of relatively rare waterbodies with levels of N~2~O supersaturation that are sufficiently high to drive the population mean to values close to, or even greater than 1.  Thus most waterbodies in the CONUS are functioning as N~2~O sinks, but a few function as strong N~2~O sources.
 
-![Figure 2. Distribution of N~2~O saturation values for the population of waterbodies in the nine major ecoregions.  Each blue line (n=500) represents the distribution of values from a single realization of the posterior prediction.  Vertical black dashed and solid lines indicated median and mean, respectively.  Vertical red line indicates a saturation ratio of 1.](manuscript_figures/figure2.tiff)
+#### Distribution
+
+Despite widespread N~2~O undersaturation in CONUS waterbodies, the mean N~2~O saturation ratio (ratio of measured to equilibrium concentration) was equal to or greater than 1 in seven of the nine ecoregions **[(Table 1, Figure 2)]**, suggesting that, on average, waterbodies in these ecoregions were supersatured with N~2~O and were therefore functioning as a source of N~2~O. The apparent contradiction between widespread N~2~O undersaturation throughout the CONUS and average dissolved N~2~O concentrations that exceed equilibrium in most ecoregions can be attributed to the distribution of dissolved N~2~O concentrations across the population of CONUS waterbodies (Figure 2). Across the CONUS, and within each of the nine major ecoregions, the distribution of N~2~O saturation ratios had median values that were less than 1, indicating undersaturation, but a long right tail composed of relatively rare waterbodies with levels of N~2~O supersaturation that are sufficiently high to drive the population mean to values close to, or even greater than 1. Thus most waterbodies in the CONUS are functioning as N~2~O sinks during the summer months, but a few function as strong N~2~O sources.
+
+![Figure 2. Distribution of N~2~O saturation values for the population of waterbodies in the nine major ecoregions. Each blue line (n=500) represents the distribution of values from a single realization of the posterior prediction. Vertical black dashed and solid lines indicated median and mean, respectively. Vertical red line indicates a saturation ratio of 1.  x-axis is truncated at 3 to better show the area where 97% of the observations occur.](manuscript_figures/figure2.tiff)
 
 #### Controls on N~2~O
-##### NO3
-Dissolved N~2~O concentration increased with NO~3~ concentration **[need to pick a figure]**, likely because NO~3~ concentration partially controls denitrification, a type of anaerobic metabolism that couples the oxidation of organic matter with the  sequential reduction of NO~3~ to nitrite (NO~2~), nitric oxide (NO), N~2~O, and N~2~ (Knowles 1982; Richardson et al. 2009).  The reduction of NO~3~ to N~2~ can be incomplete, however, resulting in the release of N~2~O to the water column.  Incomplete denitrification often occurs when NO~3~ is relatively abundant (Beaulieu et al Harsha Lake, Beauliue et al USACE), likely because the final reduction of N~2~O to N~2~ is the least energetic reaction in the denitrification pathway, yielding less than 20% of the total energy yield of complete denitrification (Koike and Hattori, 1975;Richardson et al., 2009). When NO~3~ is limiting, however, denitrification can resort to scavenging N~2~O from the water column and reducing it to N~2~, thereby functioning as an N~2~O sink.
 
-It is also possible that the correlation between N2O and NO3 reflects the simultaneous production of these solutes via nitrification.  Nitrification, an aerobic process which can produce N2O as a byproduct, is the microbial oxidation of ammonium (NH~4~^+^) to NO~3~ **[citation]**.  Nitrification might be expected to be more prevalent in the predominantly well oxygenated surface waters where the N~2~O samples were collected than denitrification, which is an anaeorbic process.  However, denitrification can occur in anoxic microsites within particulate matter suspended in an aerobic water column **[citation]** and can be transported from aoxic sediments to the water surface via advection and diffusion (Delsontro no longer a paradox).  Thus the N~2~O - NO3 relationship may be reflective of some combination of N2O production/consumption via denitrification and N2O production via nitrification.
+##### NO3
+
+Dissolved N~2~O concentration increased with NO~3~ concentration **[Fig. 3]**, likely because NO~3~ concentration partially controls denitrification, a type of anaerobic metabolism that couples the oxidation of organic matter with the sequential reduction of NO~3~ to nitrite (NO~2~), nitric oxide (NO), N~2~O, and N~2~ [@knowles_1982, @richardson_etal_2009]. The reduction of NO~3~ to N~2~ can be incomplete, however, resulting in the release of N~2~O to the water column. Incomplete denitrification often occurs when NO~3~ is relatively abundant [@Beaulieu_etal_2015, @Beaulieu_etal_2014], likely because the final reduction of N~2~O to N~2~ is the least energetic reaction in the denitrification pathway, yielding less than 20% of the total energy yield of complete denitrification [@koike_etal_1975, @richardson_etal_2009]. When NO~3~ is limiting, however, denitrification can resort to scavenging N~2~O from the water column and reducing it to N~2~, thereby functioning as an N~2~O sink.  N~2~O consumption via denitrification likely explains the N~2~O undersaturation observed at low NO~3~ concentrations, whereas denitrification was likely a source of N~2~O at higher NO~3~ concentrations.
+
+It is also possible that the correlation between N~2~O and NO~3~ reflects the simultaneous production of these solutes via nitrification. Nitrification, an aerobic process which can produce N~2~O as a byproduct, is the microbial oxidation of ammonium (NH~4~^+^) to NO~3~ **[citation]**. Nitrification might be expected to be more prevalent in the predominantly well oxygenated surface waters where the N~2~O samples were collected than denitrification, which is an anaeorbic process. However, denitrification can occur in anoxic microsites within particulate matter suspended in an aerobic water column **[citation]** and can be transported from aoxic sediments to the water surface via advection and diffusion [@delsontro_etal_2018]. Thus the N~2~O - NO3 relationship may be reflective of some combination of N~2~O production/consumption via denitrification and N~2~O production via nitrification.
+
+![Figure 3.  A) Relationship between N~2~O saturation and nitrate (NO~3~) concentration, dependent upon surface water temperature.  The five NO~3~ categories correspond to concentration ($\mu$g L^-1^) ranges of 1) below detection, 2) $\geq$ 0.55 and < 4.09, 3) $\geq$ 4.09 and < 30.20, 4) $\geq$ 30.20 and < 223.13, and 5) $\geq$ 223.13. B) Relationship between N~2~O saturation and surface water temperature, dependent upon NO~3~ category.  Horizontal dashed lines in both panels reflects an N~2~O saturation value of 1.](manuscript_figures/sat_cond_surftemp.tiff)
 
 ##### Temperature
-The sensitivity of N2O to NO3 increased with water temperature **[need to pick a figure]**, which is consistent with N2O production and consumption occurring through temperature sensitive biological processes.  At low NO3 concentrations, greater water temperature exacerbated N2O undersaturation, presumably by stimulating N2O consumption rates.  At high NO3 concentration, greater water temperature increased N2O supersaturation, likely by stimulating N2O production rates.  The relative effect of NO3 was greater than that of temperature, thus elevated water temperature serves to magnify the rates of N2O production or consumption dictated by NO3 availability.  
+
+N~2~O saturation also increased with water temperature **[Fig. 3]**, which is consistent with N~2~O production and consumption occurring through temperature sensitive biological processes, but the relationship was dependent on NO~3~ availability. At low NO3 concentrations, temperature had a relatively minor affect on N~2~O saturation, possibly because N~2~O production/consumption was limited by substrate rather than temperature.  The effect of temperature became more pronounced when NO~3~ availability was greater, possibly reflecting the stimulatory affect of higher temperature on biological N~2~O production.  The relative effect of NO~3~ was greater than that of temperature, thus elevated water temperature serves to magnify rates of N~2~O production that are largely dictated by NO~3~ availability.
 
 ##### Waterbody size
 
-While NO3 and water temperature were the primary drivers of N2O production or consumption rates, waterbody morphology determined the extent to which N2O processing affected dissolved N~2~O in surface waters.  When pooled across all ecoregions, the absolute magnitude of the difference between the measured and equilibrium N~2~O concentration, known as $\Delta$ N~2~O, decreases with increasing waterbody size class (Figure 3A). Waterbody size can affect dissolved gas concentration through several mechanisms. In lakes with low volume to benthic surface area ratios, the mass of N~2~O consumed or produced in the sediments can be a substantial fraction of the mass of N~2~O dissolved in the water column.  Since water volume to benthic surface area ratios tend to scale positively with lake surface area, benthic N~2~O biogeochemistry will have a greater affect on dissolved N~2~O concentration in small lakes, regardless of whether the sediments function as a net sink or source of N~2~O **[see Wetzel for references]**.  Furthermore, sediment may warm faster in small and shallow lakes, whereas thermal stratification may substantially delay sediment warming in large and deep lakes, resulting in greater rates of N~2~O production or consumption in small lakes **[need a citation for N2O ~ temperature relationship]**.  Thermal stratification may also prevent the exchange of water between the lake surface and the hypolimnion, thereby preventing N~2~O depleted or enriched water from advecting to the lake surface (Beaulieu et al N2O Harsha Lake and USACE N2O papers).
+While NO~3~ and water temperature were the primary drivers of N~2~O production or consumption rates, waterbody morphology determined the extent to which N~2~O processing affected dissolved N~2~O in surface waters. When pooled across all ecoregions, the absolute magnitude of the difference between the measured and equilibrium N~2~O concentration, known as $\Delta$ N~2~O, decreases with increasing waterbody size class **[Fig. 4A]**. This pattern holds regardless of whether N~2~O is supersaturated or undersatured **[Fig. 4B, C]**.  Waterbody size and shape can affect dissolved gas concentration through several mechanisms. In lakes with low water volume to benthic surface area ratios, the mass of N~2~O consumed or produced in the sediments can be a substantial fraction of the mass of N~2~O dissolved in the water column (@carpenter_1983) . Furthermore, sediment may warm faster in small and shallow lakes, whereas thermal stratification may substantially delay sediment warming in large and deep lakes, resulting in greater rates of N~2~O production or consumption in small lakes. Thermal stratification may also prevent the exchange of water between the lake surface and the hypolimnion, thereby preventing N~2~O depleted or enriched water from advecting to the lake surface (@Beaulieu_etal_2015, @Beaulieu_etal_2014).  Unfortunately, the morphometric data required to test these hypothesis (e.g. mean depth, max depth) are not available for the samples waterbodies.
 
-Persistent patterns in the air-water gas exchange rate across lake size classes may also contribute to greater N~2~O disequlibrim in smaller waterbodies.  Air-water gas exchange will vent excess N~2~O from surface waters or facilitate the invasion of air that can replenish depleted N~2~O in undersaturated waterbodies.  Regardless of whether a waterbody is superaturated or undersatured in N~2~O, air-water gas exchange will function to move the dissolved N~2~O concentration toward equilibrium.  One of the primary drivers of air-water gas exchange in lentic waters is wind speed (Vachon and Prairie reference).  Wind speeds tend to be greater in large lakes with long fetches and lower in small waterbodies, particularly if they are sheltered by shoreline vegetation.  Thus, greater air-water gas exchange rates in large lakes may maintain dissolved N~2~O concentrations close to equilibrium, whereas the affect of biogeochemistry on dissolved N~2~O is more pronounced in small waterbodies because low air-water gas exchange limits the rate at which excess N~2~O can be ventilated or depleted N~2~O can be replenished.
+Persistent patterns in the air-water gas exchange rate across lake size classes may also contribute to greater N~2~O disequlibrim in smaller waterbodies. Air-water gas exchange will vent excess N~2~O from surface waters or facilitate the invasion of air that can replenish depleted N~2~O in undersaturated waterbodies. Regardless of whether a waterbody is superaturated or undersatured in N~2~O, air-water gas exchange will function to move the dissolved N~2~O concentration toward equilibrium. One of the primary drivers of air-water gas exchange in lentic waters is wind speed (@Vachon_etal_2013). Wind speeds tend to be greater in large lakes with long fetches and lower in small waterbodies, particularly if they are sheltered by shoreline vegetation. Thus, greater air-water gas exchange rates in large lakes may maintain dissolved N~2~O concentrations close to equilibrium, whereas the affect of biogeochemistry on dissolved N~2~O is more pronounced in small waterbodies because low air-water gas exchange limits the rate at which excess N~2~O can be ventilated or depleted N~2~O can be replenished.
 
-The influence of waterbody size is also evident in the statistical interaction between NO3 and surface area (Fig XX).  At high NO3 concentrations, N2O is highly supersatured in small waterbodies, but moves toward equilibrium in large waterbodies, as seen in the Coastal Plains ecoregion**[is CPL high NO3?]**.  At low NO3 concentrations, N2O is undersatured in small waterbodies, but increases toward equilibrium in larger waterbodies, as seen in the Northern Plains ecoregion **[is NPL low nitrate?]**(Fig).  
+![Figure 4.  A) Relationship between $\Delta$ N~2~O (difference between observed and equilibrium N~2~O concentration) and waterbody surface areas.  B,C) relationship between N~2~O saturation and waterbody size for the Coastal Plains and Northern Plains ecoregions.  The vertical blue line references a N~2~O saturation value of 1.0.  The horizontal red arrows highlight $\Delta$ N~2~O for the smallest lake size class.](manuscript_figures/deltaN2ObySize.tiff)
 
-The model indicates that NO3, water temperature, and surface area interact to determine the N2O saturation ratio.  These interactions yield a broad range of N2O saturation values across the population of CONUS waterbodies, but also enable the identifcation of broad scale patterns.  First, small waterbodies with low NO3 concentration tend to be undersaturated, whereas small waterbodies with high NO3 tend to be highly supersaturated.  Large waterbodies, regardless of NO3 status, tend to have N2O saturation ratios close to equilibrium.  Therefore intra and inter regional patterns in N2O saturation are determined by the joint distributions of waterbody size, NO3 availability, and water temperature within an ecoregion.
+The influence of waterbody size is also evident in the statistical interaction between NO~3~ and surface area **[Fig. 5]**. At high NO~3~ concentrations, N~2~O is highly supersatured in small waterbodies, but moves toward equilibrium in large waterbodies **[Fig. 5A]**. At low NO3 concentrations, N~2~O is undersatured in small waterbodies, but increases toward equilibrium in larger waterbodies **[Fig. 5A]**.  
 
-![Figure 3. Relationship between delta N~2~O and lake size category across A) the population of CONUS waterbodies and B) within each of the nine major CONUS ecoregions.  Red arrows in panel A illustrate the magnitude of N~2~O disequilibrium in the smallest lake size class.  Data are inferences made to the population of CONUS waterbodies.](manuscript_figures/figure3.tiff)
-
-
-
-![Figure 4. Partial dependence plot illustrating the relationship between N~2~O concentration and waterbody surface area as a function of nitrate concentration.](manuscript_figures/N2O vs surface area x NO3 partial dependence plot.png)
+The model indicates that NO~3~, water temperature, and surface area interact to determine the N~2~O saturation ratio. These interactions yield a broad range of N~2~O saturation values across the population of CONUS waterbodies, but also enable the identifcation of broad scale patterns. First, small waterbodies with low NO3 concentration tend to be undersaturated, whereas small waterbodies with high NO3 tend to be highly supersaturated. Large waterbodies, regardless of NO~3~ status, tend to have N~2~O saturation ratios closer to equilibrium. Therefore intra and inter regional patterns in N~2~O saturation are determined by the joint distributions of waterbody size, NO~3~ availability, and water temperature.
 
 
-**Not sure where I am going with this paragraph.  Maybe scratch it.  Mostly included as a placeholder for these references**
-While previous surveys have documented relationships between lake size and dissolved methane concentration (Pighini et al. 2018, Juutinen et al 2009, Borges et al. 2011), another greenhouse gas, to the best of our knowledge, this is the first study to document a relationship between lake size and $\Delta$ N~2~O.  Perhaps because previous surveys have included little variation in waterbody size (Webb et al. 2019, Kortelainen et al) or water quality (Soued et al. 2015).  
+![Figure 5. Partial dependence plots illustrating the relationship between N~2~O saturation and A) nitrate (NO~3~ availability dependent upon lake size, and B) lake size dependent upon NO~3~ availability. The five NO~3~ categories correspond to concentration ($\mu$g L^-1^) ranges of 1) below detection, 2) $\geq$ 0.55 and < 4.09, 3) $\geq$ 4.09 and < 30.20, 4) $\geq$ 30.20 and < 223.13, and 5) $\geq$ 223.13.](manuscript_figures/sat_cond_area.tiff)
+
+**Not sure where I am going with this paragraph. Maybe scratch it. Mostly included as a placeholder for these references** While previous surveys have documented relationships between lake size and dissolved methane concentration (Pighini et al. 2018, Juutinen et al 2009, Borges et al. 2011), another greenhouse gas, to the best of our knowledge, this is the first study to document a relationship between lake size and $\Delta$ N~2~O. Perhaps because previous surveys have included little variation in waterbody size (@webb_etal_2019, @kortelainen_etal_2020) or water quality (@soued_etal_2016).
+
+## Emission Rates
+
+Despite widespread N~2~O undersaturation in CONUS waterbodies, the national average N~2~O emission rate was `r national_stats$post_med_en2o` (95% CI: `r national_stats$LCL_en2o` - `r national_stats$UCL_en2o` mg N2O m^-2^ d^-1^ (Table 1). This contradiction is due to relatively rare waterbodies with very high emission rates that pull the mean (`r national_stats$post_med_en2o` mg N2O m^-2^ d^-1^) to a value that far exceeds the median (`r national_stats$post_median_en2o` mg N2O m^-2^ d^-1^) (SI Figure 1). At the ecoregional scale, only the Northern Appalachians and Northern Plains ecoregions had mean emission rates less than 0.  These ecoregions also had the lowest mean NO~3~ availability of all nine ecoregions **[need table or figure.  See ecoreg_stats$post_med_no3 variable.  maybe a SI table with summaries of all data from all_predictions?]**.  
+
+## Fluxes 
+Total N~2~O flux from the surface of CONUS waterbodies is a function of the N~2~O emission rate and waterbody surface area.  The largest lake size class (> 50 Ha) had the greatest N~2~O flux in all ecoregions, but flux estimates for this lake size class were also the most uncertain (Fig. 6). Small uncertainties in emission rates translate to large uncertainties in flux when expressed across the surface area of large waterbodies.  Despite widespread N~2~O undersaturation, all ecoregions were a net source of N~2~O to the atmosphere (Table 1).  Differences in N~2~O flux across ecoregions are explained by patterns in N~2~O saturation and waterbody surface.  The Coastal Plains ecoregion had the greatest flux, driven by the high levels of N~2~O saturation and extensive waterbody surface area. By contrast, the Northern Plains had the lowest N~2~O saturation, waterbody surface area, and N~2~O flux.
+
+At the national scale, we estimate that CONUS waterbodies emit [problem knitting inline code? table1_dat %>% filter(`spatial domain` == "national") %>% select(`N2O flux`) %>% pull()] 1049 (358 - 1581) Mg N~2~O year^{-1}, assuming that the emission rates reported here hold for an entire calendar year. This is likely a conservative estimate because our data is based on summer conditions, whereas several studies have reported maximum N~2~O emission rates during the winter (citation, see climate benefits paper) and Fall (harsha n2o paper, LD n2o paper) in lakes and reservoirs.  While we are unaware of independent estimates of N~2~O emissions from CONUS lakes and reservoirs, the Intergovernmental Panel on Climate Change estimates that CONUS drainage networks, inclusive of zero order streams through major river mouths, receiving run off from croplands and grasslands emit `r ipcc.n2o.surface` (22,767) Mg N~2~O year^{-1} (@epa_2023).  Emissions from lakes and reservoirs represent only `r round((national_stats %>% select(post_med_fn2o) %>% pull() / ipcc.n2o.surface) * 100, digits = 1)` % of total surface water emissions, with the balance emanating from streams and rivers.  Emissions from CONUS lakes and reservoirs are also small when compared to other anthropogenic N~2~O sources including wastewater treatment (88,00  Mg N~2~O year^{-1}), stationary combustion (84,000 Mg N~2~O year^{-1}), and manure management (66,000  Mg N~2~O year^{-1}).   
+
+![Figure 6: N~2~O flux by ecoregion and lake size category](manuscript_figures/n2oFluxBySizeEco.tiff)
+
+## Conclusion
+* nearly three quarters of CONUS lakes and reservoirs are N2O sinks during the summer!
+* despite widespread undersaturation, CONUS lakes and waterbodies are a small source of N2O
+* our study is limited in temporal scope, would seasonality change the story?
+* greatest uncertainty in flux is for large lakes.  Focused investigations on the nation's largest waterbodies to improve estimate?
 
 
-# EMISSION RATES
-Despite widespread N2O undersaturation in CONUS waterbodies, the national average N2O emission rate was `r national_stats$post_med_en2o` (95% CI: `r national_stats$LCL_en2o` - `r national_stats$UCL_en2o` mg N2O m^-2^ d^-1^ and only the Northern Appalachians and Northern Plains ecoregions had mean emission rates less than 0 (Table 1).  This is accordance with the distribution on N2O saturation values where relatively rare, but highly supersatured, waterbodies pull the mean to a value that far exceeds the median.    ecoregional means range from `r ecoreg_stats %>% slice_min(n = 1, post_med_en2o) %>% select(post_med_en2o) %>% pull()` to `r ecoreg_stats %>% slice_max(n = 1, post_med_en2o) %>% select(post_med_en2o) %>% pull()` mg N2O m^-2^ d^-1^ (Table 1).  
+![SI Figure 1. Distribution of N~2~O emission rates by ecoregion.  Data are inferences made to the population of CONUS waterbodies.](manuscript_figures/SIfigure1.tiff)
 
-emission rates seem way too low.  Need to double check k600 calculation
 
 
 # References
-
-
-

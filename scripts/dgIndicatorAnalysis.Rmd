@@ -2830,25 +2830,49 @@ The distribution of N2O emission rates (mg N2O m-2 d-1) for one draw is very sim
 
 The total N2O flux from US lakes and reservoirs is minor compared to other anthropogenic N2O sources
 ```{r}
-all_predictions %>% 
-  filter(.draw == 1) %>% 
-  ggplot(aes(x=e.n2o.mg.m2.d)) + 
-  geom_density() +
-  geom_rug() + 
-  facet_wrap(~WSA9, scales = "free")
+# Compare to literature
+# Read data from Webb et al. 2019
+webb <- readr::read_csv(paste0(Sys.getenv("USERPROFILE"), 
+                               "/Environmental Protection Agency (EPA)/",
+                               "ORD NLA17 Dissolved Gas - Documents/",
+                               "literature/n2o/Webb et al. 2019 PNAS/",
+                               "SI_data.csv")) %>%
+  mutate(e.n2o.mg.m2.d = N2O.umol.m2.d * (44/1000), # umol->mg
+         source = "webb")
 
+# Read data from Deemer et al. 2016
+deemer <- readxl::read_xls(paste0(Sys.getenv("USERPROFILE"), 
+                               "/Environmental Protection Agency (EPA)/",
+                               "ORD NLA17 Dissolved Gas - Documents/",
+                               "literature/n2o/Deemer et al. 2016 Bioscience SI.xls"),
+                           sheet = "Supplementary_Reservoir_GHG_Dat",
+                           skip = 1) %>%
+  mutate(e.n2o.mg.m2.d = `mg N2O-N m-2 d-1` * (44/28),
+         source = "deemer")
 
-knitr::include_graphics((paste0(Sys.getenv("USERPROFILE"), 
-                                    "/Environmental Protection Agency (EPA)/",
-                                    "ORD NLA17 Dissolved Gas - Documents/",
-                                    "EDA/en2oLiterature.tiff")))
+# combine NLA and lit data
+all_dat <- rbind(all_predictions %>% 
+  filter(.draw == 1) %>% # just one iteration
+  mutate(source = "nla") %>%
+  select(source, e.n2o.mg.m2.d),
+  webb %>% select(source, e.n2o.mg.m2.d),
+  deemer%>% select(source, e.n2o.mg.m2.d))
 
+# dot plot of N2O emission rates by source
+ggplot(all_dat, aes(source, e.n2o.mg.m2.d)) +
+  geom_point(position = "jitter")
+
+# summary statistics by source
+all_dat %>%
+  split(f = list(.$source)) %>% # split into named lists
+  map(~ summary(.x)) # apply summary function to each list element
+  
 
 
 ## Comparison to US GHG inventory
 # top sources from inventory report in kt / year
 n2o <- data.frame(kt = c(1156,88,84,66,60,34,18,14,7),
-                     source = c("Agricultural Soil Management",
+                     source = c("Agricultural Soil Management", # this includes leaching and runoff
                                 "Wastewater Treatment",
                                 "Stationary Combustion",
                                 "Manure Management",
@@ -2967,7 +2991,7 @@ all_predictions %>%
 all_predictions %>%
   group_by(WSA9, .draw) %>% # group by iteration
   #group_by(.draw) %>%
-  summarise(mean_f = mean(f.n2o.Mg.y)) %>% # 500 means for each WSA9
+  summarise(mean_f = sum(f.n2o.Mg.y)) %>% # 500 means for each WSA9
   # now summarize to 1 statistic per WSA9
   summarise( estimate = round(median(mean_f), 3), 
     LCL = round(quantile(mean_f, probs = 0.025), 3),
@@ -2980,16 +3004,16 @@ all_predictions %>%
   geom_point() +
   geom_linerange( aes( ymin = LCL, ymax = UCL)) +
   geom_hline(yintercept = 0, color='blue') +
-  ylab("mean N2O saturation ratio") +
+  ylab("N2O flux (Mg N2O)") +
   coord_flip() + 
   theme_bw()
-ggsave("output/figures/n2oSatRatioByEco.tiff")
+ggsave("output/figures/n2oFuxByEco.tiff")
 
-# point and line range by size and ecoregion
+# point and line range by size and ecoregion: facetted
 all_predictions %>%
   group_by(WSA9, size_cat, .draw) %>% # group by iteration
   #group_by(.draw) %>%
-  summarise(mean_f.n2o.Mg.y = mean(f.n2o.Mg.y)) %>% # 500 means for each WSA9 x size cat
+  summarise(mean_f.n2o.Mg.y = sum(f.n2o.Mg.y)) %>% # 500 means for each WSA9 x size cat
   # now summarize to 1 statistic per WSA9
   summarise( estimate = round(median(mean_f.n2o.Mg.y), 3), 
     LCL = round(quantile(mean_f.n2o.Mg.y, probs = 0.025), 3),
@@ -3002,18 +3026,40 @@ all_predictions %>%
   geom_point() +
   geom_linerange( aes( ymin = LCL, ymax = UCL)) +
   geom_hline(yintercept = 0, color='blue') +
-  ylab("mean N2O flux") +
+  ylab("mean N2O flux (Mg N2O year-1)") +
   coord_flip() + 
   theme_bw() +
   facet_wrap(~ecoregion, scales = "free")
 ggsave("output/figures/n2oFluxBySizeEco.tiff", height = 5.4, width = 9.6)
 
+
+# point and line range by size and ecoregion: single plot
+all_predictions %>%
+  group_by(WSA9, size_cat, .draw) %>% # group by iteration
+  #group_by(.draw) %>%
+  summarise(mean_f.n2o.Mg.y = sum(f.n2o.Mg.y)) %>% # 500 means for each WSA9 x size cat
+  # now summarize to 1 statistic per WSA9
+  summarise( estimate = round(median(mean_f.n2o.Mg.y), 3), 
+    LCL = round(quantile(mean_f.n2o.Mg.y, probs = 0.025), 3),
+    UCL = round(quantile(mean_f.n2o.Mg.y, probs = 0.975), 3)) %>% 
+  mutate(unique = paste(WSA9, size_cat, "_")) %>%
+  # mutate(ecoregion = fct_reorder(ecoregion, )) %>%
+  ggplot( aes( y = size_cat, x = estimate ) ) +
+  geom_point() +
+  geom_linerange( aes( xmin = LCL, xmax = UCL)) +
+  geom_vline(xintercept = 0, color='blue') +
+  xlab(expression(N[2]*O~flux~(Mg~year^{-1}))) +
+  #coord_flip() + 
+  theme_bw() +
+  facet_grid(WSA9~., scales = "free")
+ggsave("output/figures/n2oFluxBySizeEcoVerticalPanel.tiff", height = 5.7, width = 2.5)
+
 # bar plot by size category and ecoregion  
 all_predictions %>% 
   filter(.draw == 1) %>% 
-  group_by(WSA9, size_cat2) %>% 
+  group_by(WSA9, size_cat) %>% 
   summarise(total.n2o = sum(f.n2o.Mg.y)) %>% 
-  ggplot(aes(x=size_cat2, y=total.n2o)) + 
+  ggplot(aes(x=size_cat, y=total.n2o)) + 
   geom_bar(stat = "identity") + 
   facet_wrap(~WSA9, scales = "free")
 
@@ -3094,6 +3140,18 @@ grid::grid.draw(g)
 
 ggsave("output/figures/n2oFluxByLakeSizeNoError.tiff", g)
 
+
+# N2O flux vs total surface area in each ecoregion
+all_predictions %>%
+  group_by(WSA9, WSA9_NAME, .draw) %>%
+  summarise(fn2o_Mg = sum(f.n2o.Mg.y),
+             total_sa = sum(area_ha)) %>%
+  summarise( post_med_fn2o = round(median(fn2o_Mg), 3), 
+             LCL_fn2o = round(quantile(fn2o_Mg, probs = 0.025), 3),
+             UCL_fn2o = round(quantile(fn2o_Mg, probs = 0.975), 3),
+             total_sa = mean(total_sa)) %>%
+  ggplot(aes(total_sa, post_med_fn2o)) +
+  geom_point()
 
 ```
 
