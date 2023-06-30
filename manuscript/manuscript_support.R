@@ -393,7 +393,7 @@ ggsave("manuscript/manuscript_figures/deltaN2ObySize.tiff", width = 6, height = 
 
 }
 
-## Figure X: N2O flux by waterbody size 
+## Figure X: N2O flux by waterbody size------
 # See 'N2O emission rate and flux: Figures and tables' section of dgIndicatorAnalysis.Rmd
 # if the image is already on computer, then nothing, else create image
 
@@ -412,7 +412,8 @@ all_predictions %>%
   geom_point() +
   geom_linerange(aes(xmin = LCL, xmax = UCL)) +
   geom_vline(xintercept = 0, color='blue') +
-  ylab(expression(N[2]*O~flux~(Mg~year^{-1}))) +
+  xlab(expression(N[2]*O~flux~(metric~tons~year^{-1}))) + # 1Mg = 1 metric ton
+    ylab("Lake size class (ha)") +
   theme_bw() +
   facet_wrap(~ecoregion, scales = "free")
 ggsave("manuscript/manuscript_figures/n2oFluxBySizeEco.tiff", height = 5.4, width = 9.6)
@@ -523,7 +524,7 @@ propN2oSinkUpperNPL <- all_predictions %>%
 # 1 mass of N2O = 265 mass CO2 www.epa.gov/system/files/documents/2023-04/US-GHG-Inventory-2023-Chapter-1-Introduction.pdf
 # 1 MMT (million metric ton) = 1000 kt (kilo ton) www.epa.gov/system/files/documents/2023-04/US-GHG-Inventory-2023-Chapter-1-Introduction.pdf
 # 1 ton = 1000 kg
-# 1000 kg = 1 Mg
+# 1000 kg = 1 Mg = 1 metric ton
 # (15.2+2.9) = 18 MMT CO2 eq * (1MMT N2O / 265 MMT CO2 Eq) * (1000kt N2O/1MMt N2O) * (1000t N2O/1kt N2O) * (1000kg N2O/1t N2O) * (1Mg/1000kg)
 ipcc.n2o.indirect <- (15.2+2.9)*(1/265)*(1000/1)*(1000/1)*(1000/1)*(1/1000) #68,302 Mg N2O
 
