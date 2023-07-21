@@ -515,6 +515,40 @@ propN2oSinkUpperNPL <- all_predictions %>%
   filter(WSA9 == "NPL") %>% 
   pull()
 
+
+## Lake size distribution----
+# proportion of total SA attributable to lakes <=50 ha
+proportionSmallSA <- all_predictions %>%
+  filter(.draw == 1) %>% # just grab one realization
+  select(area_ha) %>%
+  arrange(area_ha) %>% 
+  mutate(cumulative = cumsum(area_ha), # cumulative surface area from small to large
+         distribution = cumulative / sum(area_ha), # prop of total SA
+         delta50 = abs(50-area_ha)) %>% # how close to 50 Ha
+  filter(delta50 == min(delta50)) %>% # select closest to 50 Ha
+  pull(distribution) # 50Ha lake
+  
+# proportion of population <=50ha
+proportionSmallNumber <- all_predictions %>%
+  filter(.draw == 1) %>% # just grab one realization
+  select(area_ha) %>%
+  arrange(area_ha) %>% 
+  mutate(number = 1:nrow(.), # number each lake from smallest to largest
+         proportion = number / nrow(.)) %>% # proportion of all lakes 
+  filter(abs(50-area_ha) == min(abs(50-area_ha))) %>% # grab 50Ha lake
+  pull(proportion) # extract proportion of all lakes represented by this lake
+  
+
+# Mean and max emission rates-----
+min.max <- all_predictions %>%
+  group_by(.row) %>%
+  summarize(e.n2o.mg.m2.d = mean(e.n2o.mg.m2.d)) %>%
+  ungroup() %>%
+  summarize(min = min(e.n2o.mg.m2.d),
+            max = max(e.n2o.mg.m2.d))
+
+
+
 ## IPCC Indirect N2O Leaching and Runoff----
 # 1990 - 2021 inventory reports 15.2 + 2.9 MMT CO2-Eq per year for CONUS (Table 5-19) in 2021.
 # https://www.epa.gov/system/files/documents/2023-04/US-GHG-Inventory-2023-Chapter-5-Agriculture.pdf
