@@ -494,10 +494,26 @@ b3 <- all_predictions %>%
 #                   ggarrange(b3, ncol = 2, nrow=1, labels = "AUTO"), # single plot in 3rd row, only one column
 #                   nrow=3, labels = "AUTO")
 
-ggpubr::ggarrange(b1, b2, b3, ncol = 3, nrow=1, labels = "AUTO")
+ggpubr::ggarrange(b2, b1, b3, ncol = 3, nrow=1, labels = "AUTO")
 ggsave("manuscript/manuscript_figures/n2oFluxAndEmissionRateVsContinuousArea.tiff", width = 8, height = 4)   
 
 }
+
+all_predictions %>%
+  group_by(WSA9_NAME, .draw) %>% # group by iteration
+  summarise(mean_f.n2o.Mg.y = sum(f.n2o.Mg.y)) %>% # 2000 means for size cat
+  # now summarize to 1 statistic per WSA9
+  summarise( estimate = round(median(mean_f.n2o.Mg.y), 3), 
+             LCL = round(quantile(mean_f.n2o.Mg.y, probs = 0.025), 3),
+             UCL = round(quantile(mean_f.n2o.Mg.y, probs = 0.975), 3)) %>% 
+  ggplot(., aes(x = estimate, y = WSA9_NAME)) +
+  geom_point() +
+  geom_linerange(aes(xmin = LCL, xmax = UCL)) +
+  geom_vline(xintercept = 0, color='blue') +
+  xlab(expression(N[2]*O~flux~(metric~tons~year^{-1}))) + # 1Mg = 1 metric ton
+  ylab("Lake size class (ha)") +
+  theme_bw() 
+
 
 
 ## SI Figure 1: N2O emission rate distribution----
@@ -624,7 +640,16 @@ proportionSmallNumber <- all_predictions %>%
   filter(abs(50-area_ha) == min(abs(50-area_ha))) %>% # grab 50Ha lake
   pull(proportion) # extract proportion of all lakes represented by this lake
   
-
+# flux from largest lake size class------
+FluxBySize <- all_predictions %>%
+  group_by(size_cat, .draw) %>% # group by iteration
+  summarise(mean_f.n2o.Mg.y = sum(f.n2o.Mg.y)) %>% # 2000 means for size cat
+  # now summarize to 1 statistic per size_cat
+  summarise( estimate = round(median(mean_f.n2o.Mg.y), 3), 
+             LCL = round(quantile(mean_f.n2o.Mg.y, probs = 0.025), 3),
+             UCL = round(quantile(mean_f.n2o.Mg.y, probs = 0.975), 3))
+  
+  
 # Mean and max emission rates-----
 min.max <- all_predictions %>%
   group_by(.row) %>%
