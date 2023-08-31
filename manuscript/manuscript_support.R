@@ -1,6 +1,7 @@
 ## This script generates data to be referenced in inline-code in the manuscript.
-## This makes the inline code more succint and the .Rmd easier to read.
+## This makes the inline code more succinct and the .Rmd easier to read.
 
+# 32 minutes to run on DMAP with images already stored locally
 
 # SETUP----------------------
 ## load libraries
