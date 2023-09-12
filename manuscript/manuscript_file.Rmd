@@ -105,7 +105,7 @@ flextable(table1_dat) %>%
   
   footnote(i = 1, j = 3:6,
            ref_symbols = "a",
-           value = as_paragraph("Mean and 95% credible interval of 500 realizations of posterior predictive distribution"),
+           value = as_paragraph("Mean and 95% credible interval of 2000 realizations of posterior predictive distribution"),
            part = "header"
   ) %>%
     footnote(i = 1, j = 3,

@@ -4,7 +4,19 @@
 # 32 minutes to run on DMAP with images already stored locally
 
 # SETUP----------------------
+## Identify local path for each user
+localPath <- Sys.getenv("USERPROFILE")
+
 ## load libraries
+# DMAP not under renv control.  Should probably specify same
+# versions as used for renv library
+if(localPath == "") { # if DMAP, then
+install.packages(c("sf", "tidyverse", "janitor",
+                   "tictoc", "ggpubr", "ggallin",
+                   "devtools"))
+devtools::install_version("USAboundaries", "0.4.0")
+}
+
 library(sf) # spatial data
 library(tidyverse) # dplyr, ggplot
 library(janitor) # clean names
@@ -13,8 +25,7 @@ library(tictoc) # processing time
 library(ggpubr) # multiple plots
 library(ggallin) # psuedlolog transformation for negative values
 
-## Identify local path for each user
-localPath <- Sys.getenv("USERPROFILE")
+
 
 
 # DATA---------------
@@ -295,7 +306,7 @@ if(!("figure2.tiff" %in% list.files("manuscript/manuscript_figures"))) {
   # using xlim to zoom in on values close to 1
   
   dummy <- all_predictions %>%
-    group_by(WSA9) %>%
+    group_by(WSA9, .draw) %>%  # test this
     summarize(mean = mean(n2osat),
               median = median(n2osat)) %>%
     mutate(dens.med = c(2, 2.5, 2.3, 2.05, 1.75, 2.15, 2.2, 1.9, 1.9),
