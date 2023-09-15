@@ -27,7 +27,6 @@ library(ggallin) # psuedlolog transformation for negative values
 
 
 
-
 # DATA---------------
 ## load sample data (dg object)----
 if(localPath == "") { # if DMAP, then
@@ -197,6 +196,7 @@ ecoreg_stats <- all_predictions %>%
   summarise( mean_n2o = mean(n2o),
              mean_n2oeq = mean(n2oeq),
              mean_sat = mean(n2osat),
+             median_sat = median(n2osat),
              prop_sat = sum(n2osat < 1) / length(unique(.row)),
              mean_en2o = mean(e.n2o.mg.m2.d),
              median_en2o = median(e.n2o.mg.m2.d),
@@ -211,6 +211,7 @@ ecoreg_stats <- all_predictions %>%
              LCI_n2oeq = round(quantile(mean_n2oeq, probs = 0.025), 2),
              UCI_n2oeq = round(quantile(mean_n2oeq, probs = 0.975), 2),
              post_med_sat = round(median(mean_sat), 2),
+             post_med_med_sat = round(median(median_sat), 2),
              LCI_sat = round(quantile(mean_sat, probs = 0.025), 2),
              UCI_sat = round(quantile(mean_sat, probs = 0.975), 2),
              estimate = round(median(prop_sat), 3),
@@ -305,37 +306,33 @@ if(!("figure2.tiff" %in% list.files("manuscript/manuscript_figures"))) {
   # density plots of predicted distribution, mean, and median
   # using xlim to zoom in on values close to 1
   
-  dummy <- all_predictions %>%
-    group_by(WSA9, .draw) %>%  # test this
-    summarize(mean = mean(n2osat),
-              median = median(n2osat)) %>%
-    mutate(dens.med = c(2, 2.5, 2.3, 2.05, 1.75, 2.15, 2.2, 1.9, 1.9),
-           dens.mean = c(.4, 1.9, 2, .6, .65, .45, 1.5, 1.45, 0.9),
+  dummy <- ecoreg_stats %>%
+                        #CPL   NAP   NPL    SAP    SPL   TPL  UWM    WMT    XER
+    mutate(dens.med = c(2.5,  4,    3.1,   3.5,   2.5,  3,   3,      2,     2.5),
+           dens.mean = c(.5,  3,    2.5,   1.5,   1,    1,   2,      1.5,   1.1),
            .draw = 1) # needed to match grouping aesthetic in ggplot call
   
-  # tic() # 40 seconds for 100 draws
+  tic() # 60 seconds for 100 draws, and 16 minutes for 2000 draws, on memory intensive DMAP.  
   all_predictions %>%
-    filter(.draw %in% 1:100) %>% # subset for practice
-    #mutate(ecoregion = factor(WSA9)) %>%
-    #mutate(ecoregion = fct_reorder(ecoregion, preds_sat)) %>%
+    #filter(.draw %in% 1:100) %>% # subset for practice
     ggplot(aes(x = n2osat, group = .draw, color = .draw ) ) +
     geom_density(show.legend = FALSE) +
     geom_vline(xintercept = 1, color = "red") +
     geom_segment(data = dummy,
-                 aes(x = mean, xend = mean, y = 0,
-                     yend = dens.mean),
+                 aes(x = post_med_sat, xend = post_med_sat, 
+                     y = 0, yend = dens.mean),
                  linetype = "solid") +
     geom_segment(data = dummy,
-                 aes(x = median, xend = median, y = 0,
-                     yend = dens.med),
+                 aes(x = post_med_med_sat, xend = post_med_med_sat, 
+                     y = 0, yend = dens.med),
                  linetype = "dashed") +
     ylab ("density") + 
     xlab(expression(N[2]*O~saturation~ratio)) +
     xlim(0,3) + # data range is 0-600, but sample max is 30
-    facet_wrap(~WSA9) +
+    facet_wrap(~WSA9_NAME) +
     theme_bw() +
     theme(legend.position = "none")
-  # toc()
+  toc()
   ggsave("manuscript/manuscript_figures/figure2.tiff", width = 8.5, height = 5)
   
 }
@@ -343,67 +340,67 @@ if(!("figure2.tiff" %in% list.files("manuscript/manuscript_figures"))) {
 ## Figure X: delta N2O by waterbody size----
 # See 'N2O saturation ratio: continuous variable' section of dgIndicatorAnalysis.Rmd
 # if the image is already on computer, then nothing, else create image
-if(!("deltaN2ObySize.tiff" %in% list.files("manuscript/manuscript_figures"))) {
+if(!("n2oStarBySize.tiff" %in% list.files("manuscript/manuscript_figures"))) {
   
 
-  
+# originally drafted as three panel figure, but decided to scale down to one panel.
 # PLOT N2O SAT RATIO BY WSA9 AND SIZE
-# point and linerange
-p1.data <- all_predictions %>%
-  filter(WSA9 %in% c("CPL", "NPL")) %>% # only show two examples.  comment out to include all ecoregions
-  group_by(WSA9_NAME, size_cat, .draw) %>% # group by iteration
-  summarise(mean_sat = mean(n2osat)) %>% # 500 means for each WSA9
-  # now summarize to 1 statistic per WSA9
-  summarise( estimate = round(median(mean_sat), 3),
-             LCL = round(quantile(mean_sat, probs = 0.025), 3),
-             UCL = round(quantile(mean_sat, probs = 0.975), 3)) 
-  # mutate(ecoregion = factor(WSA9_NAME)) %>%
-  # mutate(ecoregion = fct_reorder(ecoregion, estimate))
-
-# data for arrow segment.  Only smallest size category.  Only CPL and NPL.
-p1.data.arrow <- p1.data %>%
-  filter(size_cat == "min_4")
-
-# pushing CPL and NPL to separate ggplot images to allow ggpubr
-# to label each plot A, B, and C.  When pushing to two panels
-# via faceting, ggpubr couldn't separately label the panels.
-
-# CPL plot
-p1.cpl <- p1.data %>%
-  filter(WSA9_NAME == "Coastal Plains") %>%
-  ggplot(aes(x=estimate, y=size_cat)) +
-  geom_point() +
-  geom_linerange( aes( xmin = LCL, xmax = UCL)) +
-  geom_vline(xintercept = 1, color='blue') +
-  # geom_segment(data = p1.data.arrow %>% filter(WSA9_NAME == "Coastal Plains"),
-  #              aes(x=1, y = size_cat, xend = estimate, yend = size_cat),
-  #              arrow = arrow(length = unit(0.2, "cm")),
-  #              color = "red") +
-  xlab(expression(mean~N[2]*O~saturation~ratio)) +
-  xlim(0.84, 1.5) +
-  ylab("waterbody size category (ha)") +
-  theme_bw() +
-  theme(axis.title.y = element_blank(),
-        axis.title.x = element_blank()) +
-  facet_grid(rows = vars(WSA9_NAME))
-
-# NPL plot
-p1.npl <- p1.data %>%
-  filter(WSA9_NAME == "Northern Plains") %>%
-  ggplot(aes(x=estimate, y=size_cat)) +
-  geom_point() +
-  geom_linerange( aes( xmin = LCL, xmax = UCL)) +
-  geom_vline(xintercept = 1, color='blue') +
-  # geom_segment(data = p1.data.arrow %>% filter(WSA9_NAME == "Northern Plains"),
-  #              aes(x=1, y = size_cat, xend = estimate, yend = size_cat),
-  #              arrow = arrow(length = unit(0.2, "cm")),
-  #              color = "red") +
-  xlab(expression(mean~N[2]*O~saturation~ratio)) +
-  xlim(0.84, 1.5) +
-  ylab("waterbody size category (ha)") +
-  theme_bw() +
-  theme(axis.title.y = element_blank()) +
-  facet_grid(rows = vars(WSA9_NAME))
+# # point and linerange
+# p1.data <- all_predictions %>%
+#   filter(WSA9 %in% c("CPL", "NPL")) %>% # only show two examples.  comment out to include all ecoregions
+#   group_by(WSA9_NAME, size_cat, .draw) %>% # group by iteration
+#   summarise(mean_sat = mean(n2osat)) %>% # 500 means for each WSA9
+#   # now summarize to 1 statistic per WSA9
+#   summarise( estimate = round(median(mean_sat), 3),
+#              LCL = round(quantile(mean_sat, probs = 0.025), 3),
+#              UCL = round(quantile(mean_sat, probs = 0.975), 3)) 
+#   # mutate(ecoregion = factor(WSA9_NAME)) %>%
+#   # mutate(ecoregion = fct_reorder(ecoregion, estimate))
+# 
+# # data for arrow segment.  Only smallest size category.  Only CPL and NPL.
+# p1.data.arrow <- p1.data %>%
+#   filter(size_cat == "min_4")
+# 
+# # pushing CPL and NPL to separate ggplot images to allow ggpubr
+# # to label each plot A, B, and C.  When pushing to two panels
+# # via faceting, ggpubr couldn't separately label the panels.
+# 
+# # CPL plot
+# p1.cpl <- p1.data %>%
+#   filter(WSA9_NAME == "Coastal Plains") %>%
+#   ggplot(aes(x=estimate, y=size_cat)) +
+#   geom_point() +
+#   geom_linerange( aes( xmin = LCL, xmax = UCL)) +
+#   geom_vline(xintercept = 1, color='blue') +
+#   # geom_segment(data = p1.data.arrow %>% filter(WSA9_NAME == "Coastal Plains"),
+#   #              aes(x=1, y = size_cat, xend = estimate, yend = size_cat),
+#   #              arrow = arrow(length = unit(0.2, "cm")),
+#   #              color = "red") +
+#   xlab(expression(mean~N[2]*O~saturation~ratio)) +
+#   xlim(0.84, 1.5) +
+#   ylab("waterbody size category (ha)") +
+#   theme_bw() +
+#   theme(axis.title.y = element_blank(),
+#         axis.title.x = element_blank()) +
+#   facet_grid(rows = vars(WSA9_NAME))
+# 
+# # NPL plot
+# p1.npl <- p1.data %>%
+#   filter(WSA9_NAME == "Northern Plains") %>%
+#   ggplot(aes(x=estimate, y=size_cat)) +
+#   geom_point() +
+#   geom_linerange( aes( xmin = LCL, xmax = UCL)) +
+#   geom_vline(xintercept = 1, color='blue') +
+#   # geom_segment(data = p1.data.arrow %>% filter(WSA9_NAME == "Northern Plains"),
+#   #              aes(x=1, y = size_cat, xend = estimate, yend = size_cat),
+#   #              arrow = arrow(length = unit(0.2, "cm")),
+#   #              color = "red") +
+#   xlab(expression(mean~N[2]*O~saturation~ratio)) +
+#   xlim(0.84, 1.5) +
+#   ylab("waterbody size category (ha)") +
+#   theme_bw() +
+#   theme(axis.title.y = element_blank()) +
+#   facet_grid(rows = vars(WSA9_NAME))
 
 # PLOT N2O* BY SIZE
 # point and linerange
@@ -424,14 +421,14 @@ p2 <- all_predictions %>%
   #coord_flip() + 
   theme_bw() 
 
-#ggsave("output/figures/n2oStarBySize.tiff")
+ggsave(plot = p2, filename = "manuscript/manuscript_figures/n2oStarBySize.tiff")
 
-ggpubr::ggarrange(p2, # first column
-                  ggpubr::ggarrange(p1.cpl, p1.npl, ncol=1, # second column with plots in 2 rows
-                                    nrow = 2, labels = c("B", "C")),
-                  ncol = 2, 
-                  labels = "A") # label for first plot
-ggsave("manuscript/manuscript_figures/deltaN2ObySize.tiff", width = 6, height = 5)
+# ggpubr::ggarrange(p2, # first column
+#                   ggpubr::ggarrange(p1.cpl, p1.npl, ncol=1, # second column with plots in 2 rows
+#                                     nrow = 2, labels = c("B", "C")),
+#                   ncol = 2, 
+#                   labels = "A") # label for first plot
+# ggsave("manuscript/manuscript_figures/deltaN2ObySize.tiff", width = 6, height = 5)
 
 
 }
