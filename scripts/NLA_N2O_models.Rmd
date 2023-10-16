@@ -1,5 +1,5 @@
 ---
-title: "Modeling workflow: Lake N2O survey data"
+title: "Modeling workflow: NLA N2O survey data"
 author: "Roy Martin, Jake Beaulieu, Michael McManus"
 date: "`r Sys.Date()`"
 output:
@@ -17,7 +17,7 @@ editor_options:
   chunk_output_type: inline
 ---
 
-```{r begin, eval=TRUE, include=FALSE}
+```{r setup, echo = FALSE, warning=FALSE, message=FALSE}
 library(ggpubr)
 library(moments)
 library(ggplot2)
@@ -34,6 +34,8 @@ library(itertools)
 library(bayesplot)
 library(tidybayes)
 library(brms)
+library(tictoc)
+library(arrow)
 
 options(mc.cores = parallel::detectCores(logical = FALSE))
 options( max.print = 1000 )
@@ -57,57 +59,87 @@ skew <- function(x) {
   return(r * sqrt(n) * (1 - 1/n)^1.5)
 }
 
-# function for DHARMa residual analysis
-check_brms <- function(model,             # brms model
-                       integer = FALSE,   # integer response? (TRUE/FALSE)
-                       plot = TRUE,       # make plot?
-                       resp = NULL,
-                       ...                # further arguments for DHARMa::plotResiduals 
-) {
-  
-  mdata <- brms::standata(model)
-  if(!"Y" %in% names(mdata))
-    oResp <- mdata[[paste0("Y_", resp)]]
-  else
-    oResp <- mdata[["Y"]]
-  #  stop("Cannot extract the required information from this brms model")
-  
-  dharma.obj <- DHARMa::createDHARMa(
-    simulatedResponse = t(brms::posterior_predict(model, resp = resp, ndraws = 1000)),
-    observedResponse = oResp, 
-    fittedPredictedResponse = apply(
-      t(brms::posterior_epred(model, resp = resp, ndraws = 1000, re.form = NA)),
-      1,
-      median),
-    integerResponse = integer)
-  
-  if (isTRUE(plot)) {
-    plot(dharma.obj, ...)
-  }
-  
-  invisible(dharma.obj)
-  
-}
+# Load model and data files for knitting (if they already exist)
+f1 <- "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/dg.rda"
+f2 <- "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/df_model.rda"
+f3 <- "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/df_test.rda"
+f4 <- "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/sframe.rda"
+f5 <- "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/pframe.rda"
+f6 <- "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/samp_props.rda"
+
+f7 <- "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod1.rda"
+f8 <- "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod2.rda"
+f9 <- "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod3.rda"
+f10 <- "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod4.rda"
+f11 <- "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod5.rda"
+f12 <- "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod6.rda"
+f13 <- "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/all_predictions_b.rda"
+f14 <- "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/sframe.rda"
+f15 <- "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/pframe.rda"
+f16 <- "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_survey_ests.rda"
+f17 <- "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_survey_ests_size.rda"
+f18 <- "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/sat_survey_ests.rda"
+f19 <- "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/sat_survey_ests_size.rda"
+
+if(file.exists(f1))
+  load(f1)
+if(file.exists(f2))
+  load(f2)
+if(file.exists(f3))
+  load(f3)
+if(file.exists(f4))
+  load(f4)
+if(file.exists(f5))
+  load(f5)
+if(file.exists(f6))
+  load(f6)
+if(file.exists(f7))
+  load(f7)
+if(file.exists(f8))
+  load(f8)
+if(file.exists(f9))
+  load(f9)
+if(file.exists(f10))
+  load(f10)
+if(file.exists(f11))
+  load(f11)
+if(file.exists(f12))
+  load(f12)
+if(file.exists(f13))
+  load(f13)
+if(file.exists(f14))
+  load(f14)
+if(file.exists(f15))
+  load(f15)
+if(file.exists(f16))
+  load(f16)
+if(file.exists(f17))
+  load(f17)
+if(file.exists(f18))
+  load(f18)
+if(file.exists(f19))
+  load(f19)
 ```
 
 # Background and Objectives
-This document details the modeling workflow implemented for estimating dissolved and equilibrium N2O gas concentrations and saturation ratios for all freshwater lakes and reservoirs in the lower 48 US states larger than 4 ha. Data for these estimates came from the 2017 Nation Lakes Assessment (NLA) survey, wherein waterbodies were sampled according to a spatially balanced, stratified, and unequal probability design. Stratification was among categories of lake size (surface area in hectares), WSA9 ecoregion, and US state (excluding AK and HI); and larger lakes were intentionally over-sampled relative to smaller lakes. In order for this sample to be useful for making inferences relevant to the population of interest, any estimates derived from it needed to be adjusted for potential biases arising from these design factors. It can be useful to consider the complete data likelihood when imagining how such biases may arise in sampling designs[@Link_Barker_2010; @Zachmann_etal_2022]. For the 2017 NLA survey, the complete data was considered to be all US lakes and reservoirs in the lower 48 states larger than 4 hectares. The survey samples, by comparison, are then considered a subset of the complete data with a known pattern of "missingess" assigned by the survey. For example, some lakes in the target population were missing from the sample not at random, but conditional on the design parameters. Their "missingness" is not random and, therefore, not ignorable when making inferences from the sample to the population of interest [@Gelman_etal_2014, Ch. 8; @Zachmann_etal_2022]. 
+This document describes the modeling workflow and results from estimating dissolved and equilibrium N2O gas concentrations and saturation ratios for all freshwater waterbodies (natural and man-made lakes and reservoirs) in the lower 48 US states larger than 1 ha. Data for these estimates came from the 2017 Nation Lakes Assessment (NLA) survey, wherein a subset of waterbodies were sampled from the broader population of interest (POI) according to a spatially balanced, stratified, and unequal probability design. Stratification was among categories of lake size (surface area in hectares), WSA9 ecoregion, and US state (excluding AK and HI). In order to better capture variability among the wide range of lake sizes in the POI, larger lakes were intentionally over-sampled relative to smaller lakes.
 
-One model-based strategy to account for this selection bias is to include the survey design variables as predictors in a regression model and then adjust the resulting estimates based on a known target population distribution; a post-fitting adjustment referred to as poststratification [@Gelman_etal_2020, Ch. 17]. A particularly popular version of this approach uses multilevel regression models and is aptly referred to as multilevel regression and poststratification, or MRP [@Park_etal_2004; @Gelman_Little_1997; @Gelman_etal_2020, Ch. 17; @Kennedy_Gelman_2021]. Multilevel models are often recommended because they can provide regularized estimates along the design groupings, which can improve out-of-sample inferences [e.g., @Gelman_Little_1997; @Kennedy_Gelman_2021]. Estimates for group levels that may be missing from the sample, but are part of the population of interest, are also straightforward using the multilevel approach [@Gelman_etal_2020 Ch. 17; @McElreath_2020]. 
+To make inferences back to the POI from this sample, estimates needed to be adjusted in a manner that addressed potential biases related to the relative representation of waterbody characteristics in the sample compared to the POI, specifically with respect to the survey design variables. It can be helpful to define the complete data likelihood (CDL) when considering how to address biases that may arise from sampling designs [@Link_Barker_2010; @Zachmann_etal_2022]. For the 2017 NLA survey, the complete data would be considered all US lakes and reservoirs in the lower 48 states larger than 1 hectare (_i.e._, the POI). The survey samples, by comparison, could then be considered a subset of that complete data with a known pattern of "missingess" assigned by the survey. In this case, waterbodies in the POI were missing from the sample not completely at random, but according to a probability assigned by the design parameters. This type of missingness is considered not ignorable when making inferences from a sample to a POI [@Gelman_etal_2014, Ch. 8; @Zachmann_etal_2022]. However, _conditional_ on the design variables, the sample could be considered a simple random sample (SRS) from the POI [@Gelman_etal_2014, Ch. 8; @Zachmann_etal_2022]. 
 
-With a stratified, unequal probability design, such as the one used for the 2017 NLA, the selection design prescribes a number of random draws for each of a number of pre-specified groupings (i.e., sampling unit types). Within a particular stratification level or grouping, the draws may be considered a simple random sample (SRS) from that group type in the target population. A regression model conditioning the sample observations on the design grouping structure could, therefore, be parameterized to provide group-specific estimates that are unbiased with respect to the target population. To make inferences to the broader target population, however, those regression estimates would need to be re-weighted by the known proportions of units across groups in the target population. If the estimates are not adjusted in this manner, the estimates may be biased, particularly if the response of interest varies importantly across the grouping structure. For example, for the 2017 NLA survey, the proportion of samples prescribed to small lakes was much lower, relative to their proportion in the target population, compared to larger lakes, which were sampled in greater proportion relative to the target population. Small lakes are so numerous in the US that, if this unequal weighting by lake size weren't prescribed, nearly all the samples from the survey would be from small lakes and inferences regarding larger lakes could be highly uncertain for any reasonably achievable number of samples.  On the other hand, if lake size had no real influence on the N2O responses, the stratification across size class would make little difference with regard to inferences. Sampling any sizes of lakes would result in the same marginal estimates and standard errors. 
+A simple, model-based strategy for adjusting a sample to a POI is to include the survey design variables as predictors in a regression model [@Gelman_etal_2020, Ch. 17]. After fitting the regression, the parameter estimates can be used to make adjustments according to the distribution of the design variables in the POI in a second step referred to as "poststratification" [@Gelman_etal_2020, Ch. 17]. A particularly popular version of this approach uses multilevel regression models and is referred to as multilevel regression with poststratification, or MRP [@Park_etal_2004; @Gelman_Little_1997; @Gelman_etal_2020, Ch. 17; @Kennedy_Gelman_2021]. Multilevel regression models are often recommended because they can provide regularized estimates along the design groupings, which can improve out-of-sample inferences [_e.g._, @Gelman_Little_1997; @Kennedy_Gelman_2021]. Estimates for group levels that may be missing from the sample, but are part of the population of interest, are also straightforward using the multilevel approach [@Gelman_etal_2020 Ch. 17; @McElreath_2020]. For a recent applied example and helpful tutorial employing this approach, see @Kennedy_Gelman_2021. For an example of a recent application in the context of national surveys of environmental resources, see @Zachmann_etal_2022. 
 
-For a recent applied example and helpful tutorial employing these concepts in a model-based approach using MRP, see @Kennedy_Gelman_2021. For an example of a recent application in the context of national surveys of environmental resources, see @Zachmann_etal_2022. In this study, a similar model-based approach was used to make population-level estimates from the 2017 NLA dissolved gas data. The specific workflow, data, models, and code used to make these estimates are documented in the remainder of this document. First, Bayesian multilevel regression models were used to fit the sample data to the design variable structure. Next, because eventual flux estimates needed to be estimated from lake-level measures (i.e., surface area), instead of predicting to a typical postratification table, predictions were made to each individual lake in the population of interest. This meant predicting to 465,897 individual natural and man made US lakes larger than 4 hectares in the lower 48 states. These predictions were assumed relevant to average conditions during the biological index period for each lake in 2017. The specific objective of the modeling effort was to provide population estimates for (1) dissolved and equilibrium N2O concentrations; (2) the N2O saturation ratio (i.e., dissolved N2O/equilibrium N2O); and (3) the proportion of under-saturated water bodies (i.e., saturation ratio < 1). As previously indicated, the gas estimates would also be used to estimate the total flux of N2O gas attributable to the target population of lakes over the index period. Saturation ratio was calculated as the ratio of dissolved to equilibrium N2O. Because dissolved and equilibrium N2O were observed on the same sample units (lake sites), models were fit to their joint distribution and the ratio estimates were assembled as a derived quantity. The response variable was, therefore, multivariate in order to account for any potential statistical dependencies between dissolved and equilibrium N2O due to, for example, common dependencies on geography. Although predictions of the mean marginal probabilities from separate models may have provided comparable estimates, a joint model allowing correlated errors was expected to better capture uncertainty and potentially improve out-of-sample predictions, should the variables be conditionally correlated [@Warton_etal_2015; @Poggiato_etal_2021]. All of the models fit were constructed using the `brms` package [@Burkner_2017] in `R` [@R_Core_Team_2021] as an interface to Stan, a software package for fitting fully Bayesian models via Hamiltonian Monte Carlo [HMC, @Stan_Development_Team_2018_a; @Stan_Development_Team_2018_b; @Stan_Development_Team_2018_c]. More specific details on the model structures is provided throughout the "Model fitting" section below.
+In this study, we used a MRP-like approach to provide population-level estimates based on the 2017 NLA dissolved gas survey data. The remainder of this document provides the workflow, data, models, and code used to make these estimates. To begin, a number of Bayesian multilevel regression models were fit to the sample data. These models were fit and checked against both the data used to construct the models as well as hold-out data from future visits. After evaluating a number of different models, a final model was selected for use in inference. Because total N2O flux estimates needed to be estimated based on individual, waterbody-level measures (_e.g._, surface area), predictions from the model were made to each individual lake in the POI (n = 465,897). These predictions were assumed relevant to average conditions during the biological index period for each lake in 2017. 
+
+The objective of the modeling effort was to provide estimates for (1) dissolved and equilibrium N2O concentrations; (2) the N2O saturation ratio (i.e., dissolved N2O/equilibrium N2O); and (3) the proportion of under-saturated water bodies (i.e., saturation ratio < 1) for the National-level POI and a number of sub-populations therein (_e.g._, ecoregion, state, size category). The gas estimates were also used to estimate the total flux of N2O gas attributable to the target populations. Saturation ratio was calculated as the ratio of dissolved to equilibrium N2O. Because dissolved and equilibrium N2O were observed on the same sample units (sites in lakes), the regression models were fit to their joint distribution and the ratio estimates were assembled as a derived quantity calculated from the joint posterior predictive distribution of those variables. The response variable was, therefore, modeled as multivariate in order to account for any potential statistical dependencies between dissolved and equilibrium N2O due to, for example, common dependencies on geography. Although predictions of the mean marginal probabilities from separate models may have provided comparable estimates, a joint model allowing correlated errors was expected to better capture uncertainty and potentially improve out-of-sample predictions, should the variables be conditionally correlated [@Warton_etal_2015; @Poggiato_etal_2021]. All of the models fit were constructed using the `brms` package [@Burkner_2017] in `R` [@R_Core_Team_2021] as an interface to Stan, a software package for fitting fully Bayesian models via Hamiltonian Monte Carlo [HMC, @Stan_Development_Team_2018_a; @Stan_Development_Team_2018_b; @Stan_Development_Team_2018_c]. More specific details on the model structures is provided throughout the "Model fitting" section below.
 
 # Data
 As explained in a previous data munging document document
 (https://github.com/USEPA/DissolvedGasNla/blob/master/scripts/dgIndicatorAnalysis.html), duplicate dissolved gas samples were collected at a depth of ~0.1m at designated index sites distributed across 1091 lakes nationwide, of which 95 were sampled twice as repeat visits. This subset of revisit sites was used as a test set for assessing model fit and out-of-sample performance. 
 
-Gas samples were analyzed via gas chromotography and concentrations were recorded to the nearest 0.001 nmol/L. As part of the survey design, each gas observation was indexed to an individual lake selected with unequal probability from 5 different lake size categories, $j \in j=1,...,J = 5$, according to surface area (ha), and from within a state, $k \in k=1,...,K = 48$, situated within an aggregated, WSA9 or Omernik ecoregion, $l \in l=1,...,L = 9$. All 9 WSA9 ecoregions were represented in the sample, including Xeric (XER), Western Mountain (WMT),  Northern Plains (NPL), Southern Plains (SPL), Temperate Plains (TPL), Coastal Plains (CPL), Upper Midwest (UMW), Northern Appalachian (NAP), and Southern Appalachian (SAP) regions. As shown below, the data from the initial and revisit samples were separately compiled into data frame objects in $\textbf{R}$, with $n=984$ and $n=95$ rows, respectively, of gas observations indexed to the survey design variables and several potentially relevant covariates. 
+Water samples were analyzed via gas chromotography and concentrations were recorded to the nearest 0.001 nmol/L. As part of the survey design, each gas observation was indexed to an individual lake selected with unequal probability from 5 different lake size categories, $j \in j=1,...,J = 5$, according to surface area (ha), and from within a state, $k \in k=1,...,K = 48$, situated within an aggregated, WSA9 or Omernik ecoregion, $l \in l=1,...,L = 9$. All WSA9 ecoregions were represented, including the Xeric (XER), Western Mountain (WMT),  Northern Plains (NPL), Southern Plains (SPL), Temperate Plains (TPL), Coastal Plains (CPL), Upper Midwest (UMW), Northern Appalachian (NAP), and Southern Appalachian (SAP) regions. Gas data from the first and second (follow-up) visits were separated, with $n=984$ _vs._ $n=95$ observations each. In addition to the design variables, a number of potentially useful covariates were also indexed to the gas observations, including measures of NO3, surface water temperature, elevation, chlorophyll a content, dissolved oxygen content, and waterbody size (hectares). These gas data and covariates were previously described and munged at: https://github.com/USEPA/DissolvedGasNla/blob/master/scripts/dataMunge.html. 
 
 ## Import
-The gas data and covariates were previously described and munged at 
-https://github.com/USEPA/DissolvedGasNla/blob/master/scripts/dataMunge.html. That dataset was imported below. 
+That originally munged gas dataset was imported below. 
 
 ```{r import_data, eval=FALSE, include=TRUE}
 load( file = paste0( localPath,
@@ -119,19 +151,19 @@ load( file = paste0( localPath,
 save(dg, file = "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/dg.rda") 
 ```
 
-A new data frame for modeling was constructed from the original file including only the variables of interest: (1) the N2O gas observations; (2) the survey design variables indexed to those observations; and (3) additional covariates considered potentially useful for improving the fit of the model. The modeling data frame below excluded the second-visit observations, which would later be used for model checking. Some variables from the imported data were renamed for convenience. In addition, the NO3 covariate was rounded according to the documented measurement precision and an alternative version was also created by log-transforming and re-coding the variable as an ordered factor with five levels. The left-most cut point separated observations below the detection limit from the completely observed samples. The remaining cut points were drawn at approximately equal distances in the positive direction along the log scale. Finally, one lake had no N2O gas information and was removed from the data frame.
+A new data frame for modeling was constructed from the original file, including only the variables of interest: (1) the N2O gas observations; (2) the survey design variables indexed to those observations; and (3) additional covariates considered potentially useful for improving the fit and/or practical interpretation of the model. The modeling data frame below excluded the second-visit observations, which would later be used for model checking. Some variables from the imported data were renamed for convenience. In addition, the NO3 covariate was rounded according to the documented measurement precision and an alternative version was created by log-transforming and re-coding the variable as an ordered factor with five levels. The left-most cut point separated observations below the detection limit from the completely observed samples. The remaining cut points were drawn at approximately equal distances in the positive direction along the log scale. Finally, one lake had no N2O gas information and was removed from the data frame.
 
-```{r model_data, echo=TRUE, paged.print=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/dg.rda")
-
+```{r all_data_n, echo=TRUE, paged.print=TRUE}
 dg %>%
-  filter(!is.na(dissolved.n2o.nmol)) %>% # 1 obs with missing measurement
+  filter(!is.na(dissolved.n2o.nmol)) %>% # 1 obs with missing N2O measurement
   nrow() # number of observations before filtering
+```
 
+```{r model_data, eval=FALSE, include=TRUE}
 df_model <- dg %>%
   filter(!is.na(dissolved.n2o.nmol)) %>%
   filter(sitetype == "PROB") %>% # probability samples only
-  filter(visit.no == 1) %>%
+  filter(visit.no == 1) %>% # first-visit sites only
   mutate(n2o = round(dissolved.n2o.nmol, 2),
          n2o_eq = round(sat.n2o.nmol, 2),
          n2o_sat = n2o.sat.ratio,
@@ -149,7 +181,7 @@ df_model <- dg %>%
          log_do = log(do_surf),
          bf_max = max.bf,
          sqrt_bf = sqrt(bf_max),
-         size_cat = recode(area.cat6, 
+         size_cat = recode(area.cat6, # simpler naming conventions for the size categories
                            "(1,4]" = "min_4" ,
                            "(10,20]" = "10_20",
                            "(20,50]" = "20_50",
@@ -198,27 +230,31 @@ df_model <- dg %>%
          )
 
 save(df_model, file = "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/df_model.rda") 
+```
 
+A preview showing the first 10 rows of the modeling data:
+
+```{r model_data_print, echo=TRUE, paged.print=TRUE}
 nrow(df_model) # number of obs after filtering
 
 df_model %>%
   head(10)
 ```
 
-A second data frame including only the second visit observations was constructed below. These data were later used as a "test set" to assess the out-of-sample performance of the model developed on the first-visit or "training set".
+A second data frame, including only the second visit observations was constructed below. These data were later used as a "test set" to assess the out-of-sample performance of the model developed on the first-visit or "training set".
 
-```{r test_data, echo=TRUE, paged.print=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/dg.rda")
-
+```{r all_data_n_2, echo=TRUE, paged.print=TRUE}
 # number of observations before filtering probability samples
 dg %>%
   filter(!is.na(dissolved.n2o.nmol)) %>% # remove obs with missing response measurements
   nrow()
+```
 
+```{r test_data, eval=FALSE, include=TRUE}
 df_test <- dg %>%
   filter(!is.na(dissolved.n2o.nmol)) %>%
   filter(sitetype == "PROB") %>% # probability samples only
-  filter(visit.no == 2) %>%
+  filter(visit.no == 2) %>% # second-visit sites only
   mutate(n2o = round(dissolved.n2o.nmol, 2),
          n2o_eq = round(sat.n2o.nmol, 2),
          n2o_sat = n2o.sat.ratio,
@@ -236,7 +272,7 @@ df_test <- dg %>%
          log_do = log(do_surf),
          bf_max = max.bf,
          sqrt_bf = sqrt(bf_max),
-         size_cat = recode(area.cat6, 
+         size_cat = recode(area.cat6, # simpler naming conventions for the size categories
                            "(1,4]" = "min_4" ,
                            "(10,20]" = "10_20",
                            "(20,50]" = "20_50",
@@ -285,7 +321,11 @@ df_test <- dg %>%
          )
 
 save(df_test, file = "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/df_test.rda") 
+```
 
+A preview of the first 10 rows of the test data:
+
+```{r test_data_print, echo=TRUE, paged.print=TRUE}
 nrow(df_test) # number of obs after filtering for probability samples, first visits, and removing one site missing ecoregion (WSA9) info.
 
 df_test %>%
@@ -293,9 +333,10 @@ df_test %>%
 ```
 
 ## Target population
-Below. the NLA sampling frame was imported and filtered to include all lakes the target population. The resulting target population above included a total of 465,897 waterbodies.
 
-```{r import_sample_frame, echo=TRUE}
+Below. the original NLA sampling frame was imported and filtered to include only lakes in the POI. The resulting target population included a total of 465,897 waterbodies.
+
+```{r import_sample_frame, eval=FALSE, include=TRUE}
 df_pop <- read.csv(file = paste0(localPath,
               "/Environmental Protection Agency (EPA)/",
               "ORD NLA17 Dissolved Gas - Documents/",
@@ -332,16 +373,18 @@ sframe <- df_pop %>%
 rm(df_pop)
 
 save(sframe, file = "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/sframe.rda") 
+```
 
+Below is a sample of the first ten rows describing the POI:
+
+```{r sample_frame_print, echo=TRUE, paged.print=TRUE}
 sframe %>%
   head(10)
 ```
 
-Cross tabulations below describe the structure of the target population with respect to the survey design variables. The cross-tabulation shows that each ecoregion does not contain each state. Therefore, in the statistical sense, states were nested in ecoregions.
+Cross tabulations below show the structure of the target population with respect to the survey design variables. The cross-tabulation shows that each ecoregion does not contain each state. Therefore, states were nested within ecoregions.
 
 ```{r frame_dimensions_1, echo=TRUE, message=FALSE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/sframe.rda")
-
 sframe %>%
   group_by(WSA9, state) %>%
   summarise(n = n(), .groups = "drop") %>%
@@ -349,11 +392,9 @@ sframe %>%
   head(10)
 ```
 
-The cross-tablulation below indicates that lake size category was nested in state (which was nested in ecoregion). That is, not every ecoregion:state contained every size category.
+The cross-tablulation below indicates that lake size category was nested within state (which was nested in ecoregion). That is, not every ecoregion:state contained every size category.
 
 ```{r frame_dimensions_4, echo=TRUE, message=FALSE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/sframe.rda")
-
 sframe %>%
   group_by(WSA9, state, size_cat) %>%
   summarise(n = n(), .groups = "drop") %>%
@@ -361,11 +402,9 @@ sframe %>%
   head(10)
 ```
 
-Below, the sampling frame was munged to create a post-stratification table. There were 536 "types" or groupings of lakes in the population of interest with respect to the sampling design. The total counts of those lake types (n_lakes) and their proportions (prop_cell) relative to the counts in the target population were tabulated.
+Below, the sampling frame was used to create a typical post-stratification table. There were 536 "types" or groupings of lakes in the POI with respect to the sampling design. The total counts of those lake types (n_lakes) and their proportions (prop_cell) relative to the counts in the target population were tabulated.
 
-```{r filter_frame, echo=TRUE, message=FALSE, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/sframe.rda")
-
+```{r filter_frame, eval=FALSE, include=TRUE}
 pframe <- sframe %>%
   mutate(obs = 1) %>%
   group_by(WSA9, state, size_cat) %>%
@@ -375,17 +414,18 @@ pframe <- sframe %>%
   mutate(type = "population") 
 
 save(pframe, file = "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/pframe.rda")
+```
 
+```{r filter_frame_print}
 pframe %>%
   head(10)
 ```
 
 ## Sample vs. population
-Below, the lake distributions in the population of interest were compared to the proportions in the observed sample. There were 352 lake types in the sample compared to the 536 in the population of of interest. There were 984 observations distributed across these 352 lake types in the sample; and the number of samples was not distributed evenly across the types. Some cells were represented by as few as 1 lake. In total, 536-352 = 184 lake types in the population of interest were not represented in the sample.
 
-```{r sample_cell_counts, echo=TRUE, message=FALSE, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/df_model.rda")
+Below, the distribution of waterbody types in the POI were compared to their proportions in the observed sample. There were 352 waterbody types in the sample compared to the 536 in the POI. There were 984 observations distributed across these 352 lake types in the sample; and the number of samples was not distributed evenly across the types. Some cells were represented by as few as 1 lake. In total, 536-352 = 184 lake types in the population of interest were not represented in the sample.
 
+```{r sample_cell_counts, eval=FALSE, include=TRUE}
 samp_props <- df_model %>%
   mutate(obs = 1) %>%
   group_by(WSA9, state, size_cat) %>%
@@ -395,17 +435,16 @@ samp_props <- df_model %>%
   mutate(type = "sample") 
 
 save(samp_props, file = "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/samp_props.rda")
-
-samp_props %>%
-  head(10)
 ```
 
-Below, a graphical comparison was constructed to depict the distribution of cells in the population of interest _vs._ those in the sample.
+```{r sample_cell_count_print, echo=TRUE, paged.print=TRUE}
+samp_props %>%
+  print()
+```
 
-```{r compare_sample_pop_cells, echo=FALSE, fig.align='center', fig.height=4, fig.width=10}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/pframe.rda")
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/samp_props.rda")
+Below, a graphical comparison was constructed to depict the distribution of cells in the POI _vs._ those in the sample.
 
+```{r compare_sample_pop_cells, echo=FALSE, fig.align='center', fig.asp=0.5, fig.width=10}
 pframe %>%
   bind_rows(samp_props) %>%
   ggplot(aes(x = interaction(WSA9, state, size_cat), y = prop_cell, group = type, linetype = type)) +
@@ -417,11 +456,9 @@ pframe %>%
   ylab("proportion in cell")
 ```
 
-Another comparison between population and sample was constructed by ecoregion. The samples were not balanced across ecoregions. Lakes in the Coastal Plains (CPL) ecoregion, for example, were clearly undersampled relative to their proportion of the population.
+Another comparison between population and sample was constructed by ecoregion below. Lakes in the Coastal Plains (CPL) ecoregion, for example, were clearly undersampled relative to their proportion of the population.
 
-```{r eco_props_pop, eval=FALSE, include=TRUE, message=FALSE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/pframe.rda")
-
+```{r eco_props_pop, fig.align='center', fig.asp=0.5, fig.width=10}
 pframe_eco <- pframe %>%
   group_by(WSA9) %>%
   summarise(n_lakes = sum(n_lakes)) %>%
@@ -430,12 +467,6 @@ pframe_eco <- pframe %>%
   ungroup() %>%
   mutate(type = 'population') 
 
-save(pframe_eco, file = "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/pframe_eco.rda")
-```
-
-```{r eco_props_sample, eval=FALSE, include=TRUE, message=FALSE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/samp_props.rda")
-
 samp_props_eco <- samp_props %>%
   group_by(WSA9) %>%
   summarise(n_lakes = sum(n_lakes)) %>%
@@ -443,13 +474,6 @@ samp_props_eco <- samp_props %>%
   mutate(prop_cell = round(n_lakes/sum(n_lakes), 7)) %>%
   ungroup() %>%
   mutate(type = 'sample')
-
-save(samp_props_eco, file = "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/samp_props_eco.rda")
-```
-
-```{r compare_eco_sample_pop_cells, echo=FALSE, fig.align='center', fig.height=4, fig.width=6}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/pframe_eco.rda")
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/samp_props_eco.rda")
 
 pframe_eco %>%
   bind_rows(samp_props_eco) %>%
@@ -467,9 +491,7 @@ pframe_eco %>%
 
 A similar comparison by state was constructed below.
 
-```{r state_props_pop, eval=FALSE, include=TRUE, message=FALSE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/pframe.rda")
-
+```{r state_props_pop, fig.align='center', fig.asp=0.5, fig.width=10}
 pframe_state <- pframe %>%
   group_by(state) %>%
   summarise(n_lakes = sum(n_lakes)) %>%
@@ -478,13 +500,6 @@ pframe_state <- pframe %>%
   ungroup() %>%
   mutate(type = 'population')
 
-save(pframe_state, file = "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/pframe_state.rda")
-```
-
-```{r state_props_sample, eval=FALSE, include=TRUE, message=FALSE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/samp_props.rda")
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/samp_props.rda")
-
 samp_props_state <- samp_props %>%
   group_by(state) %>%
   summarise(n_lakes = sum(n_lakes)) %>%
@@ -492,13 +507,6 @@ samp_props_state <- samp_props %>%
   mutate(prop_cell = round(n_lakes/sum(n_lakes), 7)) %>%
   ungroup() %>%
   mutate(type = 'sample')
-
-save(samp_props_state, file = "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/samp_props_state.rda")
-```
-
-```{r compare_state_sample_pop_cells, echo=FALSE, fig.align='center', fig.height=4, fig.width=10}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/pframe_state.rda")
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/samp_props_state.rda")
 
 pframe_state %>%
   bind_rows(samp_props_state) %>%
@@ -511,11 +519,9 @@ pframe_state %>%
   ylab("proportion in cell")
 ```
 
-Finally, a comparison by lake size category is shown below. Small lakes were under-sampled relative to larger lakes.
+Finally, a comparison by NLA size category is shown below. Waterbodies of the smallest size category were heavily under-sampled relative to the POI and those from the larger size categories were over-sampled.
 
-```{r size_props_pop, eval=FALSE, include=TRUE, message=FALSE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/pframe.rda")
-
+```{r size_props_pop, fig.align='center', fig.asp=0.5, fig.width=10}
 pframe_size <- pframe %>%
   group_by(size_cat) %>%
   summarise(n_lakes = sum(n_lakes)) %>%
@@ -524,12 +530,6 @@ pframe_size <- pframe %>%
   ungroup() %>%
   mutate(type = 'population')
 
-save(pframe_size, file = "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/pframe_size.rda")
-```
-
-```{r size_props_sample, eval=FALSE, include=TRUE, message=FALSE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/samp_props.rda")
-
 samp_props_size <- samp_props %>%
   group_by(size_cat) %>%
   summarise(n_lakes = sum(n_lakes)) %>%
@@ -537,13 +537,6 @@ samp_props_size <- samp_props %>%
   mutate(prop_cell = round(n_lakes/sum(n_lakes), 7)) %>%
   ungroup() %>%
   mutate(type = 'sample')
-
-save(samp_props_size, file = "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/samp_props_size.rda")
-```
-
-```{r compare_size_sample_pop_cells, echo=FALSE, fig.align='center', fig.height=4, fig.width=6}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/pframe_size.rda")
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/samp_props_size.rda")
 
 pframe_size %>%
   bind_rows(samp_props_size) %>%
@@ -556,31 +549,30 @@ pframe_size %>%
 ```
 
 ## Sample-based estimates
-Below are _naive_ estimates, based only on the sample, for national means for dissolved and equilibrium N2O and the saturation ratio.
+
+Below are (naive) estimates, based only on the sample, for national means for dissolved and equilibrium N2O and the saturation ratio.
+
+Dissolved N2O:
 
 ```{r sample_summary_n2o}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/df_model.rda")
-
 df_model %>%
   summarise(mean = mean(n2o),
              sd = sd(n2o)) %>%
   print()
 ```
 
+Equilibrium N2O:
 
 ```{r sample_summary_n2oeq}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/df_model.rda")
-
 df_model %>%
   summarise(mean = mean(n2o_eq),
              sd = sd(n2o_eq)) %>%
   print()
 ```
 
+Saturation ratio:
 
 ```{r sample_summary_n2osat}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/df_model.rda")
-
 df_model %>%
   summarise(mean = mean(n2o / n2o_eq),
              sd = sd(n2o / n2o_eq)) %>%
@@ -590,18 +582,14 @@ df_model %>%
 Roughly 67% of lakes in the sample were under-saturated (i.e., saturation ratio < 1):
 
 ```{r sample_summary_propsat}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/df_model.rda")
-
 df_model %>%
   summarise(prop_undersat = sum((n2o / n2o_eq) < 1) / 984) %>%
   print()
 ```
 
-Using only the sample observations again, a plot was constructed of the overall mean (dashed line) along with the ecoregion-specific means (black circles). The shaded areas indicate +/- 1 standard deviation. Neither dissolved N2O nor the saturation ratio were clearly structured by ecoregion, but there did appear to be some structure along this variable in the equilibrium N2O observations.
+Using only the sample observations again, a plot was constructed of the overall mean (dashed line) along with the ecoregion-specific means (black circles). The shaded areas indicate +/- 1 standard deviation. Neither dissolved N2O nor the saturation ratio were clearly structured by ecoregion in the sample, but there did appear to be some potential structure along this variable in the equilibrium N2O observations.
 
-```{r sample_summary_eco, echo=FALSE, fig.align='center', fig.height=6, fig.width=8, message=FALSE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/df_model.rda")
-
+```{r sample_summary_eco, echo=FALSE, fig.align='center', fig.asp=0.75, fig.width=10, message=FALSE}
 p1 <- df_model %>%
   group_by(WSA9) %>%
   summarise(mean = mean(n2o),
@@ -651,9 +639,7 @@ grid.arrange(p1, p2, p3)
 
 The same summary by state is below.
 
-```{r sample_summary_state, echo=FALSE, fig.align='center', fig.height=6, fig.width=8, message=FALSE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/df_model.rda")
-
+```{r sample_summary_state, echo=FALSE, fig.align='center', fig.asp=0.75, fig.width=10, message=FALSE}
 p1 <- df_model %>%
   group_by(state) %>%
   summarise(mean = mean(n2o),
@@ -710,9 +696,7 @@ grid.arrange(p1, p2, p3)
 
 Finally, the same summary by size category.
 
-```{r sample_summary_size, echo=FALSE, fig.align='center', fig.height=6, fig.width=8, message=FALSE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/df_model.rda")
-
+```{r sample_summary_size, echo=FALSE, fig.align='center', fig.asp=0.75, fig.width=10, message=FALSE}
 p1 <- df_model %>%
   group_by(size_cat) %>%
   summarise(mean = mean(n2o),
@@ -762,11 +746,10 @@ grid.arrange(p1, p2, p3)
 ```
 
 ## Sample data exploration
-Below, the distribution N2O concentrations for the sample was summarized using a density and rug plot. Note the natural log scale of the x-axis. Both the dissolved and equilibrium N2O data had considerable right skew even after the log transformation. This was not unexpected and has been noted in other studies [@Webb_etal_2019]. The saturation ratio was also skewed since it was derived from the other two observed variables (i.e., sat_ratio = n2o / n2o_eq).
 
-```{r summary_N2O, echo=FALSE, fig.align='center', fig.height=8, fig.width=5, message=FALSE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/df_model.rda")
+Below, the distribution N2O concentrations for the sample was summarized using a density and rug plot. Note the natural log scale of the x-axis. Both the dissolved and equilibrium N2O data had considerable right skew even after the log transformation. This was not unexpected and has been noted in other studies [_e.g._, @Webb_etal_2019]. The saturation ratio was also skewed (sat_ratio = n2o / n2o_eq).
 
+```{r summary_N2O, echo=FALSE, fig.align='center', fig.asp=0.75, fig.width=10, message=FALSE}
 p1 <- df_model %>%
   ggplot(aes(x = n2o)) +
   geom_boxplot(aes(x = n2o, y = -0.5), outlier.shape = NA, alpha = 0.7) + 
@@ -809,8 +792,6 @@ grid.arrange(p1, p2, p3)
 Below are plots of dissolved N2O vs. NO3. The first plot shows log(N2O) vs. log(NO3), as well as the ordinal categories assigned to NO3 (vertical lines). The leftmost vertical line is dashed and separates the NO3 observations below the detection limit. The trend is increasing and nonlinear on the log scale, with increasing variance in N2O as NO3 increased.
 
 ```{r summary_N2O_vs_NO3, echo=FALSE, fig.align='center', fig.height=4, fig.width=6, message=FALSE, warning=FALSE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/df_model.rda")
-
 df_model %>%
   ggplot(aes(x = log(no3), y = log(n2o))) +
   geom_point(show.legend = F) +
@@ -826,8 +807,6 @@ df_model %>%
 Below are plots of dissolved N2O vs. NO3 for 6 quantiles of the surface temperature measurements (quantiles increasing from 1 to 6). This plot suggested that the NO3 effect on N2O may have been stronger in lakes with higher observed temperatures.
 
 ```{r summary_N2O_vs_NO3_surftemp, echo=FALSE, fig.align='center', fig.height=5, fig.width=8, message=FALSE, warning=FALSE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/df_model.rda")
-
 df_model %>%
   ggplot(aes(x = log(no3), y = log(n2o))) +
   geom_point(show.legend = F) +
@@ -840,8 +819,6 @@ df_model %>%
 The next plot below shows the relationship between dissolved N2O and NO3 at 6 different quantiles (increasing 1 to 6) of the log-scaled lake surface area estimates.
 
 ```{r summary_N2O_vs_NO3_logarea, echo=FALSE, fig.align='center', fig.height=5, fig.width=8, message=FALSE, warning=FALSE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/df_model.rda")
-
 df_model %>%
   ggplot(aes(x = log(no3), y = log(n2o))) +
   geom_point(show.legend = F) +
@@ -854,8 +831,6 @@ df_model %>%
 Similar plots are below, but with NO3 expressed as an ordered categorical variable with 5 levels. The positive and monotonic trends area similar to the previous plots where NO3 was treated as continuous. Note the large number of observations in the first NO3 category (no3_cat = 1). This category represented all of the observations for NO3 that were below the detection limit, which was most of the data.
 
 ```{r summary_N2O_vs_NO3cat, echo=FALSE, fig.align='center', fig.height=4, fig.width=6, message=FALSE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/df_model.rda")
-
 df_model %>%
   ggplot(aes(x = no3_cat, y = log(n2o), color = 1)) +
   geom_point( position = position_jitterdodge(), show.legend = F ) +
@@ -866,8 +841,6 @@ df_model %>%
 
 
 ```{r summary_N2O_vs_NO3cat_surftemp, echo=FALSE, fig.align='center', fig.height=5, fig.width=8, message=FALSE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/df_model.rda")
-
 df_model %>%
   ggplot(aes(x = no3_cat, y = log(n2o), color = 1)) +
   geom_point( position = position_jitterdodge(), show.legend = F ) +
@@ -879,8 +852,6 @@ df_model %>%
 
 
 ```{r summary_N2O_vs_NO3cat_logarea, echo=FALSE, fig.align='center', fig.height=5, fig.width=8, message=FALSE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/df_model.rda")
-
 df_model %>%
   ggplot(aes(x = no3_cat, y = log(n2o), color = 1)) +
   geom_point( position = position_jitterdodge(), show.legend = F ) +
@@ -890,11 +861,9 @@ df_model %>%
   theme_bw()
 ```
 
-Below is a plot of log(dissolved N2O) vs. log(NO3) by ecoregion, which suggested that the NO3 effect on N2O may have varied by ecoregion.
+Below is a plot of log(dissolved N2O) vs. log(NO3) by ecoregion, which suggested that the NO3 effect on dissolved N2O may have varied by ecoregion.
 
 ```{r summary_N2O_vs_NO3_ecoregion, echo=FALSE, fig.align='center', fig.height=6, fig.width=8, message=FALSE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/df_model.rda")
-
 df_model %>%
   ggplot(aes(x = log(no3), y = log(n2o))) +
   geom_point(show.legend = F) +
@@ -911,8 +880,6 @@ df_model %>%
 Below is the same plot as above but for the ordered categorical version of NO3.
 
 ```{r summary_N2O_vs_NO3cat_ecoregion, echo=FALSE, fig.align='center', fig.height=6, fig.width=8, message=FALSE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/df_model.rda")
-
 df_model %>%
   ggplot(aes(x = no3_cat, y = log(n2o), color = 1)) +
   geom_point( position = position_jitterdodge(), show.legend = F ) +
@@ -925,11 +892,9 @@ df_model %>%
   theme_bw()
 ```
 
-A plot below shows trends by state within just the Temperate Plains (TPL) ecoregion. Within states, the number of observations were relatively small, but the trends appeared closer to linear.
+A plot below shows the relationships between dissolved N2O and log(NO3) by state, but within just the Temperate Plains (TPL) ecoregion. Within states, the number of observations were relatively small, but the trends were perhaps more linear.
 
 ```{r summary_N2O_vs_NO3_wsa9state3, echo=FALSE, fig.align='center', fig.height=4, fig.width=8, message=FALSE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/df_model.rda")
-
 df_model %>%
   filter(WSA9 == "TPL") %>%
   ggplot(aes(x = log(no3), y = log(n2o), group = state, color = state)) +
@@ -940,7 +905,7 @@ df_model %>%
 ```
 
 # Model fitting
-The first regression model was constructed to estimate the joint distribution of log-transformed dissolved and equilibrium N2O conditional on the the design factors. Each log-transformed observation, $i \in 1,..,N=984$, for each response, $p \in 1:P=2$, was assumed to be drawn from a multivariate normal distribution with the parameters $\nu$ and $\Sigma$, where $\nu$ is the multivariate mean estimated conditional on the design effects and $\Sigma$ is a covariance matrix containing the observation-level variances and residual correlation:
+The first regression model was constructed to estimate the joint distribution of log-transformed dissolved and equilibrium N2O conditional only on the the survey design factors. Each log-transformed observation, $i \in 1,..,N=984$, for each response, $p \in 1:P=2$, was assumed to be drawn from a multivariate normal distribution with the parameters $\nu$ and $\Sigma$, where $\nu$ is the multivariate mean estimated conditional on the design effects and $\Sigma$ is a covariance matrix containing the observation-level variances and residual correlation:
 $$Y \sim MVN(\nu, \Sigma)$$
 
 The multivariate mean is a vector of location parameters, $\nu:[\mu_{p=1}, \mu_{p=2}]$, for each response. Each location parameter was further defined by a linear combination of parameters where, for each response $p$ and observation $i$:
@@ -969,13 +934,13 @@ wherein the $\sigma$ parameters were the observation-level standard deviations f
 $$\Omega = \begin{pmatrix} 1 & \rho \\ \rho & 1 \end{pmatrix}$$
 wherein $\rho$ captured the residual correlation between responses.
 
-For model fitting, priors were needed for all parameters conditioned directly on the data, which included the global intercept, the scale parameters, and the correlation matrices. A normal or Gaussian prior, $N(\mu = 2, \sigma = 1)$ centered near the (log-scale) data means, was used for the global mean parameter for each response. This prior was considered minimally informative as it placed most (~80%) of the prior mass over values between approximately 2 and 27 ng/L for median N2O or N2O equilibrium concentration and included support in the tails for values approaching 0 ng/L on the lower end and 80 ng/L on the high end. We placed $Exp(2)$ priors over all scale parameters, which placed most of the support between values very close to 0 and values near 1 (central 80% density interval from approximately 0.005 to 1.15). Finally, for the correlation matrices, an $LKJ(\eta =2)$ prior was used, which, for a 2-dimensional response, placed most support for correlations between approximately -0.9 and 0.9. This prior seemed reasonable as there were no apparant causal mechanisms to ensure a very strong correlation between the N2O measures. Any potential residual dependence was expected to be indirect due to, for example, a common correlate (e.g., elevation, temperature). For more information on prior choice recommendations in Stan, see: https://github.com/stan-dev/stan/wiki/Prior-Choice-Recommendations
+For model fitting, priors were needed for all parameters conditioned directly on the data, which included the global intercept, the scale parameters, and the correlation matrices. A normal or Gaussian prior, $N(\mu = 2, \sigma = 1)$ centered near the (log-scale) data means, was used for the global mean parameter for each response. This prior was considered minimally informative as it placed most (~80%) of the prior mass over values between approximately 2 and 27 ng/L for median N2O or N2O equilibrium concentration and included support in the tails for values approaching 0 ng/L on the lower end and 80 ng/L on the high end. We placed $Exp(2)$ priors over all scale parameters, which placed most of the support between values very close to 0 and values near 1 (central 80% density interval from approximately 0.005 to 1.15). Finally, for the correlation matrices, an $LKJ(\eta =2)$ prior was used, which, for a 2-dimensional response, placed most support for correlations between approximately -0.9 and 0.9. This prior seemed reasonable as there were no clear causal mechanisms to ensure a very strong correlation between the N2O measures. Any potential residual dependence was expected to be indirect due to, for example, a common correlate (e.g., elevation, temperature). For more information on prior choice recommendations in Stan, see: https://github.com/stan-dev/stan/wiki/Prior-Choice-Recommendations
 
 The $\textbf{brms}$ package [@Burkner_2017] for $\textbf{R}$ [@R_Core_Team_2021] was used to fit all of the models in a fully Bayesian setting. The formula syntax of the $\textbf{brms}$ package is similar to the syntax used in the $\textbf{lme4}$ package that is widely used to fit mixed effects models in frequentist settings. In either package, the linear predictor for $\mu$ described above could be expressed as:
 
 $$\sim 1 + (1|WSA9) + (1|WSA9:state) + (1|WSA9:state:size)$$
 
-In the $\textbf{brms}$ package, there is additional functionality and syntax for multivariate responses and for allowing the varying intercepts in a multivariate model to be correlated, e.g.,:
+In the $\textbf{brms}$ package, there is additional functionality and formula syntax for multivariate responses and for allowing the varying intercepts in a multivariate model to be correlated, e.g.,:
 
 $$
 \begin{aligned} 
@@ -984,16 +949,15 @@ $$
 \end{aligned}
 $$
 
-The above syntax would indicate that the linear predictor for both responses in the multivariate model have the same group-level varying effects, and that those effects may be correlated between responses. 
+The above formula syntax would indicate that the linear predictor for both responses in the multivariate model have the same group-level varying effects, and that those effects may be correlated between responses. 
 
 For the remainder of this document, only this simplified syntax is presented to describe the model structure. For more information on $\textbf{brms}$ functionality and syntax with multivariate response models, the package vignette may be helpful, and can be found at: https://cran.r-project.org/web/packages/brms/vignettes/brms_multivariate.html.
 
 ## Model 1
-The first model fit was as explained above.
+
+The first model fit.
 
 ```{r n2o_mod_mv_1, eval=FALSE, include=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/df_model.rda")
-
 bf_n2o <- bf(log(n2o) ~ 1 + 
                (1 | a | WSA9) + 
                (1 | b | WSA9:state) + 
@@ -1032,24 +996,24 @@ save(n2o_mod1, file = "C:/Users/rmartin/OneDrive - Environmental Protection Agen
 ```
 
 ### Summarize fit
+
 The summaries of the estimated parameters and key HMC convergence diagnostics for the fitted model are printed below. There were no obvious issues with the HMC sampling. All $\hat{R}$ values were less than 1.01 and effective sample size ($ESS$) calculations suggested that the posterior contained a sufficient number of effective samples for conducting inference.
 
 ```{r print_mod1, echo=FALSE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod1.rda")
-
 print(n2o_mod1, prior = T)
 ```
 
 In the summary above, the estimated standard deviations for the varying group effects on the mean behavior of the dissolved N2O response suggested fairly low, but non-zero variability across each of the three levels. The standard deviations estimated for the same varying effects for equilibrium N2O were also relatively small. Finally, note the relatively small, but positive residual correlation between the two N2O responses. 
 
-Before investing too much into the inferences from this model, however, the model fit was evaluated below using a series of graphical posterior predictive checks [PPC, @Gelman_etal_2014; @Gelman_etal_2020, Ch. 11].
+Before investing too much into inferences from this model, however, the model fit was evaluated below using a series of graphical posterior predictive checks [PPC, @Gelman_etal_2014; @Gelman_etal_2020, Ch. 11].
 
 ### Model checks
+
 #### Dissolved N2O
+
 Below are a series of panels illustrating graphical PPCs for the dissolved N2O component of the multivariate model. The top left panel compares a density plot of the observed data (black line) to density estimates drawn for 200 samples from the posterior predictive distribution (PPD; blue lines) of the fitted model. The top right panel compares the cumulative density distributions in the same manner. The left middle panel compares means _vs._ standard deviations for 1000 draws from the PPD (blue dots) to the sample mean _vs._ standard deviation (black dot). The right middle panel compares skewness _vs._ kurtosis for 1000 draws from the PPD to the skewness _vs._ kurtosis estimates for the observed data. The bottom left panel compares max _vs._ min values for 1000 draws from the PPD to the max _vs._ min values of the sample data. Finally, the bottom right panel shows the observed _vs._ average predicted values for each observation in the sample. The average predicted values were calculated as the mean prediction for each observation in the PPD based on 1000 draws.
 
-```{r ppc_n2o1, echo=FALSE, fig.align='center', fig.height=8, fig.width=8, message=FALSE, warning=FALSE, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod1.rda")
+```{r ppc_n2o1, echo=FALSE, fig.align='center', fig.asp=1.25, fig.width=10, message=FALSE, warning=FALSE, cache=TRUE}
 grid.arrange(
 pp_check(n2o_mod1, 
          resp = "logn2o",
@@ -1106,9 +1070,7 @@ The general takeaway from the PPCs above was that the model replicated the centr
 
 The same checks were run below, but for the test set of 95 held-out, second-visit data points. The patterns in misfit were similar to the patterns indicated in the PPCs with the training data above.
 
-```{r ppc_n2o1_test, echo=FALSE, fig.align='center', fig.height=8, fig.width=8, message=FALSE, warning=FALSE, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod1.rda")
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/df_test.rda")
+```{r ppc_n2o1_test, echo=FALSE, fig.align='center', fig.asp=1.25, fig.width=10, message=FALSE, warning=FALSE, cache=TRUE}
 grid.arrange(
 pp_check(n2o_mod1, 
          newdata = df_test,
@@ -1170,8 +1132,7 @@ pp_check(n2o_mod1,
 #### Equilibrium N2O
 Below are PPCs for the equilibrium N2O component of the model. As with the dissolved N2O PPCs, the model seemed to do an OK job at replicating the central tendency, but performed less well at replicating other important aspects of the overall distribution. 
 
-```{r ppc_n2oeq1, echo=FALSE, fig.align='center', fig.height=8, fig.width=8, message=FALSE, warning=FALSE, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod1.rda")
+```{r ppc_n2oeq1, echo=FALSE, fig.align='center', fig.asp=1.25, fig.width=10, message=FALSE, warning=FALSE, cache=TRUE}
 grid.arrange(
 pp_check(n2o_mod1, 
          resp = "logn2oeq",
@@ -1226,8 +1187,7 @@ pp_check(n2o_mod1,
 
 Below are the same PPCs for equilibrium N2O in the re-visit sites.
 
-```{r ppc_n2oeq1_test, echo=FALSE, fig.align='center', fig.height=8, fig.width=8, message=FALSE, warning=FALSE, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod1.rda")
+```{r ppc_n2oeq1_test, echo=FALSE, fig.align='center', fig.asp=1.25, fig.width=10, message=FALSE, warning=FALSE, cache=TRUE}
 grid.arrange(
 pp_check(n2o_mod1,
          newdata = df_test,
@@ -1289,8 +1249,7 @@ pp_check(n2o_mod1,
 #### Bivariate
 The graphical check below compared bivariate density contours estimated from the observed data (black lines) to density contours estimated for each of 20 draws from the PPD. The model appeared to do a good job of replicating the bivariate mean, but was poor at representing the overall joint distribution.
 
-```{r ppc_biv1, echo=FALSE, fig.align='center', fig.height=4, fig.width=4, message=FALSE, warning=FALSE, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod1.rda")
+```{r ppc_biv1, echo=FALSE, fig.align='center', fig.asp=1, fig.width=10,  message=FALSE, warning=FALSE, cache=TRUE}
 df_model %>%
   add_predicted_draws(n2o_mod1, 
                       ndraws = 20) %>%
@@ -1312,8 +1271,7 @@ df_model %>%
 
 The same bivariate check is shown below for the re-visit data.
 
-```{r ppc_biv1_test, echo=FALSE, fig.align='center', fig.height=4, fig.width=4, message=FALSE, warning=FALSE, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod1.rda")
+```{r ppc_biv1_test, echo=FALSE, fig.align='center', fig.asp=1, fig.width=10, message=FALSE, warning=FALSE, cache=TRUE}
 df_test %>%
   add_predicted_draws(n2o_mod1, 
                       ndraws = 20) %>%
@@ -1343,8 +1301,7 @@ Overall, these checks indicated that properly representing the tails of the diss
 
 The top left panel, below, is a density plot of the observed saturation ratio (black line) compared to an estimate using 50 draws from the derived PPD (blue lines). The top right panel shows the observed proportion of under-saturated lakes compared to a model estimate based on 1000 draws from the PPD. The left middle panel shows the mean _vs._ standard deviation of the saturation ratio for the observed data compared to the same estimates for 500 draws from the PPD. The right middle panel shows the max _vs._ min for the sample compared to 500 draws from the PPD. Finally, the bottom left panel shows the observed _vs._ average predicted saturation ratio for all 984 lakes sampled in the dataset.
 
-```{r ppc_sat1, echo=FALSE, fig.align='center', fig.height=8, fig.width=8, message=FALSE, warning=FALSE, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod1.rda")
+```{r ppc_sat1, echo=FALSE, fig.align='center', fig.asp=1.25, fig.width=10, message=FALSE, warning=FALSE, cache=TRUE}
 grid.arrange(
 df_model %>%
   add_predicted_draws(n2o_mod1, 
@@ -1449,8 +1406,7 @@ df_model %>%
 
 The same PPCs are shown below for the revisit data. These checks indicated that the model did a similarly underwhelming job of replicating the re-visit data.
 
-```{r ppc_sat1_test, echo=FALSE, fig.align='center', fig.height=8, fig.width=8, message=FALSE, warning=FALSE, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod1.rda")
+```{r ppc_sat1_test, echo=FALSE, fig.align='center', fig.asp=1.25, fig.width=10, message=FALSE, warning=FALSE, cache=TRUE}
 grid.arrange(
 df_test %>%
   add_predicted_draws(n2o_mod1, 
@@ -1554,28 +1510,26 @@ df_test %>%
 ```
 
 #### R-square
+
 Below, the Bayesian $R^2$ values are reported for each response in the model.
 
-```{r r2_1, echo=FALSE, message=FALSE, warning=FALSE, cache = TRUE, fig.align='center', fig.width=4, fig.height=4}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod1.rda")
+```{r r2_1, echo=FALSE, message=FALSE, warning=FALSE, cache = TRUE}
 round(bayes_R2(n2o_mod1, resp = "logn2o", cores = 1), 3)
 round(bayes_R2(n2o_mod1, resp = "logn2oeq", cores = 1), 3)
 ```
 
 The $R^2$ were also estimated for the re-visit data.
 
-```{r r2_1_test, echo=FALSE, message=FALSE, warning=FALSE, cache=TRUE, fig.align='center', fig.width=4, fig.height=4}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod1.rda")
+```{r r2_1_test, echo=FALSE, message=FALSE, warning=FALSE, cache = TRUE}
 round(bayes_R2(n2o_mod1, resp = "logn2o", newdata = df_test, cores = 1), 3)
 round(bayes_R2(n2o_mod1, resp = "logn2oeq", newdata = df_test, cores = 1), 3)
 ```
 
 ## Model 2
-In an attempt to better fit the observed data, the next model included a distributional model for each sub-model that allowed for heterogeneous variances. The distributional terms were each fit as a function of the survey design structure. The same structure as for the models for the mean components.
+
+In an attempt to better fit the observed data, the next model included a distributional sub-model that allowed for heterogeneous variances. The distributional terms for both N2O responses were each fit as a function of the survey design structure. The same structure as for the models for the submodels for the mean component before.
 
 ```{r n2o_mod_2, eval=FALSE, include=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/df_model.rda")
-
 bf_n2o <- bf(log(n2o) ~ 1 +
                (1 | a | WSA9) + 
                (1 | b | WSA9:state) + 
@@ -1625,21 +1579,20 @@ save(n2o_mod2, file = "C:/Users/rmartin/OneDrive - Environmental Protection Agen
 ```
 
 ### Summarize fit
+
 The summaries of the estimated parameters and key HMC convergence diagnostics for the fitted model are printed below.
 
 ```{r print_mod2, echo=FALSE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod2.rda")
-
 print(n2o_mod2, prior = T)
 ```
 
 ### Model checks
+
 Below the same PPCs were performed as with the initial model (see above for more details on each panel). Though the checks below suggested some improvement in replicating the tails of the observed data, the overall fit again suggested room for improvement.
 
 ##### Dissolved N2O
 
-```{r ppc_n2o2, echo=FALSE, fig.align='center', fig.height=8, fig.width=8, message=FALSE, warning=FALSE, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod2.rda")
+```{r ppc_n2o2, echo=FALSE, fig.align='center', fig.asp=1.25, fig.width=10,  message=FALSE, warning=FALSE, cache=TRUE}
 grid.arrange(
 pp_check(n2o_mod2, 
          resp = "logn2o",
@@ -1695,10 +1648,10 @@ pp_check(n2o_mod2,
 ```
 
 #### Equilibrium N2O
+
 The checks below suggested that this model offered little no improvement upon the initial model for equilibrium N2O. 
 
-```{r ppc_n2oeq2, echo=FALSE, fig.align='center', fig.height=8, fig.width=8, message=FALSE, warning=FALSE, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod2.rda")
+```{r ppc_n2oeq2, echo=FALSE, fig.align='center', fig.asp=1.25, fig.width=10, message=FALSE, warning=FALSE, cache=TRUE}
 grid.arrange(
 pp_check(n2o_mod2, 
          resp = "logn2oeq",
@@ -1756,10 +1709,10 @@ pp_check(n2o_mod2,
 ```
 
 #### Bivariate
+
 This check perhaps suggested an improvement with regard to replicating the joint density. However, the predictions were still clearly over-dispersed relative to the observations.
 
-```{r ppc_biv2, echo=FALSE, fig.align='center', fig.height=4, fig.width=4, message=FALSE, warning=FALSE, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod2.rda")
+```{r ppc_biv2, echo=FALSE, fig.align='center', fig.asp=0.75, fig.width=10, message=FALSE, warning=FALSE, cache=TRUE}
 df_model %>%
   add_predicted_draws(n2o_mod2, 
                       ndraws = 20) %>%
@@ -1782,10 +1735,10 @@ df_model %>%
 ```
 
 #### Saturation
+
 The PPCs for the saturation metrics below indicated that including the distributional models was perhaps an improvement on the initial model in some aspects; in particular, the bias in the predicted proportion of under-saturated lakes was substantially decreased. However, there appeared to still be issues in replicating the tails as well as issues with central tendency.
 
-```{r ppc_sat2, echo=FALSE, fig.align='center', fig.height=8, fig.width=8, message=FALSE, warning=FALSE, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod2.rda")
+```{r ppc_sat2, echo=FALSE, fig.align='center', fig.asp=1.25, fig.width=10, message=FALSE, warning=FALSE, cache=TRUE}
 grid.arrange(
 df_model %>%
   add_predicted_draws(n2o_mod2, 
@@ -1889,20 +1842,19 @@ df_model %>%
 ```
 
 #### R-square
-Relative to model 1, there was a substantial decrease in the $R^2$ estimate for the dissolved N2O component of this model. The estimate for the equilibrium N2O-eq component was similar to the model 1. 
 
-```{r r2_2, echo=FALSE, message=FALSE, warning=FALSE, cache=TRUE, fig.align='center', fig.width=4, fig.height=4}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod2.rda")
+Relative to model 1, there was a substantial decrease in the $R^2$ estimate for the dissolved N2O component of this model. The estimate for the equilibrium N2O-eq component was similar to model 1. 
+
+```{r r2_2, echo=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
 round(bayes_R2(n2o_mod2, resp = "logn2o", cores = 1), 3) 
 round(bayes_R2(n2o_mod2, resp = "logn2oeq", cores = 1), 3)
 ```
 
 ## Model 3
-In the next model, the categorical version of the NO3 covariate and an surface temperature covariate were included to try to improve the fit. The ordinal NO3 variable was used as a monotonic, ordinal effect and only in the dissolved N2O component of the model. For the equlibrium N2O component, surface temperature and log-transformed elevation were used, along with their interaction. The model also retained the same distributional specifications included in model 2 above.
+
+In the next model, the categorical version of the NO3 covariate and a surface temperature covariate were included to try to improve the fit. The ordinal NO3 variable was used as a monotonic, ordinal effect and only in the dissolved N2O component of the model. For the equlibrium N2O component, surface temperature and log-transformed elevation were used, along with their interaction. The model also retained the same distributional specifications included in model 2 above.
 
 ```{r n2o_mod_3, eval=FALSE, include=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/df_model.rda")
-
 bf_n2o <- bf(log(n2o) ~ mo(no3_cat) +
                surftemp +
                (mo(no3_cat) | a | WSA9) + 
@@ -1957,20 +1909,20 @@ save(n2o_mod3, file = "C:/Users/rmartin/OneDrive - Environmental Protection Agen
 ```
 
 ### Summarize fit
+
 The fitted parameters and MCMC diagnostics are below.
 
 ```{r print_mod3, echo=FALSE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod3.rda")
-
 print(n2o_mod3, prior = T)
 ```
 
 ### Model checks
-#### Dissolved N2O
-The PPCs below indicated a better fit compared to the previous models. The central tendency and tail behavior looked to be reasonably replicated by comparison. However, the observed _vs._ predicted plot suggested that larger overserved values were likely being systematically underestimated.
 
-```{r ppc_full_checks_mod_n2o3, echo=FALSE, fig.align='center', fig.height=8, fig.width=8, message=FALSE, warning=FALSE, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod3.rda")
+#### Dissolved N2O
+
+The PPCs below indicated a better fit compared to the previous models. The central tendency and tail behavior looked to be reasonably replicated by comparison. However, the observed _vs._ predicted plot suggested that larger N2O observations were likely being systematically underestimated.
+
+```{r ppc_full_checks_mod_n2o3, echo=FALSE, fig.align='center', fig.asp=1.25, fig.width=10, message=FALSE, warning=FALSE, cache=TRUE}
 grid.arrange(
 pp_check(n2o_mod3, 
          resp = "logn2o",
@@ -2030,10 +1982,10 @@ pp_check(n2o_mod3,
 ```
 
 #### Equilibrium N2O
+
 The PPCs below indicated that this model appeared to be an improvement for equilibrium N2O as well. However, some checks (e.g., skewness) suggested some room for additional improvement.
 
-```{r ppc_full_checks_mod_n2oeq3, echo=FALSE, fig.align='center', fig.height=8, fig.width=8, message=FALSE, warning=FALSE, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod3.rda")
+```{r ppc_full_checks_mod_n2oeq3, echo=FALSE, fig.align='center', fig.asp=1.25, fig.width=10, message=FALSE, warning=FALSE, cache=TRUE}
 grid.arrange(
 pp_check(n2o_mod3, 
          resp = "logn2oeq",
@@ -2091,10 +2043,10 @@ pp_check(n2o_mod3,
 ```
 
 #### Bivariate
+
 The check for the joint distribution below also suggested an improvement upon the previous models.
 
-```{r ppc_bv_check_mod_n2o3, echo=FALSE, fig.align='center', fig.height=4, fig.width=4, message=FALSE, warning=FALSE, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod3.rda")
+```{r ppc_bv_check_mod_n2o3, echo=FALSE, fig.align='center', fig.asp=1, fig.width=10, message=FALSE, warning=FALSE, cache=TRUE}
 df_model %>%
   add_predicted_draws(n2o_mod3, 
                       ndraws = 20) %>%
@@ -2117,10 +2069,10 @@ df_model %>%
 ```
 
 #### Saturation
+
 This model looked to be an improvement with regard to the PPCs for the saturation metrics. However, the proportion of under-saturated lakes remained biased low and other checks indicated that further improvements would be ideal.
 
-```{r ppc_sat_check_mod_n2o3, echo=FALSE, fig.align='center', fig.height=8, fig.width=8, message=FALSE, warning=FALSE, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod3.rda")
+```{r ppc_sat_check_mod_n2o3, echo=FALSE, fig.align='center', fig.asp=1, fig.width=10,  message=FALSE, warning=FALSE, cache=TRUE}
 grid.arrange(
 df_model %>%
   add_predicted_draws(n2o_mod3, 
@@ -2224,23 +2176,23 @@ df_model %>%
 ```
 
 #### R-square
-The $R^2$ estimates for this model are below and suggested substantial improvements on the previous models.
 
-```{r r2_mod_n2o3, echo=FALSE, message=FALSE, warning=FALSE, cache=TRUE, fig.align='center', fig.width=4, fig.height=4}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod3.rda")
+The $R^2$ estimates for this model are below and suggested substantial improvements over the previous models.
+
+```{r r2_mod_n2o3, echo=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
 round(bayes_R2(n2o_mod3, resp = "logn2o", cores = 1), 3) 
 round(bayes_R2(n2o_mod3, resp = "logn2oeq", cores = 1), 3)
 ```
 
 ### Covariate effects
+
 Below are plots illustrating the modeled effects of covariates on both N2O and equilibrium N2O.
 
 #### Dissolved N2O
+
 The conditional effects plots below for dissolved N2O illustrated a positive, monotonic, and non-linear relationship with NO3; and a negative, linear relationship with surface temperature.
 
-```{r conditional_effects_mod_n2o3, echo=FALSE, message=FALSE, warning=FALSE, fig.align='center', fig.width=8, fig.height=3, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod3.rda")
-
+```{r conditional_effects_mod_n2o3, echo=FALSE, message=FALSE, warning=FALSE, fig.align='center', fig.asp=0.5, fig.width=10, cache=TRUE}
 p1 <- conditional_effects(n2o_mod3, 
                           resp = "logn2o", 
                           effects = c("no3_cat"), 
@@ -2256,15 +2208,15 @@ plt <- ggarrange(plot(p1, plot = F)[[1]],
 
 rm(p1, p2)
 
-annotate_figure(plt, top = text_grob("N2O: conditional effects", 
+annotate_figure(plt, top = text_grob("Conditional effects: N2O", 
                color = "black", face = "bold", size = 14))
 ```
 
 #### Equilibrium N2O
+
 The modeled effects for the equilibrium N2O component illustrated a negative relationship with both predictors and an interaction such that the surface temperature effect became slightly steeper at lower elevations.
 
-```{r conditional_effects_mod_n2oeq3, echo=FALSE, message=FALSE, warning=FALSE, fig.align='center', fig.width=8, fig.height=3, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod3.rda")
+```{r conditional_effects_mod_n2oeq3, echo=FALSE, message=FALSE, warning=FALSE, fig.align='center', fig.asp=0.5, fig.width=10, cache=TRUE}
 p1 <- conditional_effects(n2o_mod3, 
                           resp = "logn2oeq", 
                           effects = c("log_elev:surftemp"), 
@@ -2279,16 +2231,15 @@ plt <- ggarrange(plot(p1, plot = F)[[1]],
 
 rm(p1, p2)
 
-annotate_figure(plt, top = text_grob("Equilibrium N2O: conditional effects", 
+annotate_figure(plt, top = text_grob("Conditional effects: Equilibrium N2O", 
                color = "black", face = "bold", size = 14))
 ```
 
 ## Model 4
+
 In the next model, covariate terms were also included in the $\sigma$ components of both models in order to try to better capture remaining heterogeneity in the variances of both N2O and N2O-eq.
 
 ```{r n2o_mod_mv_4, eval=FALSE, include=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/df_model.rda")
-
 bf_n2o <- bf(log(n2o) ~ mo(no3_cat) +
                surftemp +
                (mo(no3_cat) | a | WSA9) + 
@@ -2347,22 +2298,22 @@ save(n2o_mod4, file = "C:/Users/rmartin/OneDrive - Environmental Protection Agen
 ```
 
 ### Summarize fit
+
 Below is a summary of the fitted parameters along with some convergence diagnostics.
 
 ```{r print_mod4, echo=FALSE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod4.rda")
-
 print(n2o_mod4, prior = T, digits = 3)
 ```
 
 ### Model checks
+
 The same PPCs were employed for this model as above.
 
 #### Dissolved N2O
-This model appeared to be an improvement on the previous model, particularly with regard to the more constant variance indicated in the observed _vs._ predicted plot (bottom, right panel).
 
-```{r ppc_full_checks_mod_n2o4, echo=FALSE, fig.align='center', fig.height=8, fig.width=8, message=FALSE, warning=FALSE, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod4.rda")
+This model appeared to be a moderate improvement on the previous models.
+
+```{r ppc_full_checks_mod_n2o4, echo=FALSE, fig.align='center', fig.asp=1.25, fig.width=10, message=FALSE, warning=FALSE, cache=TRUE}
 grid.arrange(
 pp_check(n2o_mod4, 
          ndraws = 200,
@@ -2421,10 +2372,10 @@ pp_check(n2o_mod4,
 ```
 
 #### Equilibrium N2O
+
 This component of the model also seemed to be an improvement over model 3, with better representation in the tails as indicated in the skewness _vs._ kurtosis PPC. 
 
-```{r ppc_full_checks_mod_n2oeq4, echo=FALSE, fig.align='center', fig.height=8, fig.width=8, message=FALSE, warning=FALSE, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod4.rda")
+```{r ppc_full_checks_mod_n2oeq4, echo=FALSE, fig.align='center', fig.asp=1.25, fig.width=10, message=FALSE, warning=FALSE, cache=TRUE}
 grid.arrange(
 pp_check(n2o_mod4, 
          ndraws = 200,
@@ -2482,10 +2433,10 @@ pp_check(n2o_mod4,
 ```
 
 #### Bivariate
+
 Again, an improvement over the previous model with a tighter fit of the PPC to the observed bivariate density.
 
-```{r ppc_bv_check_mod_n2o4, echo=FALSE, fig.align='center', fig.height=4, fig.width=4, message=FALSE, warning=FALSE, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod4.rda")
+```{r ppc_bv_check_mod_n2o4, echo=FALSE, fig.align='center', fig.asp=1, fig.width=10, message=FALSE, warning=FALSE, cache=TRUE}
 df_model %>%
   add_predicted_draws(n2o_mod4, 
                       ndraws = 20) %>%
@@ -2508,10 +2459,10 @@ df_model %>%
 ```
 
 #### Saturation
+
 This check also suggested an improvement over the previous models, with better tail behavior and less bias in the proportion under-saturated measure.
 
-```{r ppc_sat_check_mod_n2o4, echo=FALSE, fig.align='center', fig.height=8, fig.width=8, message=FALSE, warning=FALSE, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod4.rda")
+```{r ppc_sat_check_mod_n2o4, echo=FALSE, fig.align='center', fig.asp=1.25, fig.width=10, message=FALSE, warning=FALSE, cache=TRUE}
 grid.arrange(
 df_model %>%
   add_predicted_draws(n2o_mod4, 
@@ -2615,21 +2566,21 @@ df_model %>%
 ```
 
 #### R-square
+
 The Bayesian $R^2$ estimates below indicated an improvement from the previous models.
 
-```{r r2_mod_n2o4, echo=FALSE, message=FALSE, warning=FALSE, cache=TRUE, fig.align='center', fig.width=4, fig.height=4}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod4.rda")
+```{r r2_mod_n2o4, echo=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
 round(bayes_R2(n2o_mod4, resp = "logn2o", cores = 1), 3) 
 round(bayes_R2(n2o_mod4, resp = "logn2oeq", cores = 1), 3)
 ```
 
 ### Covariate effects
+
 #### Dissolved N2O
-The conditional effects plots for the covariate effects on dissolved N2O remained largely unchanged from the previous model.
 
-```{r conditional_effects_mod_n2o4, echo=FALSE, message=FALSE, warning=FALSE, fig.align='center', fig.width=8, fig.height=2, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod4.rda")
+The conditional effects plots for the covariate effects on dissolved N2O remained similar to the previous model.
 
+```{r conditional_effects_mod_n2o4, echo=FALSE, message=FALSE, warning=FALSE, fig.align='center', fig.asp=0.5, fig.width=10, cache=TRUE}
 p1 <- conditional_effects(n2o_mod4, 
                           resp = "logn2o", 
                           effects = c("no3_cat"), 
@@ -2645,15 +2596,13 @@ plt <- ggarrange(plot(p1, plot = F)[[1]],
 
 rm(p1, p2)
 
-annotate_figure(plt, top = text_grob(expression(paste("N2O: covariate effects on ", mu)), 
+annotate_figure(plt, top = text_grob(expression(paste("Covariate effects on ", mu, ": N2O")), 
                color = "black", face = "bold", size = 14))
 ```
 
 Below are estimates of the conditional effects of the covariates on $\sigma$ for N2O. These plots suggested a large effect of NO3 on the variance of N2O, but little to no effect of surface temperature.
 
-```{r conditional_effects_sigma_n2o4, echo=FALSE, message=FALSE, warning=FALSE, fig.align='center', fig.width=8, fig.height=2, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod4.rda")
-
+```{r conditional_effects_sigma_n2o4, echo=FALSE, message=FALSE, warning=FALSE, fig.align='center', fig.asp=0.5, fig.width=10, cache=TRUE}
 p1 <- conditional_effects(n2o_mod4, 
                           resp = "logn2o",
                           dpar = "sigma",
@@ -2671,18 +2620,17 @@ plt <- ggarrange(plot(p1, plot = F)[[1]],
 rm(p1, p2)
 
 annotate_figure(plt, 
-                top = text_grob(expression(paste("N2O: covariate effects on ", sigma)),
+                top = text_grob(expression(paste("Covariate effects on ", sigma, ": N2O")),
                                 color = "black",
                                 face = "bold",
                                 size = 14))
 ```
 
 #### Equilibrium N2O
+
 The covariate effects on equilibrium N2O remained largely the same as for the previous model.
 
-```{r conditional_effects_mod_n2oeq4, echo=FALSE, message=FALSE, warning=FALSE, fig.align='center', fig.width=8, fig.height=2, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod4.rda")
-
+```{r conditional_effects_mod_n2oeq4, echo=FALSE, message=FALSE, warning=FALSE, fig.align='center', fig.asp=0.5, fig.width=10, cache=TRUE}
 p1 <- conditional_effects(n2o_mod4, 
                           resp = "logn2oeq", 
                           effects = c("log_elev:surftemp"), 
@@ -2696,15 +2644,13 @@ plt <- ggarrange(plot(p1, plot = F)[[1]],
 
 rm(p1, p2)
 
-annotate_figure(plt, top = text_grob(expression(paste("Equilibrium N2O: covariate effects on ", mu)), 
+annotate_figure(plt, top = text_grob(expression(paste("Covariate effects on ", mu, ": Equilibrium N2O")), 
                color = "black", face = "bold", size = 14))
 ```
 
 The covariate effects on $\sigma$ for N2O-eq suggested a negative effect of surface temperature and litte to no effect of elevation.
 
-```{r conditional_effects_sigma_n2oeq4, echo=FALSE, message=FALSE, warning=FALSE, fig.align='center', fig.width=8, fig.height=2, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod4.rda")
-
+```{r conditional_effects_sigma_n2oeq4, echo=FALSE, message=FALSE, warning=FALSE, fig.align='center', fig.asp=0.5, fig.width=10, cache=TRUE}
 p1 <- conditional_effects(n2o_mod4, 
                           resp = "logn2oeq",
                           dpar = "sigma",
@@ -2720,16 +2666,15 @@ plt <- ggarrange(plot(p1, plot = F)[[1]],
 
 rm(p1, p2)
 
-annotate_figure(plt, top = text_grob(expression(paste("Equilibrium N2O: covariate effects on ", sigma)), 
+annotate_figure(plt, top = text_grob(expression(paste("Covariate effects on ", sigma, ": Equilibrium N2O")), 
                color = "black", face = "bold", size = 14))
 ```
 
 ## Model 5
-In the next model, additional complexity is added to the dissolved N2O component by including a covariate for continuous lake surface area (log scale) as well as interactions between NO3 and log(surface area) and surface temperature. 
+
+In the next model, additional complexity is added to the dissolved N2O component by including a covariate for continuous lake surface area (log scale) as well as interactions between NO3 and log(surface area) and surface temperature. Although, some aspect of lake size was likely captured by the categorical size factor from the survey in the models above, the largest category is very coarse and includes all lakes >50 hecatares, which is an extremely wide distribution of sizes from 50 to over 300,000 hectares at max. Including the continuous size covariate at the observation level in this manner was expected to do a better job of resolving any trends with size. Colinearity between the grouped and observation-level measures were not a major, concern, since the observation-level measure would account for any variation first. However, we did later check for any common violations of the Gauss-Markov assumptions, by looking at potential correlations between the model errors and covariates [not shown; @Bafumi_Gelman_2007].
 
 ```{r n2o_mod_mv_5, eval=FALSE, include=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/df_model.rda")
-
 bf_n2o <- bf(log(n2o) ~ mo(no3_cat) +
                log_area +
                surftemp + 
@@ -2794,22 +2739,22 @@ save(n2o_mod5, file = "C:/Users/rmartin/OneDrive - Environmental Protection Agen
 ```
 
 ### Summarize fit
+
 Below is a summary of the fitted parameters along with MCMC convergence diagnostics.
 
 ```{r print_mod5, echo=FALSE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod5.rda")
-
 print(n2o_mod5, prior = T, digits = 3)
 ```
 
 ### Model checks
+
 Again, the same PPCs as above were performed for this model.
 
 #### Dissolved N2O
+
 This PPCs for dissolved N2O looked similar to the previous model.
 
-```{r ppc_full_checks_mod_n2o5, echo=FALSE, fig.align='center', fig.height=8, fig.width=8, message=FALSE, warning=FALSE, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod5.rda")
+```{r ppc_full_checks_mod_n2o5, echo=FALSE, fig.align='center', fig.asp=1.25, fig.width=10, message=FALSE, warning=FALSE, cache=TRUE}
 grid.arrange(
 pp_check(n2o_mod5, 
          ndraws = 200,
@@ -2869,10 +2814,10 @@ pp_check(n2o_mod5,
 ```
 
 #### Equilibrium N2O
+
 Again, the PPCs for this model were similar to the previous model, which was unsurprising given that it was the same model for N2O-eq.
 
-```{r ppc_full_checks_mod_n2oeq5, echo=FALSE, fig.align='center', fig.height=8, fig.width=8, message=FALSE, warning=FALSE, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod5.rda")
+```{r ppc_full_checks_mod_n2oeq5, echo=FALSE, fig.align='center', fig.asp=1.25, fig.width=10, message=FALSE, warning=FALSE, cache=TRUE}
 grid.arrange(
 pp_check(n2o_mod5, 
          ndraws = 200,
@@ -2932,10 +2877,10 @@ pp_check(n2o_mod5,
 ```
 
 #### Bivariate
+
 This PPC was also similar to the previous model.
 
-```{r ppc_bv_check_mod_n2o5, echo=FALSE, fig.align='center', fig.height=4, fig.width=4, message=FALSE, warning=FALSE, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod5.rda")
+```{r ppc_bv_check_mod_n2o5, echo=FALSE, fig.align='center', fig.asp=1, fig.width=10, message=FALSE, warning=FALSE, cache=TRUE}
 df_model %>%
   add_predicted_draws(n2o_mod5, 
                       ndraws = 20) %>%
@@ -2958,10 +2903,10 @@ df_model %>%
 ```
 
 #### Saturation
+
 This check was also similar to the prevoius model, with perhaps slightly less bias in the proportion unsaturated estimates. There was also a potentially concerning extreme prediction in the observed _vs_ predicted PPC.
 
-```{r ppc_sat_check_mod_n2o5, echo=FALSE, fig.align='center', fig.height=8, fig.width=8, message=FALSE, warning=FALSE, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod5.rda")
+```{r ppc_sat_check_mod_n2o5, echo=FALSE, fig.align='center', fig.asp=1.25, fig.width=10, message=FALSE, warning=FALSE, cache=TRUE}
 grid.arrange(
 df_model %>%
   add_predicted_draws(n2o_mod5, 
@@ -3066,19 +3011,18 @@ df_model %>%
 
 #### R-square
 
-```{r r2_mod_n2o5, echo=FALSE, message=FALSE, warning=FALSE, cache=TRUE, fig.align='center', fig.width=4, fig.height=4}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod5.rda")
+```{r r2_mod_n2o5, echo=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
 round(bayes_R2(n2o_mod5, resp = "logn2o", cores = 1), 3) 
 round(bayes_R2(n2o_mod5, resp = "logn2oeq", cores = 1), 3)
 ```
 
 ### Covariate effects
+
 #### Dissolved N2O
+
 The conditional effects plots suggested a similar effect of NO3, but interesting interactions between NO3 and lake area and NO3 and surface temperature. For lake area, the effect was estimated to be larger and more negative at the highest levels of NO3; and slightly negative at the lowest level of NO3. For surface temperature, the effect was estimated to be largest and positive at the highest level of NO3; and negative at the lowest level of NO3.
 
-```{r conditional_effects_mod_n2o5, echo=FALSE, message=FALSE, warning=FALSE, fig.align='center', fig.width=8, fig.height=4, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod5.rda")
-
+```{r conditional_effects_mod_n2o5, echo=FALSE, message=FALSE, warning=FALSE, fig.align='center', fig.asp=1, fig.width=10, cache=TRUE}
 p1 <- conditional_effects(n2o_mod5, 
                           resp = "logn2o", 
                           effects = c("no3_cat"), 
@@ -3099,15 +3043,13 @@ plt <- ggarrange(plot(p1, plot = F)[[1]],
 
 rm(p1, p2, p3)
 
-annotate_figure(plt, top = text_grob(expression(paste("N2O: covariate effects on ", mu)), 
+annotate_figure(plt, top = text_grob(expression(paste("Covariate effects on ", mu, ": N2O")), 
                color = "black", face = "bold", size = 14))
 ```
 
 The estimated covariate effects on $\sigma$ suggested a negative relationship with log(area) and a positive relationship, again, with NO3.
 
-```{r conditional_effects_sigma_n2o5, echo=FALSE, message=FALSE, warning=FALSE, fig.align='center', fig.width=8, fig.height=2, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod5.rda")
-
+```{r conditional_effects_sigma_n2o5, echo=FALSE, message=FALSE, warning=FALSE, fig.align='center', fig.asp=0.5, fig.width=10, cache=TRUE}
 p1 <- conditional_effects(n2o_mod5, 
                           resp = "logn2o",
                           dpar = "sigma",
@@ -3126,18 +3068,17 @@ plt <- ggarrange(plot(p1, plot = F)[[1]],
 rm(p1, p2)
 
 annotate_figure(plt, 
-                top = text_grob(expression(paste("N2O: covariate effects on ", sigma)),
+                top = text_grob(expression(paste("Covariate effects on ", sigma, ": N2O")),
                                 color = "black",
                                 face = "bold",
                                 size = 14))
 ```
 
 #### Equilibrium N2O
+
 The estimated covariate effects on equilibrium N2O remained largely the same as estimated in the previous model.
 
-```{r conditional_effects_mod_n2oeq5, echo=FALSE, message=FALSE, warning=FALSE, fig.align='center', fig.width=8, fig.height=2, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod5.rda")
-
+```{r conditional_effects_mod_n2oeq5, echo=FALSE, message=FALSE, warning=FALSE, fig.align='center', fig.asp=0.5, fig.width=10, cache=TRUE}
 p1 <- conditional_effects(n2o_mod5, 
                           resp = "logn2oeq", 
                           effects = c("surftemp:log_elev"), 
@@ -3153,14 +3094,12 @@ plt <- ggarrange(plot(p1, plot = F)[[1]],
 
 rm(p1, p2)
 
-annotate_figure(plt, top = text_grob(expression(paste("Equilibrium N2O: covariate effects on ", mu)), 
+annotate_figure(plt, top = text_grob(expression(paste("Covariate effects on ", mu, ": Equilibrium N2O")), 
                color = "black", face = "bold", size = 14))
 ```
 
 
-```{r conditional_effects_sigma_n2oeq5, echo=FALSE, message=FALSE, warning=FALSE, fig.align='center', fig.width=8, fig.height=2, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod5.rda")
-
+```{r conditional_effects_sigma_n2oeq5, echo=FALSE, message=FALSE, warning=FALSE, fig.align='center', fig.asp=0.5, fig.width=10, cache=TRUE}
 p1 <- conditional_effects(n2o_mod5, 
                           resp = "logn2oeq",
                           dpar = "sigma",
@@ -3178,23 +3117,24 @@ plt <- ggarrange(plot(p1, plot = F)[[1]],
 
 rm(p1, p2)
 
-annotate_figure(plt, top = text_grob(expression(paste("Equilibrium N2O: covariate effects on ", sigma)), 
+annotate_figure(plt, top = text_grob(expression(paste("Covariate effects on ", sigma, ": Equilibrium N2O")), 
                color = "black", face = "bold", size = 14))
 ```
 
 ## A Final Model
-As demonstrated above, models excluding the NO3 covariate consistently resulted in poorer fits to to the observed dissolved N2O data and potentially strongly biased estimates of the saturation ratio. Including surface temperature and elevation in the equilibrium N2O part of the model also resulted in substantially improved replication of key aspects of the observed data. Likewise, added flexibility in the distributional terms for both dissolved and equilibrium N2O led to improvements. 
 
-To make inferences to the population of interest from a model including these covariates, however, however, the covariates needed to be (1) fully observed across that population or (2) their missingness needed to be modeled. For the lake area and elevation covariates, data _was_ available for all lakes from previously compiled geospatial databases. However, neither surface temperature or NO3 were observed for lakes outside of the sample. That is, they were partially observed with respect to the target population. Therefore, a more complex model was constructed below that included surface temperature and NO3 as additional responses conditioned on the survey design variables and fully observed covariates. This approach to inference for N2O was similar to Bayesian structural equation modeling approaches [@Merkle_etal_2021; @Merkle_Rosseel_2018]. The logical dependence structure could be characterized as:
+As demonstrated above, models excluding the NO3 covariate consistently resulted in poorer fits to to the observed dissolved N2O data and potentially biased estimates of the saturation ratio. Including surface temperature and elevation in the equilibrium N2O part of the model also resulted in substantially improved replication of key aspects of the observed data. Added flexibility in the distributional terms for both dissolved and equilibrium N2O also led to improvements. 
+
+To make inferences to the population of interest from a model including these covariates, however, the covariates needed to be (1) fully observed across that population or (2) their missingness needed to be modeled. For the lake area and elevation covariates, data _was_ available for all lakes from previously compiled geospatial databases. However, neither surface temperature or NO3 were observed for lakes outside of the sample. That is, they were partially observed with respect to the target population. Therefore, a more complex model was constructed below that included surface temperature and NO3 as additional responses conditioned on the survey design variables and fully observed covariates. This approach to inference for N2O was similar to a Bayesian structural equation modeling approach [@Merkle_etal_2021; @Merkle_Rosseel_2018]. The logical dependence structure could be characterized as:
 
 $$\begin{aligned} 
-{\boldsymbol{N_2O_{diss}}} &\sim Survey + Area + {\boldsymbol{NO_3}} + {\boldsymbol{Temp}} \\ 
-{\boldsymbol{N_2O_{equil}}} &\sim Survey + Elev  + {\boldsymbol{Temp}}\\
-{\boldsymbol{NO_3}} &\sim Survey + Area + {\boldsymbol{Temp}} \\ 
-{\boldsymbol{Temp}} &\sim Survey + Lat + Elev + Day
+{p( \boldsymbol{N_2O_{diss}}} &| Survey, Area, {\boldsymbol{NO_3}}, {\boldsymbol{Temp}}) \\ 
+{p( \boldsymbol{N_2O_{equil}}} &| Survey, Elev, {\boldsymbol{Temp}})\\
+{p( \boldsymbol{NO_3}} &| Survey, Area, {\boldsymbol{Temp}}) \\ 
+{p( \boldsymbol{Temp}} &| Survey, Lat, Elev, Day)
 \end{aligned}$$
 
-Variables in bold text above were treated as partially observed with respect to the population of interest (i.e., observed only in the sample), whereas variables not in bold were considered fully observed. The partially observed variables, being dissolved and equilibrium N2O, NO3, and surface temperature, were each modeled conditional on the survey design variables and other partially and/or fully observed covariates. This piece-wise approach required a more complex set of post-processing steps compared to a typical MRP analysis. In order to propagate estimates and uncertainty through the dependency structure and make inferences, the fitted model was used to first predict surface temperature in the target population, since it depended only on the fully observed covariates. That predictive distribution was then used alongside the relevant fully observed covariates to predict NO3 in the target population. Finally, the predictive distributions for temperature and NO3 were used to predict the N2O responses. These steps were carried out in the "Predict to population" section to follow.
+Variables in bold text above were treated as partially observed with respect to the population of interest (i.e., observed only in the sample), whereas variables not in bold were considered fully observed. The partially observed variables, being dissolved and equilibrium N2O, NO3, and surface temperature, were each modeled conditional on the survey design variables and other partially and/or fully observed covariates. This piece-wise approach to predicting N2O required a more complex set of post-processing steps compared to a typical MRP analysis. In order to propagate uncertainty through the dependency structure and make inferences to the POI below, the fitted final model was used to first predict surface temperature in the target population, since it depended only on the fully observed covariates. That predictive distribution was then used alongside the relevant fully observed covariates to predict NO3 in the target population. Finally, the predictive distributions for temperature and NO3 were used to predict the N2O responses. These steps were carried out in the "Predict to population" section to follow.
 
 In the final model below, the sub-model for surface temperature assumed a Gamma distributed error distribution and the linear predictor included the survey design variables, latitude, elevation, and Julian date. The shape parameter was also modeled as a function of latitude to address increasing response variance along the latitudinal gradient. The NO3 sub-model was a cumulative logit model and the linear predictor included all of the survey factors as well as surface temperature and lake area. 
 
@@ -3203,8 +3143,6 @@ The dissolved and equilibrium N2O responses were each modeled with Gamma distrib
 Note that there was no observation-level residual correlation term for this model, since the residuals are undefined for the Gamma and cumulative logit models. Dropping the observation-level residual correlation term was deemed a reasonable compromise that enabled the inclusion of NO3 as a covariate on dissolved N2O. The random intercepts, however, still allowed for potential correlations between the four responses at the group levels. 
 
 ```{r n2o_mod_mv_6, eval=FALSE, include=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/df_model.rda")
-
 bf_n2o <- bf(n2o ~ mo(no3_cat) +
                log_area +
                surftemp + 
@@ -3301,19 +3239,18 @@ save(n2o_mod6, file = "C:/Users/rmartin/OneDrive - Environmental Protection Agen
 ### Summarize fit
 Below is a summary of the fitted parameters and MCMC diagnostics. 
 ```{r print_mod6, echo=FALSE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod6.rda")
-
 print(n2o_mod6, digits = 3, prior = T)
 ```
 
 ### Model checks
+
 Below, the same PPCs for dissolved and equilibrium N2O were used as before.
 
 #### Dissolved N2O
+
 The PPCs for dissolved N2O were similar to those for models 4 and 5 above.
 
-```{r ppc_full_checks_mod_n2o6, echo=FALSE, fig.align='center', fig.height=8, fig.width=8, message=FALSE, warning=FALSE, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod6.rda")
+```{r ppc_full_checks_mod_n2o6, echo=FALSE, fig.align='center', fig.asp=1.25, fig.width=10, message=FALSE, warning=FALSE, cache=TRUE}
 grid.arrange(
 pp_check(n2o_mod6, 
          resp = "n2o",
@@ -3373,10 +3310,10 @@ pp_check(n2o_mod6,
 ```
 
 #### Equilibrium N2O
+
 The PPCs for eqilibrium N2O were also similar to the same checks in models 4 and 5.
 
-```{r ppc_full_checks_mod_n2oeq6, echo=FALSE, fig.align='center', fig.height=8, fig.width=8, message=FALSE, warning=FALSE, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod6.rda")
+```{r ppc_full_checks_mod_n2oeq6, echo=FALSE, fig.align='center', fig.asp=1.25, fig.width=10, message=FALSE, warning=FALSE, cache=TRUE}
 grid.arrange(
 pp_check(n2o_mod6, 
          resp = "n2oeq",
@@ -3436,11 +3373,10 @@ pp_check(n2o_mod6,
 ```
 
 #### Bivariate
-This model provided a reasonable representation of the bivariate relationship between the two N2O responses.
 
-```{r ppc_bv_check_mod_n2o6, echo=FALSE, fig.align='center', fig.height=4, fig.width=4, message=FALSE, warning=FALSE, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod6.rda")
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/df_model.rda")
+This final model provided a reasonable representation of the bivariate relationship between the two N2O responses.
+
+```{r ppc_bv_check_mod_n2o6, echo=FALSE, fig.align='center', fig.asp=0.5, fig.width=10, message=FALSE, warning=FALSE, cache=TRUE}
 df_model %>%
   add_predicted_draws(n2o_mod6,
                       resp = c("n2o","n2oeq"),
@@ -3464,10 +3400,10 @@ df_model %>%
 ```
 
 #### Saturation
+
 The saturation ratio PPCs below suggested similar behavior as with models 4 and 5 above, but with perhaps slightly less bias in the predictions for the proportion of undersaturated waterbodies and fewer extreme predictions for the means and standard deviations. The observed _vs._ predicted PPC also appears to have a better behaved variance and no extreme predictions, compared to models 4 and 5.
 
-```{r ppc_sat_check_mod_n2o6, echo=FALSE, fig.align='center', fig.height=8, fig.width=8, message=FALSE, warning=FALSE, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod6.rda")
+```{r ppc_sat_check_mod_n2o6, echo=FALSE, fig.align='center', fig.asp=1.25, fig.width=10, message=FALSE, warning=FALSE, cache=TRUE}
 grid.arrange(
 df_model %>%
   add_predicted_draws(n2o_mod6, 
@@ -3577,9 +3513,7 @@ df_model %>%
 
 The plot below shows the same PPC, but for the second-vist data.
 
-```{r ppc_sat_check_testdata_mod_n2o6, echo=FALSE, fig.align='center', fig.height=8, fig.width=8, message=FALSE, warning=FALSE, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod6.rda")
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/df_test.rda")
+```{r ppc_sat_check_testdata_mod_n2o6, echo=FALSE, fig.align='center', fig.asp=1.25, fig.width=10, message=FALSE, warning=FALSE, cache=TRUE}
 grid.arrange(
 df_test %>%
   add_predicted_draws(n2o_mod6, 
@@ -3688,10 +3622,10 @@ df_test %>%
 ```
 
 #### R-square
+
 Below are estimates for the Bayesian $R^2$, which were largely similar for the N2O responses as with models 4 and 5 above. The $R^2$ for the surface temperature response also suggested a good fit.
 
-```{r r2_mod_n2o6, echo=FALSE, message=FALSE, warning=FALSE, cache=TRUE, fig.align='center', fig.width=4, fig.height=4}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod6.rda")
+```{r r2_mod_n2o6, echo=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
 round(bayes_R2(n2o_mod6, resp = "n2o"), 3) 
 round(bayes_R2(n2o_mod6, resp = "n2oeq"), 3)
 round(bayes_R2(n2o_mod6, resp = "surftemp"), 3)
@@ -3699,50 +3633,53 @@ round(bayes_R2(n2o_mod6, resp = "surftemp"), 3)
 
 Below are the $R^2$ estimates for the second-visit data. That these estimates were similar to those for the data used to fit the model was encouraging and suggested that the model may perform reasonably well out-of-sample.
 
-```{r r2_test_mod_n2o6, echo=FALSE, message=FALSE, warning=FALSE, cache=TRUE, fig.align='center', fig.width=4, fig.height=4}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod6.rda")
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/df_test.rda")
+```{r r2_test_mod_n2o6, echo=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
 round(bayes_R2(n2o_mod6, resp = "n2o", newdata = df_test), 3) 
 round(bayes_R2(n2o_mod6, resp = "n2oeq", newdata = df_test), 3)
 round(bayes_R2(n2o_mod6, resp = "surftemp", newdata = df_test), 3)
 ```
 
 ### Covariate effects
+
 #### Dissolved N2O
+
 The conditional effects plot for the covariate effects on dissolved N2O suggested a similar effect of NO3 as in previous models, but with interesting potential interactions between NO3 and lake area and NO3 and surface temperature. The lake area effect was estimated to be larger and more negative at the highest levels of NO3 and slightly negative at the lowest level of NO3. The surface temperature effect was estimated to be largest and positive at the highest level of NO3 and negative at the lowest level of NO3.
 
-```{r conditional_effects_mod_n2oF, echo=FALSE, message=FALSE, warning=FALSE, fig.align='center', fig.width=8, fig.height=4, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod6.rda")
-
+```{r conditional_effects_mod_n2oF, echo=FALSE, message=FALSE, warning=FALSE, fig.align='center', fig.asp=1, fig.width=10, cache=TRUE}
 p1 <- conditional_effects(n2o_mod6, 
                           resp = "n2o", 
-                          effects = c("no3_cat"), 
+                          effects = c("no3_cat:log_area"), 
                           plot = F)
 
 p2 <- conditional_effects(n2o_mod6, 
                           resp = "n2o", 
                           effects = c("log_area:no3_cat"), 
                           plot = F)
+
 p3 <- conditional_effects(n2o_mod6, 
+                          resp = "n2o", 
+                          effects = c("no3_cat:surftemp"), 
+                          plot = F)
+
+p4 <- conditional_effects(n2o_mod6, 
                           resp = "n2o", 
                           effects = c("surftemp:no3_cat"), 
                           plot = F)
 
 plt <- ggarrange(plot(p1, plot = F)[[1]], 
                  plot(p2, plot = F)[[1]],
-                 plot(p3, plot = F)[[1]])
+                 plot(p3, plot = F)[[1]],
+                 plot(p4, plot = F)[[1]])
 
-rm(p1, p2, p3)
+rm(p1, p2, p3, p4)
 
-annotate_figure(plt, top = text_grob(expression(paste("N2O: covariate effects on ", mu)), 
+annotate_figure(plt, top = text_grob(expression(paste("Covariate effects on ", mu, ": N2O")), 
                color = "black", face = "bold", size = 14))
 ```
 
 The estimated covariate effects on $\sigma$ for dissolved N2O suggested a negative relationship with log(area) and a positive relationship with NO3.
 
-```{r conditional_effects_sigma_n2oF, echo=FALSE, message=FALSE, warning=FALSE, fig.align='center', fig.width=8, fig.height=2, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod6.rda")
-
+```{r conditional_effects_sigma_n2oF, echo=FALSE, message=FALSE, warning=FALSE, fig.align='center', fig.asp=0.5, fig.width=10, cache=TRUE}
 p1 <- conditional_effects(n2o_mod6, 
                           resp = "n2o",
                           dpar = "shape",
@@ -3761,18 +3698,17 @@ plt <- ggarrange(plot(p1, plot = F)[[1]],
 rm(p1, p2)
 
 annotate_figure(plt, 
-                top = text_grob(expression(paste("N2O: covariate effects on ", shape)),
+                top = text_grob(expression(paste("Covariate effects on ", shape, ": N2O")),
                                 color = "black",
                                 face = "bold",
                                 size = 14))
 ```
 
 #### Equilibrium N2O
+
 The estimated covariate effects on equilibrium N2O remained largely the same as estimated in the previous model.
 
-```{r conditional_effects_mod_n2oeqF, echo=FALSE, message=FALSE, warning=FALSE, fig.align='center', fig.width=8, fig.height=2, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod6.rda")
-
+```{r conditional_effects_mod_n2oeqF, echo=FALSE, message=FALSE, warning=FALSE, fig.align='center', fig.asp=0.5, fig.width=10, cache=TRUE}
 p1 <- conditional_effects(n2o_mod6, 
                           resp = "n2oeq", 
                           effects = c("surftemp:log_elev"), 
@@ -3788,14 +3724,12 @@ plt <- ggarrange(plot(p1, plot = F)[[1]],
 
 rm(p1, p2)
 
-annotate_figure(plt, top = text_grob(expression(paste("Equilibrium N2O: covariate effects on ", mu)), 
+annotate_figure(plt, top = text_grob(expression(paste("Covariate effects on ", mu, ": Equilibrium N2O")), 
                color = "black", face = "bold", size = 14))
 ```
 
 
-```{r conditional_effects_sigma_n2oeqF, echo=FALSE, message=FALSE, warning=FALSE, fig.align='center', fig.width=8, fig.height=2, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod6.rda")
-
+```{r conditional_effects_sigma_n2oeqF, echo=FALSE, message=FALSE, warning=FALSE, fig.align='center', fig.asp=0.5, fig.width=10, cache=TRUE}
 p1 <- conditional_effects(n2o_mod6, 
                           resp = "n2oeq",
                           dpar = "shape",
@@ -3813,12 +3747,406 @@ plt <- ggarrange(plot(p1, plot = F)[[1]],
 
 rm(p1, p2)
 
-annotate_figure(plt, top = text_grob(expression(paste("Equilibrium N2O: covariate effects on ", shape)), 
+annotate_figure(plt, top = text_grob(expression(paste("Covariate effects on ", shape, ": Equilibrium N2O")), 
                color = "black", face = "bold", size = 14))
 ```
 
+
+#### Saturation ratio
+
+Below are the estimated conditional effects of the covariates on means for both n2o responses as well as the implied effects on the mean saturation ratio. 
+
+```{r conditional_effects_mod_n2osat_temp_F, echo=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
+effect_no3_surftemp <- expand.grid(no3_cat = levels(df_model$no3_cat),
+                               surftemp = round(quantile(df_model$surftemp, 
+                                                   probs = seq(0.10, 0.90, 0.2)), 0),
+                               log_area = mean(df_model$log_area),
+                               log_elev = mean(df_model$log_elev)) %>%
+  add_epred_draws(n2o_mod6, resp = c("n2o", "n2oeq"), re_formula = ~ 1) %>%
+  pivot_wider(names_from = .category, values_from = .epred) %>%
+  mutate(n2o_pred = n2o,
+         n2oeq_pred = n2oeq,
+         sat_pred = n2o / n2oeq,
+         surftemp = factor(surftemp))
+
+effect_surftemp_no3 <- expand.grid(no3_cat = levels(df_model$no3_cat),
+                               surftemp = seq(range(df_model$surftemp)[1],
+                                              range(df_model$surftemp)[2],
+                                              length.out = 101),
+                               log_area = mean(df_model$log_area),
+                               log_elev = mean(df_model$log_elev)) %>%
+  add_epred_draws(n2o_mod6, resp = c("n2o", "n2oeq"), re_formula = ~ 1) %>%
+  pivot_wider(names_from = .category, values_from = .epred) %>%
+  mutate(n2o_pred = n2o,
+         n2oeq_pred = n2oeq,
+         sat_pred = n2o / n2oeq,
+         temp = surftemp)
+
+plt_n2oeq_surftemp <-
+  effect_surftemp_no3 %>%
+  ggplot() +
+  stat_lineribbon(aes(x = surftemp,
+                      y = n2oeq_pred),
+                  point_interval = "median_qi",
+                  show.legend = TRUE,
+                  size = 0.7,
+                  .width = 0.95) +
+  xlab("") +
+  ylab(expression(paste("Equilibrium N"[2], "O (nmol/L)"))) +
+  theme_pubr() +
+  theme(axis.text.x = element_blank(),
+        legend.position = "none") +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 20), breaks = seq(0, 20, 5)) +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_fill_brewer(palette = "Greys", guide = "none")
+
+
+plt_n2o_surftemp_no3 <-
+  effect_surftemp_no3 %>%
+  ggplot() +
+  stat_lineribbon(aes(x = surftemp,
+                      y = n2o_pred, 
+                      group = no3_cat,
+                      color = no3_cat),
+                  point_interval = "median_qi",
+                  show.legend = TRUE,
+                  size = 0.7,
+                  .width = 0.95) +
+  xlab("") +
+  ylab(expression(paste("Dissolved N"[2], "O (nmol/L)"))) +
+  theme_pubr() +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 55), breaks = seq(0, 50, 10)) +
+  scale_fill_brewer(palette = "Greys", guide = "none") + 
+  theme(axis.text.x = element_blank(),
+        legend.position = "none")
+
+plt_n2o_no3_surftemp <-
+  effect_no3_surftemp %>%
+  ggplot(aes(x = no3_cat, 
+             y = n2o_pred, 
+             group = surftemp,
+             color = surftemp)) +
+  stat_pointinterval(shape = 95,
+                     point_interval = "median_qi",
+                     position = position_dodge(width = 1.4, preserve = "single")) +
+  xlab("") +
+  ylab("") +
+  theme_pubr() +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 55), breaks = seq(0, 50, 10)) +
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_blank(),
+        legend.position = "none")
+
+plt_sat_no3_surftemp <-
+  effect_no3_surftemp %>%
+  ggplot(aes(x = no3_cat, 
+             y = sat_pred, 
+             group = surftemp,
+             color = surftemp)) +
+  stat_pointinterval(shape = 95,
+                     point_interval = "median_qi",
+                     position = position_dodge(width = 1.4, preserve = "single")) +
+  xlab(expression(paste("NO"[3], " category"))) +
+  ylab("") +
+  theme_pubr() +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 7), breaks = seq(0, 7, 1)) +
+  geom_hline(yintercept = 1, linetype = "dashed") +
+  theme(legend.position = "none",
+        axis.text.y = element_blank())
+
+plt_sat_surftemp_no3 <-
+  effect_surftemp_no3 %>%
+  ggplot() +
+  stat_lineribbon(aes(x = surftemp,
+                      y = sat_pred, 
+                      group = no3_cat,
+                      color = no3_cat),
+                  point_interval = "median_qi",
+                  show.legend = TRUE,
+                  size = 0.7,
+                  .width = 0.95) +
+  xlab("Surface temperature (\u00B0C)") +
+  ylab("Saturation ratio") +
+  theme_pubr() +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 7), breaks = seq(0, 7, 1)) +
+  scale_x_continuous(expand = c(0, 0)) +
+  geom_hline(yintercept = 1, linetype = "dashed") +
+  scale_fill_brewer(palette = "Greys", guide = "none") +
+  theme(legend.position = "none")
+
+legend1 <- effect_surftemp_no3 %>%
+  ggplot() +
+  stat_lineribbon(aes(x = surftemp,
+                      y = n2o_pred, 
+                      group = no3_cat,
+                      color = no3_cat),
+                  point_interval = "median_qi",
+                  show.legend = TRUE,
+                  size = 0.7,
+                  .width = 0.95) +
+  theme_void() +
+  scale_fill_brewer(palette = "Greys", guide = "none") + 
+  theme(legend.position = c(0.5, 0.1),
+        legend.direction = "horizontal",
+        legend.text = element_text(size = 10, angle = 45)) +
+  labs(color = expression(paste("NO"[3], " category"))) +
+  guides(color = guide_legend(title.position = "top", title.hjust = 0.5, title.vjust = 0.5))
+
+legend1 <- get_legend(legend1)
+
+legend2 <- 
+  effect_no3_surftemp %>%
+  ggplot(aes(x = no3_cat, 
+             y = n2o_pred, 
+             group = surftemp,
+             color = surftemp)) +
+  stat_pointinterval(shape = 95,
+                     point_interval = "median_qi",
+                     position = position_dodge(width = 1.4, preserve = "single")) +
+  theme_void() +
+  theme(legend.position = c(0.5, 0.5),
+        legend.direction = "horizontal",
+        legend.text = element_text(size = 10, angle = 45)) +
+  labs(color = "Surface temperature (\u00B0C)") +
+  guides(color = guide_legend(title.position = "top", title.hjust = 0.5, title.vjust = 1))
+
+legend2 <- get_legend(legend2)
+
+legendPlot <- ggarrange(legend1, legend2, ncol = 1)
+
+plt_surftemp_effects <- ggarrange(plt_n2oeq_surftemp,
+                                  legendPlot,
+                                  plt_n2o_surftemp_no3,
+                                  plt_n2o_no3_surftemp,
+                                  plt_sat_surftemp_no3,
+                                  plt_sat_no3_surftemp,
+                             ncol = 2,
+                             nrow = 3,
+                             widths = c(1, 1, 1, 1, 1, 1),
+                             heights = c(1, 1, 1, 1, 1, 1),
+                             labels = c("A", "Legend", "B", "C", "D", "E"),
+                             hjust = c(-6, -1, -6, -6, -6, -6),
+                             vjust = c(2, 2, 2, 2, 2, 2)
+                             )
+
+plt_surftemp_effects <- plt_surftemp_effects %>%
+  annotate_figure(plt_surftemp_effects,
+                  left = text_grob("Posterior mean", 
+                                   size = 18, 
+                                   rot = 90)
+                  )
+
+# ggsave only works in R console (i.e., copy + paste to save)
+ggsave(filename = "cond_effect_surftemp_no3.tif",
+       plot = plt_surftemp_effects,
+       device = "tiff",
+       width = 180 / 25.4,
+       height = 210 / 25.4,
+       units = "in")
+```
+
+```{r plot_surftemp_effects, echo=FALSE, fig.align='center', fig.asp=1.166667, fig.width=8}
+plt_surftemp_effects
+```
+
+```{r conditional_effects_mod_n2osat_area_F, echo=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
+effect_no3_area <- expand.grid(no3_cat = levels(df_model$no3_cat),
+                               log_area = round(quantile(df_model$log_area, 
+                                                   probs = seq(0.10, 0.90, 0.2)), 0),
+                               surftemp = mean(df_model$surftemp),
+                               log_elev = mean(df_model$log_elev)) %>%
+  add_epred_draws(n2o_mod6, resp = c("n2o", "n2oeq"), re_formula = ~ 1) %>%
+  pivot_wider(names_from = .category, values_from = .epred) %>%
+  mutate(n2o_pred = n2o,
+         n2oeq_pred = n2oeq,
+         sat_pred = n2o / n2oeq,
+         log_area = factor(log_area))
+
+effect_area_no3 <- expand.grid(no3_cat = levels(df_model$no3_cat),
+                               log_area = seq(range(df_model$log_area)[1],
+                                              range(df_model$log_area)[2],
+                                              length.out = 101),
+                               surftemp = mean(df_model$surftemp),
+                               log_elev = mean(df_model$log_elev)) %>%
+  add_epred_draws(n2o_mod6, resp = c("n2o", "n2oeq"), re_formula = ~ 1) %>%
+  pivot_wider(names_from = .category, values_from = .epred) %>%
+  mutate(n2o_pred = n2o,
+         n2oeq_pred = n2oeq,
+         sat_pred = n2o / n2oeq,
+         log_area = log_area)
+
+plt_n2oeq_area <-
+  effect_area_no3 %>%
+  ggplot() +
+  stat_lineribbon(aes(x = log_area,
+                      y = n2oeq_pred),
+                  point_interval = "median_qi",
+                  show.legend = TRUE,
+                  size = 0.7,
+                  .width = 0.95) +
+  xlab("") +
+  ylab(expression(paste("Equilibrium N"[2], "O (nmol/L)"))) +
+  theme_pubr() +
+  theme(axis.text.x = element_blank(),
+        legend.position = "none") +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 20), breaks = seq(0, 20, 5)) +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_fill_brewer(palette = "Greys", guide = "none")
+
+
+plt_n2o_area_no3 <-
+  effect_area_no3 %>%
+  ggplot() +
+  stat_lineribbon(aes(x = log_area,
+                      y = n2o_pred, 
+                      group = no3_cat,
+                      color = no3_cat),
+                  point_interval = "median_qi",
+                  show.legend = TRUE,
+                  size = 0.7,
+                  .width = 0.95) +
+  xlab("") +
+  ylab(expression(paste("Dissolved N"[2], "O (nmol/L)"))) +
+  theme_pubr() +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 55), breaks = seq(0, 50, 10)) +
+  scale_fill_brewer(palette = "Greys", guide = "none") + 
+  theme(axis.text.x = element_blank(),
+        legend.position = "none")
+
+plt_n2o_no3_area <-
+  effect_no3_area %>%
+  ggplot(aes(x = no3_cat, 
+             y = n2o_pred, 
+             group = log_area,
+             color = log_area)) +
+  stat_pointinterval(shape = 95,
+                     point_interval = "median_qi",
+                     position = position_dodge(width = 1.4, preserve = "single")) +
+  xlab("") +
+  ylab("") +
+  theme_pubr() +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 55), breaks = seq(0, 50, 10)) +
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_blank(),
+        legend.position = "none")
+
+plt_sat_no3_area <-
+  effect_no3_area %>%
+  ggplot(aes(x = no3_cat, 
+             y = sat_pred, 
+             group = log_area,
+             color = log_area)) +
+  stat_pointinterval(shape = 95,
+                     point_interval = "median_qi",
+                     position = position_dodge(width = 1.4, preserve = "single")) +
+  xlab(expression(paste("NO"[3], " category"))) +
+  ylab("") +
+  theme_pubr() +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 7), breaks = seq(0, 7, 1)) +
+  geom_hline(yintercept = 1, linetype = "dashed") +
+  theme(legend.position = "none",
+        axis.text.y = element_blank())
+
+plt_sat_area_no3 <-
+  effect_area_no3 %>%
+  ggplot() +
+  stat_lineribbon(aes(x = log_area,
+                      y = sat_pred, 
+                      group = no3_cat,
+                      color = no3_cat),
+                  point_interval = "median_qi",
+                  show.legend = TRUE,
+                  size = 0.7,
+                  .width = 0.95) +
+  xlab("log(surface area (ha))") +
+  ylab("Saturation ratio") +
+  theme_pubr() +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 7), breaks = seq(0, 7, 1)) +
+  scale_x_continuous(expand = c(0, 0)) +
+  geom_hline(yintercept = 1, linetype = "dashed") +
+  scale_fill_brewer(palette = "Greys", guide = "none") +
+  theme(legend.position = "none")
+
+legend1 <- effect_area_no3 %>%
+  ggplot() +
+  stat_lineribbon(aes(x = log_area,
+                      y = n2o_pred, 
+                      group = no3_cat,
+                      color = no3_cat),
+                  point_interval = "median_qi",
+                  show.legend = TRUE,
+                  size = 0.7,
+                  .width = 0.95) +
+  theme_void() +
+  scale_fill_brewer(palette = "Greys", guide = "none") + 
+  theme(legend.position = c(0.5, 0.1),
+        legend.direction = "horizontal",
+        legend.text = element_text(size = 10, angle = 45)) +
+  labs(color = expression(paste("NO"[3], " category"))) +
+  guides(color = guide_legend(title.position = "top", title.hjust = 0.5, title.vjust = 0.5))
+
+legend1 <- get_legend(legend1)
+
+legend2 <- 
+  effect_no3_area %>%
+  ggplot(aes(x = no3_cat, 
+             y = n2o_pred, 
+             group = log_area,
+             color = log_area)) +
+  stat_pointinterval(shape = 95,
+                     point_interval = "median_qi",
+                     position = position_dodge(width = 1.4, preserve = "single")) +
+  theme_void() +
+  theme(legend.position = c(0.5, 0.5),
+        legend.direction = "horizontal",
+        legend.text = element_text(size = 10, angle = 45)) +
+  labs(color = "log(surface area (ha))") +
+  guides(color = guide_legend(title.position = "top", title.hjust = 0.5, title.vjust = 1))
+
+legend2 <- get_legend(legend2)
+
+legendPlot <- ggarrange(legend1, legend2, ncol = 1)
+
+plt_area_effects <- ggarrange(plt_n2oeq_area,
+                                  legendPlot,
+                                  plt_n2o_area_no3,
+                                  plt_n2o_no3_area,
+                                  plt_sat_area_no3,
+                                  plt_sat_no3_area,
+                             ncol = 2,
+                             nrow = 3,
+                             widths = c(1, 1, 1, 1, 1, 1),
+                             heights = c(1, 1, 1, 1, 1, 1),
+                             labels = c("A", "Legend", "B", "C", "D", "E"),
+                             hjust = c(-6, -1, -6, -6, -6, -6),
+                             vjust = c(2, 2, 2, 2, 2, 2)
+                             )
+
+plt_area_effects <- plt_area_effects %>%
+  annotate_figure(plt_area_effects,
+                  left = text_grob("Posterior mean", 
+                                   size = 18, 
+                                   rot = 90)
+                  )
+# ggsave only works in R console (i.e., copy + paste to save)
+ggsave(filename = "cond_effect_area_no3.tif",
+       plot = plt_area_effects,
+       device = "tiff",
+       width = 180 / 25.4,
+       height = 210 / 25.4,
+       units = "in")
+```
+
+
+```{r plot_area_effects, fig.align='center', fig.asp=1.166667, fig.width=8, }
+plt_area_effects
+```
+
 # Predict to population
-As previously described, in order to make inferences to the population of interest, the final model above was used to, first, predict surface temperature in the target population, since it depended only on the fully observed covariates. Next, the predictive distribution for surface temperature was used, along with the relevant fully observed covariates, to predict NO3 in the target population. Finally, the predictive distributions for temperature and NO3 were used to predict the N2O responses. The code for these steps is outlined in the following.
+
+As mentioned above, in order to make inferences to the population of interest, the final model above was used to, first, predict surface temperature in the target population, since it depended only on the fully observed covariates. Next, the predictive distribution for surface temperature was used, along with the relevant fully observed covariates, to predict NO3 in the target population. Finally, the predictive distributions for temperature and NO3 were used to predict the N2O responses. The code for these steps is outlined in the following.
 
 The first step used the final model to predict surface temperature to the population:
 
@@ -3831,28 +4159,19 @@ predict_temp <- sframe %>%
   add_predicted_draws(n2o_mod6, resp=c("surftemp"), 
                       allow_new_levels = TRUE, 
                       cores =1, 
-                      ndraws = 500) %>%
+                      ndraws = 2000) %>%
   mutate(surftemp = .prediction)
 
-save(predict_temp, file = "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/predict_temp.rda")
+save(predict_temp, file = "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/predict_temp_b.rda")
 ```
 
-NO3 was next predicted using the posterior predictions for surface temperature and the other fully observed covariates. Note that the posterior predictive distribution for NO3 was subsampled in order to minimize excess simulations.
+NO3 was next predicted using the posterior predictions for surface temperature and the other fully observed covariates. Note that only one posterior draw per posterior predictive draw for surface temperature was used in order to reduce excess simulations.
 
 ```{r parallel_predict_draws, eval=FALSE, include=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod6.rda")
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/predict_temp.rda")
-
 temp_X <- predict_temp %>% # select relevant columns as predictors
   ungroup() %>%
-  select(WSA9,
-         state,
-         size_cat,
-         log_area,
-         .row,
-         .draw,
-         surftemp) %>%
-  select(WSA9, state, size_cat, log_area, surftemp)
+  arrange(.draw) %>%
+  select(.row, .draw, WSA9, state, size_cat, log_area, log_elev, surftemp)
 
 
 rm(predict_temp) # reduce memory
@@ -3860,43 +4179,43 @@ gc()
 
 # set number of cores to use for parallel predictions
 # and register the workers
-cl <- parallel::makeCluster(5) 
+cl <- parallel::makeCluster(25)
 doSNOW::registerDoSNOW(cl) 
 
 # make a progress bar
-pb <- txtProgressBar(max = 1500, style = 3)
+pb <- txtProgressBar(max = 2000, 
+                     style = 3)
 progress <- function(n) setTxtProgressBar(pb, n)
 opts <- list(progress = progress)
 
-system.time( # approx 26 hrs with 5 workers & 500 draws from PPD
-predict_no3 <- foreach(sub_X = isplitRows(temp_X, chunkSize = 155299), 
+system.time( # approx x hrs with 25 workers & 1 draw from PPD
+predict_no3 <- foreach(sub_X = isplitRows(temp_X, chunkSize = 465897), 
                        .combine = 'c',
                        .packages = c("brms"),
                        .options.snow = opts
                        ) %dopar% {
-                         apply(brms::posterior_predict(n2o_mod6,
+                         brms::posterior_predict(n2o_mod6,
                                                  newdata = sub_X,
                                                  resp = "no3cat",
                                                  allow_new_levels = T,
-                                                 ndraws = 500,
-                                                 cores = 1), 2, sample, 1)
+                                                 ndraws = 1,
+                                                 cores = 1)
                          }
 )
-
 
 close(pb)
 parallel::stopCluster(cl)
 
-save(predict_no3, file = "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/predict_no3.rda")
+save(predict_no3, file = "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/predict_no3_b.rda")
 ```
 
-Finally, dissolved and equilibrium N2O were predicted using the surface temperature and NO3 predictions along with the survey variables and known covariates. Again, the posterior was subsampled in order to reduce excess simulations.
+Finally, dissolved and equilibrium N2O were predicted using the surface temperature and NO3 predictions, along with the survey variables and other fully observed covariates.
 
 ```{r n2o_covariates_X, eval=FALSE, include=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/predict_no3.rda")
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/predict_temp.rda")
+# re-load the temp predictions into memory
+load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/predict_temp_b.rda")
 
-# Assemble dataframe containing relevant covariates (known and predicted)
+# Assemble dataframe containing relevant covariates (known and predicted) for predicting N2O responses.
 n2o_X <- predict_temp %>%
   ungroup() %>%
   mutate(no3_cat = predict_no3) %>%
@@ -3908,32 +4227,21 @@ n2o_X <- predict_temp %>%
          log_elev,
          no3_cat)
 
-# clear objects to reduce memory overhead
-rm(predict_no3, predict_temp) 
-gc()
-
-# save the predictors for n2o and n2oeq
-save(n2o_X, file = "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_X.rda")
-```
-
-
-```{r parallel_predict, eval=FALSE, include=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_mod6.rda")
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_X.rda")
+rm(predict_temp, predict_no3) # reduce memory
 
 # set number of cores to use for parallel predictions
 # and register the workers
-cl <- parallel::makeCluster(6) 
+cl <- parallel::makeCluster(25) 
 doSNOW::registerDoSNOW(cl) 
 
 # make a progress bar
-pb <- txtProgressBar(max = 1500, style = 3)
+pb <- txtProgressBar(max = 2000, style = 3)
 progress <- function(n) setTxtProgressBar(pb, n)
 opts <- list(progress = progress)
 
 # make predictions in parallel
 system.time(
-predict_n2o <- foreach(sub_X = isplitRows(n2o_X, chunkSize = 155299),
+predict_n2o <- foreach(sub_X = isplitRows(n2o_X, chunkSize = 465897),
                  .combine = rbind,
                  .options.snow = opts,
                  .packages = c("brms")) %dopar% {
@@ -3941,9 +4249,8 @@ predict_n2o <- foreach(sub_X = isplitRows(n2o_X, chunkSize = 155299),
                           newdata = sub_X,
                           resp = c("n2o", "n2oeq"),
                           allow_new_levels = T,
-                          ndraws = 500,
-                          cores = 1),
-        2, sample, 1)
+                          ndraws = 1,
+                          cores = 1), 3, t)
                    }
 )
 
@@ -3952,15 +4259,15 @@ parallel::stopCluster(cl)
 
 colnames(predict_n2o) <- c("n2o", "n2oeq")
 
-save(predict_n2o, file = "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/predict_n2o.rda")
+save(predict_n2o, file = "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/predict_n2o_b.rda")
 ```
 
 Finally, the predictions for all four partially observed responses were assembled into a new dataframe for use in inference:
 
 ```{r assemble_predictions, eval=FALSE, include=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/predict_n2o.rda")
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/predict_no3.rda")
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/predict_temp.rda")
+load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/predict_temp_b.rda")
+load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/predict_no3_b.rda")
+load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/predict_n2o_b.rda")
 
 all_predictions <- predict_temp %>%
   ungroup() %>%
@@ -3984,22 +4291,19 @@ all_predictions <- predict_temp %>%
          n2oeq,
          n2osat)
 
-rm(predict_n2o, predict_temp, predict_no3) # clean up workspace for RAM
-gc()
- 
-
-save(all_predictions, file = "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/all_predictions.rda")
+save(all_predictions, file = "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/all_predictions_b.rda")
 ```
 
+
 # Population estimates
+
 A number of estimates for the target population were assembled and presented below. First, the full posterior predictive distributions for dissolved N2O, equilibrium N2O, and the saturation ratio were assessed. These distributions summarized the predicted distribution of concentrations or ratios for all lakes in the population of interest and included parameter uncertainty propagated through the model. Next, population means were assessed, followed by comparisons of some model-based estimates to previously calculated design-based estimates.
 
 ## Posterior predictive distributions
-Below, a density plot summarized the posterior predictive distributions across the target population of lakes. The PPDs consisted of based on 500 simulations for each variable. Note that the x-axis was truncated at 50 nmol/L for a clearer visualization of the bulk of the predictive distribution. For reference, the max predicted value was 4403.2 nmol/L for dissolved N2O, 20.4 nmol/L for dissolved N2O, and 793.5 for the saturation ratio. 
 
-```{r plot_n2o_posterior_preds, echo=FALSE, fig.align='center', fig.height=5, fig.width=5, message=FALSE, warning=FALSE, cache=TRUE, cache.lazy=FALSE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/all_predictions.rda")
+Below, a density plot summarized the posterior predictive distributions across the target population of lakes. The summaries of the PPDs were based on 2000 draws. Note that the x-axis was truncated at 50 nmol/L for a clearer visualization of the bulk of the predictive distribution. For reference, the max predicted value was 4403.2 nmol/L for dissolved N2O, 20.4 nmol/L for dissolved N2O, and 793.5 for the saturation ratio. 
 
+```{r plot_n2o_posterior_preds, echo=FALSE, fig.align='center', fig.asp=1, fig.width=5, message=FALSE, warning=FALSE, cache=TRUE, cache.lazy=FALSE}
 all_predictions %>%
   group_by(.draw) %>% 
   slice_sample(n=1e4) %>% # simple random sample 10k lakes
@@ -4013,9 +4317,7 @@ all_predictions %>%
 ```
 
 
-```{r plot_n2oeq_posterior_preds, echo=FALSE, fig.align='center', fig.height=5, fig.width=5, message=FALSE, warning=FALSE, cache=TRUE}
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/all_predictions.rda")
-
+```{r plot_n2oeq_posterior_preds, echo=FALSE, fig.align='center', fig.asp=1, fig.width=5, message=FALSE, warning=FALSE, cache=TRUE}
 all_predictions %>%
   group_by(.draw) %>% 
   slice_sample(n=1e4) %>% # simple random sample 10k lakes
@@ -4029,9 +4331,7 @@ all_predictions %>%
 ```
 
 
-```{r plot_sat_posterior_preds, echo=FALSE, fig.align='center', fig.height=5, fig.width=5, message=FALSE, warning=FALSE, cache=TRUE}
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/all_predictions.rda")
-
+```{r plot_sat_posterior_preds, echo=FALSE, fig.align='center', fig.asp=1, fig.width=5, message=FALSE, warning=FALSE, cache=TRUE}
 all_predictions %>%
   group_by(.draw) %>% 
   slice_sample(n=1e4) %>% # simple random sample 10k lakes
@@ -4047,12 +4347,12 @@ all_predictions %>%
 
 
 ## Estimated means
+
 ### National
+
 Below are density plots summarizing the posterior distribution of _means_ for N2O concentrations and the saturation ratio for all US lakes and reservoirs > 4ha in the lower 48 states).
 
-```{r plot_n2o_nat_posterior_mean, echo=FALSE, fig.align='center', fig.height=4, fig.width=4, message=FALSE, warning=FALSE, cache=TRUE}
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/all_predictions.rda")
-
+```{r plot_n2o_nat_posterior_mean, echo=FALSE, fig.align='center', fig.asp=1, fig.width=5, message=FALSE, warning=FALSE, cache=TRUE}
 all_predictions %>%
   group_by(.draw) %>% 
   summarise(mean_n2o = mean(n2o)) %>%
@@ -4064,9 +4364,7 @@ all_predictions %>%
 ```
 
 
-```{r plot_n2oeq_nat_posterior_mean, echo=FALSE, fig.align='center', fig.height=4, fig.width=4, message=FALSE, warning=FALSE, cache=TRUE}
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/all_predictions.rda")
-
+```{r plot_n2oeq_nat_posterior_mean, echo=FALSE, fig.align='center', fig.asp=1, fig.width=5, message=FALSE, warning=FALSE, cache=TRUE}
 all_predictions %>%
   group_by(.draw) %>% 
   summarise(mean_n2o = mean(n2oeq)) %>%
@@ -4078,9 +4376,7 @@ all_predictions %>%
 ```
 
 
-```{r plot_sat_nat_posterior_mean, echo=FALSE, fig.align='center', fig.height=4, fig.width=4, message=FALSE, warning=FALSE, cache=TRUE}
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/all_predictions.rda")
-
+```{r plot_sat_nat_posterior_mean, echo=FALSE, fig.align='center', fig.asp=1, fig.width=5, message=FALSE, warning=FALSE, cache=TRUE}
 all_predictions %>%
   group_by(.draw) %>% 
   summarise(mean_sat = mean(n2o/n2oeq)) %>%
@@ -4091,11 +4387,11 @@ all_predictions %>%
   theme_tidybayes()
 ```
 
+
 To illustrate the skewness in the predictive distribution for the saturation ratio, an estimate for the median ratio is shown below. The entire posterior distribution of the mean above was larger than 1, which represents the boundary of under- _vs._ oversaturation. By comparison, the posterior estimate of the median below only included values less than one, suggesting that though the mean saturation ratio was likely greater than 1, most lakes in the national population were undersaturated (i.e., ratio less than 1). In distributions with strong right-skew, the mean can often be considerably larger than the median.
 
-```{r plot_sat_nat_posterior_median, echo=FALSE, fig.align='center', fig.height=4, fig.width=4, message=FALSE, warning=FALSE, cache=TRUE}
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/all_predictions.rda")
 
+```{r plot_sat_nat_posterior_median, echo=FALSE, fig.align='center', fig.asp=1, fig.width=5, message=FALSE, warning=FALSE, cache=TRUE}
 all_predictions %>%
   group_by(.draw) %>% 
   summarise(median_sat = median(n2o/n2oeq)) %>%
@@ -4108,9 +4404,7 @@ all_predictions %>%
 
 Below is a plot of the posterior mean estimate for the proportion of unsaturated lakes at the national scale.
 
-```{r plot_undersat_posterior_mean, echo=FALSE, fig.align='center', fig.height=4, fig.width=4, message=FALSE, warning=FALSE, cache=TRUE}
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/all_predictions.rda")
-
+```{r plot_undersat_posterior_mean, echo=FALSE, fig.align='center', fig.asp=1, fig.width=5, message=FALSE, warning=FALSE, cache=TRUE}
 all_predictions %>%
   group_by(.draw) %>%
   summarise(prop_sat = sum(n2osat < 1) / length(unique(.row))) %>%
@@ -4122,11 +4416,10 @@ all_predictions %>%
 ```
 
 ### Ecoregion
+
 Below are posterior estimates of the means for dissolved and equilibrium N2O and the saturation ratio by WSA9 ecoregion.
 
-```{r plot_n2o_wsa9_posterior_mean, echo=FALSE, fig.align='center', fig.height=8, fig.width=4, message=FALSE, warning=FALSE, cache=TRUE}
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/all_predictions.rda")
-
+```{r plot_n2o_wsa9_posterior_mean, echo=FALSE, fig.align='center', fig.asp=2, fig.width=5, message=FALSE, warning=FALSE, cache=TRUE}
 all_predictions %>%
   group_by(WSA9, .draw) %>%
   summarise(mean_n2o = mean(n2o), .groups = "drop") %>%
@@ -4142,9 +4435,7 @@ all_predictions %>%
 ```
 
 
-```{r plot_n2oeq_wsa9_posterior_mean, echo=FALSE, fig.align='center', fig.height=8, fig.width=4, message=FALSE, warning=FALSE, cache=TRUE}
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/all_predictions.rda")
-
+```{r plot_n2oeq_wsa9_posterior_mean, echo=FALSE, fig.align='center', fig.asp=2, fig.width=5, message=FALSE, warning=FALSE, cache=TRUE}
 all_predictions %>%
   group_by(WSA9, .draw) %>%
   summarise(mean_n2oeq = mean(n2oeq), .groups = "drop") %>%
@@ -4159,9 +4450,7 @@ all_predictions %>%
 ```
 
 
-```{r plot_sat_wsa9_posterior_mean, echo=FALSE, fig.align='center', fig.height=8, fig.width=4, message=FALSE, warning=FALSE, cache=TRUE}
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/all_predictions.rda")
-
+```{r plot_sat_wsa9_posterior_mean, echo=FALSE, fig.align='center', fig.asp=2, fig.width=5, message=FALSE, warning=FALSE, cache=TRUE}
 all_predictions %>%
   group_by(WSA9, .draw) %>%
   summarise(mean_sat = mean(n2o/n2oeq), .groups = "drop") %>%
@@ -4175,11 +4464,9 @@ all_predictions %>%
   theme_tidybayes()
 ```
 
-A plot of the posterior estimates for the median saturation ratio below indicated, again, that most lakes in each ecoregion were undersaturated (i.e., median << 1).
+A plot of the posterior estimates for the median saturation ratio below indicated that most lakes in each ecoregion were undersaturated (i.e., median < 1).
 
-```{r plot_sat_wsa9_posterior_median, echo=FALSE, fig.align='center', fig.height=8, fig.width=4, message=FALSE, warning=FALSE, cache=TRUE}
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/all_predictions.rda")
-
+```{r plot_sat_wsa9_posterior_median, echo=FALSE, fig.align='center', fig.asp=2, fig.width=5, message=FALSE, warning=FALSE, cache=TRUE}
 all_predictions %>%
   group_by(WSA9, .draw) %>%
   summarise(median_sat = median(n2o/n2oeq), .groups = "drop") %>%
@@ -4196,9 +4483,7 @@ all_predictions %>%
 A plot of the estimates of the proportion of under-saturated lakes by ecoregion is below.
 These summaries again suggested that most lakes in each ecoregion were likely undersaturated (i.e., median << 1).
 
-```{r plot_prop_sat_wsa9_posterior_median, echo=FALSE, fig.align='center', fig.height=8, fig.width=4, message=FALSE, warning=FALSE, cache=TRUE}
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/all_predictions.rda")
-
+```{r plot_prop_sat_wsa9_posterior_median, echo=FALSE, fig.align='center', fig.asp=2, fig.width=5, message=FALSE, warning=FALSE, cache=TRUE}
 all_predictions %>%
   group_by(WSA9, .draw) %>%
   summarise(prop_sat = sum(n2osat < 1) / length(unique(.row)), .groups = "drop") %>%
@@ -4213,11 +4498,10 @@ all_predictions %>%
 ```
 
 ### State
-Comparisons of mean estimates by state are below. Density estimates were not included to minimize the vertical plot space.
 
-```{r plot_state_mean_n2o, echo=FALSE, fig.align='center', fig.height=5, fig.width=8, message=FALSE, warning=FALSE, cache=TRUE}
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/all_predictions.rda")
+Comparisons of mean estimates by state are below. Density polygons were not included to minimize the vertical plot space.
 
+```{r plot_state_mean_n2o, echo=FALSE, fig.align='center', fig.asp=0.5, fig.width=10, message=FALSE, warning=FALSE, cache=TRUE}
 all_predictions %>%
   group_by(state, .draw) %>%
   summarise(mean_n2o = mean(n2o), .groups = "drop") %>%
@@ -4239,9 +4523,7 @@ all_predictions %>%
 ```
 
 
-```{r plot_state_mean_n2oeq, echo=FALSE, fig.align='center', fig.height=5, fig.width=8, message=FALSE, warning=FALSE, cache=TRUE}
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/all_predictions.rda")
-
+```{r plot_state_mean_n2oeq, echo=FALSE, fig.align='center', fig.asp=0.5, fig.width=10, message=FALSE, warning=FALSE, cache=TRUE}
 all_predictions %>%
   group_by(state, .draw) %>%
   summarise(mean_n2oeq = mean(n2oeq), .groups = "drop") %>%
@@ -4262,11 +4544,9 @@ all_predictions %>%
   theme(axis.text.x = element_text(size=9, angle=45))
 ```
 
-Below is a plot of estimates for the mean (black circles) and median (grey circles) saturation ratio by state. A horizontal, dashed, black line is shown at ratio = 1, indicating the boundary for under- _vs._ oversaturation. Only a few states (e.g., NV, DE) had median estimates that were 1 or greater, suggesting that, for most states, most lakes were undersaturated.
+Below is a plot of estimates for the mean (black circles) and median (grey circles) saturation ratio by state. A horizontal, dashed, black line is shown at ratio = 1, indicating the boundary for under- _vs._ oversaturation. Only a few states (e.g., NV, DE) had median estimates that were 1 or greater, suggesting that, for most states, most lakes were estimated to be undersaturated.
 
-```{r plot_state_mean_median_sat, echo=FALSE, fig.align='center', fig.height=5, fig.width=8, message=FALSE, warning=FALSE, cache=TRUE}
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/all_predictions.rda")
-
+```{r plot_state_mean_median_sat, echo=FALSE, fig.align='center', fig.asp=0.5, fig.width=10, message=FALSE, warning=FALSE, cache=TRUE}
 all_predictions %>%
   group_by(state, .draw) %>%
   summarise(mean_sat = mean(n2osat), 
@@ -4309,9 +4589,7 @@ all_predictions %>%
 
 Finally, a plot of the estimated proportion of undersaturated lakes for each state in the target population. Point estimates are the posterior median of the proportion and bars are the upper and lower boundaries of the central 95th percentile of the posterior distributions of proportions.
 
-```{r plot_state_prop_sat, echo=FALSE, fig.align='center', fig.height=5, fig.width=8, message=FALSE, warning=FALSE, cache=TRUE}
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/all_predictions.rda")
-
+```{r plot_state_prop_sat, echo=FALSE, fig.align='center', fig.asp=0.5, fig.width=10, message=FALSE, warning=FALSE, cache=TRUE}
 all_predictions %>%
   group_by(state, .draw) %>%
   summarise(prop_sat = sum(n2osat < 1) / length(unique(.row)),
@@ -4338,11 +4616,10 @@ all_predictions %>%
 ```
 
 ### Size category
+
 The estimated means and medians by size category are below for dissolved and equilibrium N2O and the saturation ratio.
 
-```{r plot_n2o_size_posterior_mean, echo=FALSE, fig.align='center', fig.height=6, fig.width=4, message=FALSE, warning=FALSE, cache=TRUE}
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/all_predictions.rda")
-
+```{r plot_n2o_size_posterior_mean, echo=FALSE, fig.align='center', fig.asp=2, fig.width=5, message=FALSE, warning=FALSE, cache=TRUE}
 all_predictions %>%
   group_by(size_cat, .draw) %>%
   summarise(mean_n2o = mean(n2o),
@@ -4355,9 +4632,7 @@ all_predictions %>%
 ```
 
 
-```{r plot_n2oeq_size_posterior_mean, echo=FALSE, fig.align='center', fig.height=6, fig.width=4, message=FALSE, warning=FALSE, cache=TRUE}
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/all_predictions.rda")
-
+```{r plot_n2oeq_size_posterior_mean, echo=FALSE, fig.align='center', fig.asp=2, fig.width=5, message=FALSE, warning=FALSE, cache=TRUE}
 all_predictions %>%
   group_by(size_cat, .draw) %>%
   summarise(mean_n2o = mean(n2oeq),
@@ -4370,9 +4645,7 @@ all_predictions %>%
 ```
 
 
-```{r plot_sat_size_posterior_mean, echo=FALSE, fig.align='center', fig.height=6, fig.width=4, message=FALSE, warning=FALSE, cache=TRUE}
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/all_predictions.rda")
-
+```{r plot_sat_size_posterior_mean, echo=FALSE, fig.align='center', fig.asp=2, fig.width=5, message=FALSE, warning=FALSE, cache=TRUE}
 all_predictions %>%
   group_by(size_cat, .draw) %>%
   summarise(mean_n2o = mean(n2osat),
@@ -4386,9 +4659,7 @@ all_predictions %>%
 ```
 
 
-```{r plot_sat_size_posterior_median, echo=FALSE, fig.align='center', fig.height=6, fig.width=4, message=FALSE, warning=FALSE, cache=TRUE}
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/all_predictions.rda")
-
+```{r plot_sat_size_posterior_median, echo=FALSE, fig.align='center', fig.asp=2, fig.width=5, message=FALSE, warning=FALSE, cache=TRUE}
 all_predictions %>%
   group_by(size_cat, .draw) %>%
   summarise(mean_n2o = median(n2osat),
@@ -4403,9 +4674,7 @@ all_predictions %>%
 
 Mean _vs._ median below.
 
-```{r plot_size_cat_mean_median_sat, echo=FALSE, fig.align='center', fig.height=5, fig.width=8, message=FALSE, warning=FALSE, cache=TRUE}
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/all_predictions.rda")
-
+```{r plot_size_cat_mean_median_sat, echo=FALSE, fig.align='center', fig.asp=2, fig.width=5, message=FALSE, warning=FALSE, cache=TRUE}
 all_predictions %>%
   group_by(size_cat, .draw) %>%
   summarise(mean_sat = mean(n2osat), 
@@ -4448,9 +4717,7 @@ all_predictions %>%
 
 And, finally, the estimated proportion of undersaturated lakes in the target population by size category.
 
-```{r plot_prop_sat_size_cat_posterior_median, echo=FALSE, fig.align='center', fig.height=6, fig.width=4, message=FALSE, warning=FALSE, cache=TRUE}
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/all_predictions.rda")
-
+```{r plot_prop_sat_size_cat_posterior_median, echo=FALSE, fig.align='center', fig.asp=2, fig.width=5, message=FALSE, warning=FALSE, cache=TRUE}
 all_predictions %>%
   group_by(size_cat, .draw) %>%
   summarise(prop_sat = sum(n2osat < 1) / length(unique(.row)), .groups = "drop") %>%
@@ -4464,16 +4731,14 @@ all_predictions %>%
 ```
 
 ## Model- _vs._ design-based
+
 Below, estimates from the model-based approach are compared to previously calculated, design-based estimates. In general, the model-based estimates were similar to the design-based estimates. The model-based estimates were typically within the confidence bounds of the design-based estimates, but with much greater precision. Improved precision was expected due to the "shrinkage" induced by the multilevel parameterization, which affords some "borrowing" of information across the various levels of the survey factors. 
 
 ### Dissolved N2O
-Below, National mean estimates for dissolved N2O from the model and design-based approaches were compared. The sample-based estimate was also included as a reference. The black, vertical, dashed line represents the mean of the sample.
+
+Below, National mean estimates for dissolved N2O from the model and design-based approaches were compared. The sample-based estimate was also included as a reference. The black, vertical, dashed line indicates the mean of the sample.
 
 ```{r n2o_means_national, message=FALSE, cache=TRUE}
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/df_model.rda")
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_survey_ests.rda")
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/all_predictions.rda")
-
 all_predictions %>%
   group_by(.draw) %>%
   summarise(mean_n2o = mean(n2o)) %>%
@@ -4488,11 +4753,7 @@ all_predictions %>%
 ```
 
 
-```{r plot_n2o_means_national, echo=FALSE, fig.align='center', fig.height=2, fig.width=4, message=FALSE, warning=FALSE, cache=TRUE}
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/df_model.rda")
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/all_predictions.rda")
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_survey_ests.rda")
-
+```{r plot_n2o_means_national, echo=FALSE, fig.align='center', fig.asp=0.5, fig.width=5, message=FALSE, warning=FALSE, cache=TRUE}
 all_predictions %>%
   group_by(.draw) %>%
   summarise(mean_n2o = mean(n2o)) %>%
@@ -4518,9 +4779,6 @@ all_predictions %>%
 Below, estimates were compared by ecoregion.
 
 ```{r n2o_mean_wsa9, message=FALSE, warning=FALSE, cache=TRUE}
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/all_predictions.rda")
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_survey_ests.rda")
-
 all_predictions %>%
   group_by(WSA9, .draw) %>%
   summarise(mean_n2o = mean(n2o)) %>%
@@ -4539,10 +4797,7 @@ all_predictions %>%
 ```
 
 
-```{r plot_mean_n2o_wsa9, echo=FALSE, fig.align='center', fig.height=4, fig.width=6, message=FALSE, warning=FALSE, cache=TRUE}
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/all_predictions.rda")
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_survey_ests.rda")
-
+```{r plot_mean_n2o_wsa9, echo=FALSE, fig.align='center', fig.asp=2, fig.width=5, message=FALSE, warning=FALSE, cache=TRUE}
 all_predictions %>%
   group_by(WSA9, .draw) %>%
   summarise(mean_n2o = mean(n2o), .groups = "drop") %>%
@@ -4568,10 +4823,7 @@ all_predictions %>%
 
 Means were compared according to size categories below.
 
-```{r table_size_mean_n2o, echo=FALSE, fig.align='center', fig.height=4, fig.width=6, message=FALSE, warning=FALSE, cache=TRUE}
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/all_predictions.rda")
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_survey_ests_size.rda")
-
+```{r table_size_mean_n2o, echo=FALSE,message=FALSE, warning=FALSE, cache=TRUE}
 all_predictions %>%
   group_by(size_cat, .draw) %>%
   summarise(mean_n2o = mean(n2o), .groups = "drop") %>%
@@ -4591,10 +4843,7 @@ all_predictions %>%
 ```
 
 
-```{r plot_size_mean_n2o, echo=FALSE, fig.align='center', fig.height=4, fig.width=6, message=FALSE, warning=FALSE, cache=TRUE}
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/all_predictions.rda")
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/n2o_survey_ests_size.rda")
-
+```{r plot_size_mean_n2o, echo=FALSE, fig.align='center', fig.asp=1.5, fig.width=5, message=FALSE, warning=FALSE, cache=TRUE}
 all_predictions %>%
   group_by(size_cat, .draw) %>%
   summarise(mean_n2o = mean(n2o), .groups = "drop") %>%
@@ -4619,13 +4868,10 @@ all_predictions %>%
 ```
 
 ### Saturation
+
 Below, the same comparisons were made for the saturation estimates.
 
-```{r table_nat_sat_mean, message=FALSE, warning=FALSE, fig.align='center', fig.height=6, fig.width=8, cache=TRUE}
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/df_model.rda")
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/all_predictions.rda")
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/sat_survey_ests.rda")
-
+```{r table_nat_sat_mean, message=FALSE, warning=FALSE, cache=TRUE}
 all_predictions %>%
   group_by(.draw) %>%
   summarise(mean_sat = mean(n2osat), .groups = "drop") %>%
@@ -4641,11 +4887,7 @@ all_predictions %>%
 ```
 
 
-```{r plot_nat_sat_mean, echo=FALSE, fig.align='center', fig.height=2, fig.width=4, message=FALSE, warning=FALSE, cache=TRUE}
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/df_model.rda")
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/all_predictions.rda")
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/sat_survey_ests.rda")
-
+```{r plot_nat_sat_mean, echo=FALSE, fig.align='center', fig.asp=0.5, fig.width=5, message=FALSE, warning=FALSE, cache=TRUE}
 all_predictions %>%
   group_by(.draw) %>%
   summarise(mean_sat = mean(n2osat)) %>%
@@ -4668,10 +4910,7 @@ all_predictions %>%
 ```
 
 
-```{r plot_wsa9_sat_mean, echo=FALSE, fig.align='center', fig.height=4, fig.width=6, message=FALSE, warning=FALSE, cache=TRUE}
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/all_predictions.rda")
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/sat_survey_ests.rda")
-
+```{r plot_wsa9_sat_mean, echo=FALSE, fig.align='center', fig.asp=2, fig.width=5, message=FALSE, warning=FALSE, cache=TRUE}
 all_predictions %>%
   group_by(WSA9, .draw) %>%
   summarise( mean_sat = mean(n2osat), .groups = "drop") %>%
@@ -4698,10 +4937,7 @@ all_predictions %>%
 ```
 
 
-```{r table_size_sat_mean, echo=FALSE, fig.align='center', fig.height=4, fig.width=6, message=FALSE, warning=FALSE, cache=TRUE}
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/all_predictions.rda")
-load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/sat_survey_ests_size.rda")
-
+```{r table_size_sat_mean, echo=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
 all_predictions %>%
   group_by(size_cat, .draw) %>%
   summarise(mean_sat = mean(n2osat), .groups = "drop") %>%
@@ -4719,9 +4955,7 @@ all_predictions %>%
 ```
 
 
-```{r plot_size_sat_mean, echo=FALSE, fig.align='center', fig.height=4, fig.width=6, message=FALSE, warning=FALSE, cache=TRUE}
-#load("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/all_predictions.rda")
-
+```{r plot_size_sat_mean, echo=FALSE, fig.align='center', fig.asp=1.5, fig.width=5, message=FALSE, warning=FALSE, cache=TRUE}
 all_predictions %>%
   group_by(size_cat, .draw) %>%
   summarise(mean_sat = mean(n2osat), .groups = "drop") %>%
@@ -4738,6 +4972,7 @@ all_predictions %>%
   geom_point(position=position_dodge(width=0.5)) +
   geom_linerange(aes(ymin = LCL, ymax = UCL) , position=position_dodge(width=0.5)) +
   scale_colour_manual(values = c("black", "grey")) +
+  geom_hline(yintercept = 1, color = "lightgrey") +
   ylab("mean N2O saturation ratio") +
   ggtitle("Size category estimates comparison") +
   coord_flip() + 
