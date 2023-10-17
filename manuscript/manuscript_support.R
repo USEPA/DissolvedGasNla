@@ -1,25 +1,42 @@
 ## This script generates data to be referenced in inline-code in the manuscript.
-## This makes the inline code more succint and the .Rmd easier to read.
+## This makes the inline code more succinct and the .Rmd easier to read.
 
+# 32 minutes to run on DMAP with images already stored locally
 
 # SETUP----------------------
+## Identify local path for each user
+localPath <- Sys.getenv("USERPROFILE")
+
 ## load libraries
+# DMAP not under renv control.  Should probably specify same
+# versions as used for renv library
+if(localPath == "") { # if DMAP, then
+install.packages(c("sf", "tidyverse", "janitor",
+                   "tictoc", "ggpubr", "ggallin",
+                   "devtools"))
+devtools::install_version("USAboundaries", "0.4.0")
+}
+
 library(sf) # spatial data
 library(tidyverse) # dplyr, ggplot
 library(janitor) # clean names
 library(USAboundaries) # state boundaries
 library(tictoc) # processing time
+library(ggpubr) # multiple plots
+library(ggallin) # psuedlolog transformation for negative values
 
-## Identify local path for each user
-localPath <- Sys.getenv("USERPROFILE")
 
 
 # DATA---------------
 ## load sample data (dg object)----
+if(localPath == "") { # if DMAP, then
+  load("inputData/dg.2021-02-01.RData")
+} else { # if not DMAP, then...
 load(paste0(localPath,  # object name dg
             "/Environmental Protection Agency (EPA)/",
             "ORD NLA17 Dissolved Gas - Documents/",
             "inputData/dg.2021-02-01.RData"))
+}
 
 # To enable spatial analysis of the data, the dataframe will be converted to a 
 # 'simple features' (sf) object.
@@ -33,12 +50,17 @@ dg.sf <- st_as_sf(dg, coords = c("map.lon.dd", "map.lat.dd"),
 
 ## load ecoregions----
 # read in ecoregion polygons
+if(localPath == ""){ # if DMAP, then
+  ecoR <- st_read(dsn = "inputData",
+                  layer = "aggr_ecoregions_simple",
+                  quiet = TRUE)
+  } else { # if not DMAP, then...
 ecoR <- st_read(dsn = paste0(localPath, 
                              "/Environmental Protection Agency (EPA)/",
                              "ORD NLA17 Dissolved Gas - Documents/inputData"),
                 layer = "aggr_ecoregions_simple",
                 quiet = TRUE)
-
+}
 # Check CRS
 st_crs(ecoR) # 3857
 ecoR <- st_transform(ecoR, 5070) # convert to CONUS Albers
@@ -66,11 +88,23 @@ states <- USAboundaries::us_states() %>%
 
 
 ## load population data----
-#tic()
+#tic() # 7.6min on DMAP
+if(localPath == ""){ # if DMAP, then
+  load("../../shared/jbeaulie/all_predictions.rda")
+} else { # if not DMAP
 load(paste0(localPath, "\\Environmental Protection Agency (EPA)\\",
             "ORD NLA17 Dissolved Gas - Documents\\",
             "inputData\\all_predictions.rda"))
+}
 #toc()
+
+# remove Great Salt Lake
+dim(all_predictions) #  931794000        13
+all_predictions <- all_predictions %>%
+  filter(.row != 258807) # this row id is for Great Salt lake, 431066 ha
+dim(all_predictions) # 931792000 13, good, removed 2000 instances of salt lake
+
+format(object.size(all_predictions), "Gb") # 72.9 GB
 
 # add full ecoregion names to all_predictions
 wsa9names <- structure(list(WSA9 = c("CPL", "NAP", "NPL", "SAP", "SPL", 
@@ -90,10 +124,15 @@ all_predictions <- full_join(all_predictions, wsa9names)
 ### read wind data----
 # Mean index period wind speed was calculated on VM via 
 # nlaSampleFrameWind.R.  The resulting data object was written out and read in below.
+if(localPath == ""){ # if DMAP, then
+  wind <- read.table("inputData/windSampleFrame.txt")
+} else { # if not DMAP, then...
 wind <- read.table(paste0(Sys.getenv("USERPROFILE"), 
                           "/Environmental Protection Agency (EPA)/",
                           "ORD NLA17 Dissolved Gas - Documents/",
                           "inputData/windSampleFrame.txt"))
+}
+
 # print first 6 lines
 wind %>% head()
 
@@ -112,11 +151,12 @@ wind <- wind %>% mutate(.id = row_number())
 
 # Merge wind and all_predictions
 #tic() # 21 seconds on VM
-all_predictions <- full_join(all_predictions, wind, by = c(".row" = ".id")) # 40 seconds on laptop
+# left join needed to exclude great salt lake in wind data.  see line 88-93
+all_predictions <- left_join(all_predictions, wind, by = c(".row" = ".id")) # 40 seconds on laptop
 #toc()
 dim(wind) # 465897
-dim(all_predictions) #232948500, 500 observations for each lake
-465897*500 #232948500
+dim(all_predictions) #931792000, 2000 observations for each lake
+465896*2000 #931792000
 
 summary(wind$ws)
 
@@ -140,7 +180,9 @@ pred.k600 <- function(ws, area) {
 all_predictions <- all_predictions %>%
   mutate(k600.cm.h = pred.k600(ws = ws, area = area_ha/100), # 100ha = 1km2
          ScN2o = 2055.6 - 137.11*surftemp + 4.3173*surftemp^2 - 0.05435*surftemp^3, # schmidt number (Wanninkhof et al 1992)
-         kn2o.cm.h = k600.cm.h * (ScN2o/600)^-(2/3), #k600 to kn2o
+         #k600 to kn2o
+         kn2o.cm.h = case_when(surftemp <= 30 ~ k600.cm.h * (ScN2o/600)^-(2/3), # conversion only good up to 30C. see paper!
+                               TRUE ~ k600.cm.h),
          # 1000 L to m3. 44ng to 1nmol. ng->ug. ug->mg
          e.n2o.mg.m2.d = (((n2o - n2oeq) * 1000 * 44) / (1000 * 1000)) * 
            (k600.cm.h * (24/100)), #h->day. cm->m
@@ -154,11 +196,12 @@ ecoreg_stats <- all_predictions %>%
   summarise( mean_n2o = mean(n2o),
              mean_n2oeq = mean(n2oeq),
              mean_sat = mean(n2osat),
+             median_sat = median(n2osat),
              prop_sat = sum(n2osat < 1) / length(unique(.row)),
              mean_en2o = mean(e.n2o.mg.m2.d),
              median_en2o = median(e.n2o.mg.m2.d),
              fn2o_Mg = sum(f.n2o.Mg.y),
-             mean_no3 = mean(no3cat),
+             mean_no3 = mean(no3_cat),
              total_sa = sum(area_ha),
              prop_small = sum(size_cat == "min_4") / length(unique(.row))) %>%
   summarise( post_med_n2o = round(median(mean_n2o), 1),
@@ -168,6 +211,7 @@ ecoreg_stats <- all_predictions %>%
              LCI_n2oeq = round(quantile(mean_n2oeq, probs = 0.025), 2),
              UCI_n2oeq = round(quantile(mean_n2oeq, probs = 0.975), 2),
              post_med_sat = round(median(mean_sat), 2),
+             post_med_med_sat = round(median(median_sat), 2),
              LCI_sat = round(quantile(mean_sat, probs = 0.025), 2),
              UCI_sat = round(quantile(mean_sat, probs = 0.975), 2),
              estimate = round(median(prop_sat), 3),
@@ -262,37 +306,33 @@ if(!("figure2.tiff" %in% list.files("manuscript/manuscript_figures"))) {
   # density plots of predicted distribution, mean, and median
   # using xlim to zoom in on values close to 1
   
-  dummy <- all_predictions %>%
-    group_by(WSA9) %>%
-    summarize(mean = mean(n2osat),
-              median = median(n2osat)) %>%
-    mutate(dens.med = c(2, 2.5, 2.3, 2.05, 1.75, 2.15, 2.2, 1.9, 1.9),
-           dens.mean = c(.4, 1.9, 2, .6, .65, .45, 1.5, 1.45, 0.9),
+  dummy <- ecoreg_stats %>%
+                        #CPL   NAP   NPL    SAP    SPL   TPL  UWM    WMT    XER
+    mutate(dens.med = c(2.5,  4,    3.1,   3.5,   2.5,  3,   3,      2,     2.5),
+           dens.mean = c(.5,  3,    2.5,   1.5,   1,    1,   2,      1.5,   1.1),
            .draw = 1) # needed to match grouping aesthetic in ggplot call
   
-  # tic() # 40 seconds for 100 draws
+  tic() # 60 seconds for 100 draws, and 16 minutes for 2000 draws, on memory intensive DMAP.  
   all_predictions %>%
-    filter(.draw %in% 1:100) %>% # subset for practice
-    #mutate(ecoregion = factor(WSA9)) %>%
-    #mutate(ecoregion = fct_reorder(ecoregion, preds_sat)) %>%
+    #filter(.draw %in% 1:100) %>% # subset for practice
     ggplot(aes(x = n2osat, group = .draw, color = .draw ) ) +
     geom_density(show.legend = FALSE) +
     geom_vline(xintercept = 1, color = "red") +
     geom_segment(data = dummy,
-                 aes(x = mean, xend = mean, y = 0,
-                     yend = dens.mean),
+                 aes(x = post_med_sat, xend = post_med_sat, 
+                     y = 0, yend = dens.mean),
                  linetype = "solid") +
     geom_segment(data = dummy,
-                 aes(x = median, xend = median, y = 0,
-                     yend = dens.med),
+                 aes(x = post_med_med_sat, xend = post_med_med_sat, 
+                     y = 0, yend = dens.med),
                  linetype = "dashed") +
     ylab ("density") + 
     xlab(expression(N[2]*O~saturation~ratio)) +
     xlim(0,3) + # data range is 0-600, but sample max is 30
-    facet_wrap(~WSA9) +
+    facet_wrap(~WSA9_NAME) +
     theme_bw() +
     theme(legend.position = "none")
-  # toc()
+  toc()
   ggsave("manuscript/manuscript_figures/figure2.tiff", width = 8.5, height = 5)
   
 }
@@ -300,67 +340,67 @@ if(!("figure2.tiff" %in% list.files("manuscript/manuscript_figures"))) {
 ## Figure X: delta N2O by waterbody size----
 # See 'N2O saturation ratio: continuous variable' section of dgIndicatorAnalysis.Rmd
 # if the image is already on computer, then nothing, else create image
-if(!("deltaN2ObySize.tiff" %in% list.files("manuscript/manuscript_figures"))) {
+if(!("n2oStarBySize.tiff" %in% list.files("manuscript/manuscript_figures"))) {
   
 
-  
+# originally drafted as three panel figure, but decided to scale down to one panel.
 # PLOT N2O SAT RATIO BY WSA9 AND SIZE
-# point and linerange
-p1.data <- all_predictions %>%
-  filter(WSA9 %in% c("CPL", "NPL")) %>% # only show two examples.  comment out to include all ecoregions
-  group_by(WSA9_NAME, size_cat, .draw) %>% # group by iteration
-  summarise(mean_sat = mean(n2osat)) %>% # 500 means for each WSA9
-  # now summarize to 1 statistic per WSA9
-  summarise( estimate = round(median(mean_sat), 3),
-             LCL = round(quantile(mean_sat, probs = 0.025), 3),
-             UCL = round(quantile(mean_sat, probs = 0.975), 3)) 
-  # mutate(ecoregion = factor(WSA9_NAME)) %>%
-  # mutate(ecoregion = fct_reorder(ecoregion, estimate))
-
-# data for arrow segment.  Only smallest size category.  Only CPL and NPL.
-p1.data.arrow <- p1.data %>%
-  filter(size_cat == "min_4")
-
-# pushing CPL and NPL to separate ggplot images to allow ggpubr
-# to label each plot A, B, and C.  When pushing to two panels
-# via faceting, ggpubr couldn't separately label the panels.
-
-# CPL plot
-p1.cpl <- p1.data %>%
-  filter(WSA9_NAME == "Coastal Plains") %>%
-  ggplot(aes(x=estimate, y=size_cat)) +
-  geom_point() +
-  geom_linerange( aes( xmin = LCL, xmax = UCL)) +
-  geom_vline(xintercept = 1, color='blue') +
-  geom_segment(data = p1.data.arrow %>% filter(WSA9_NAME == "Coastal Plains"),
-               aes(x=1, y = size_cat, xend = estimate, yend = size_cat),
-               arrow = arrow(length = unit(0.2, "cm")),
-               color = "red") +
-  xlab(expression(mean~N[2]*O~saturation~ratio)) +
-  xlim(0.9, 1.3) +
-  ylab("waterbody size category (ha)") +
-  theme_bw() +
-  theme(axis.title.y = element_blank(),
-        axis.title.x = element_blank()) +
-  facet_grid(rows = vars(WSA9_NAME))
-
-# NPL plot
-p1.npl <- p1.data %>%
-  filter(WSA9_NAME == "Northern Plains") %>%
-  ggplot(aes(x=estimate, y=size_cat)) +
-  geom_point() +
-  geom_linerange( aes( xmin = LCL, xmax = UCL)) +
-  geom_vline(xintercept = 1, color='blue') +
-  geom_segment(data = p1.data.arrow %>% filter(WSA9_NAME == "Northern Plains"),
-               aes(x=1, y = size_cat, xend = estimate, yend = size_cat),
-               arrow = arrow(length = unit(0.2, "cm")),
-               color = "red") +
-  xlab(expression(mean~N[2]*O~saturation~ratio)) +
-  xlim(0.9, 1.3) +
-  ylab("waterbody size category (ha)") +
-  theme_bw() +
-  theme(axis.title.y = element_blank()) +
-  facet_grid(rows = vars(WSA9_NAME))
+# # point and linerange
+# p1.data <- all_predictions %>%
+#   filter(WSA9 %in% c("CPL", "NPL")) %>% # only show two examples.  comment out to include all ecoregions
+#   group_by(WSA9_NAME, size_cat, .draw) %>% # group by iteration
+#   summarise(mean_sat = mean(n2osat)) %>% # 500 means for each WSA9
+#   # now summarize to 1 statistic per WSA9
+#   summarise( estimate = round(median(mean_sat), 3),
+#              LCL = round(quantile(mean_sat, probs = 0.025), 3),
+#              UCL = round(quantile(mean_sat, probs = 0.975), 3)) 
+#   # mutate(ecoregion = factor(WSA9_NAME)) %>%
+#   # mutate(ecoregion = fct_reorder(ecoregion, estimate))
+# 
+# # data for arrow segment.  Only smallest size category.  Only CPL and NPL.
+# p1.data.arrow <- p1.data %>%
+#   filter(size_cat == "min_4")
+# 
+# # pushing CPL and NPL to separate ggplot images to allow ggpubr
+# # to label each plot A, B, and C.  When pushing to two panels
+# # via faceting, ggpubr couldn't separately label the panels.
+# 
+# # CPL plot
+# p1.cpl <- p1.data %>%
+#   filter(WSA9_NAME == "Coastal Plains") %>%
+#   ggplot(aes(x=estimate, y=size_cat)) +
+#   geom_point() +
+#   geom_linerange( aes( xmin = LCL, xmax = UCL)) +
+#   geom_vline(xintercept = 1, color='blue') +
+#   # geom_segment(data = p1.data.arrow %>% filter(WSA9_NAME == "Coastal Plains"),
+#   #              aes(x=1, y = size_cat, xend = estimate, yend = size_cat),
+#   #              arrow = arrow(length = unit(0.2, "cm")),
+#   #              color = "red") +
+#   xlab(expression(mean~N[2]*O~saturation~ratio)) +
+#   xlim(0.84, 1.5) +
+#   ylab("waterbody size category (ha)") +
+#   theme_bw() +
+#   theme(axis.title.y = element_blank(),
+#         axis.title.x = element_blank()) +
+#   facet_grid(rows = vars(WSA9_NAME))
+# 
+# # NPL plot
+# p1.npl <- p1.data %>%
+#   filter(WSA9_NAME == "Northern Plains") %>%
+#   ggplot(aes(x=estimate, y=size_cat)) +
+#   geom_point() +
+#   geom_linerange( aes( xmin = LCL, xmax = UCL)) +
+#   geom_vline(xintercept = 1, color='blue') +
+#   # geom_segment(data = p1.data.arrow %>% filter(WSA9_NAME == "Northern Plains"),
+#   #              aes(x=1, y = size_cat, xend = estimate, yend = size_cat),
+#   #              arrow = arrow(length = unit(0.2, "cm")),
+#   #              color = "red") +
+#   xlab(expression(mean~N[2]*O~saturation~ratio)) +
+#   xlim(0.84, 1.5) +
+#   ylab("waterbody size category (ha)") +
+#   theme_bw() +
+#   theme(axis.title.y = element_blank()) +
+#   facet_grid(rows = vars(WSA9_NAME))
 
 # PLOT N2O* BY SIZE
 # point and linerange
@@ -381,53 +421,121 @@ p2 <- all_predictions %>%
   #coord_flip() + 
   theme_bw() 
 
-#ggsave("output/figures/n2oStarBySize.tiff")
+ggsave(plot = p2, filename = "manuscript/manuscript_figures/n2oStarBySize.tiff")
 
-ggpubr::ggarrange(p2, # first column
-                  ggpubr::ggarrange(p1.cpl, p1.npl, ncol=1, # second column with plots in 2 rows
-                                    nrow = 2, labels = c("B", "C")),
-                  ncol = 2, 
-                  labels = "A") # label for first plot
-ggsave("manuscript/manuscript_figures/deltaN2ObySize.tiff", width = 6, height = 5)
+# ggpubr::ggarrange(p2, # first column
+#                   ggpubr::ggarrange(p1.cpl, p1.npl, ncol=1, # second column with plots in 2 rows
+#                                     nrow = 2, labels = c("B", "C")),
+#                   ncol = 2, 
+#                   labels = "A") # label for first plot
+# ggsave("manuscript/manuscript_figures/deltaN2ObySize.tiff", width = 6, height = 5)
 
 
 }
 
-## Figure X: N2O flux by waterbody size------
-# See 'N2O emission rate and flux: Figures and tables' section of dgIndicatorAnalysis.Rmd
-# if the image is already on computer, then nothing, else create image
+## Figure X:  Flux by lake, emission rate by lake, and nation flux.  VS continuous size-------
+if(!("n2oFluxAndEmissionRateVsContinuousArea.tiff" %in% list.files("manuscript/manuscript_figures"))) {
 
-if(!("n2oFluxBySizeEco.tiff" %in% list.files("manuscript/manuscript_figures"))) {
-# point and line range by size and ecoregion: faceted
-all_predictions %>%
-  group_by(WSA9_NAME, size_cat, .draw) %>% # group by iteration
-  summarise(mean_f.n2o.Mg.y = sum(f.n2o.Mg.y)) %>% # 500 means for each WSA9 x size cat
-  # now summarize to 1 statistic per WSA9
+  #  flux vs waterbody size continuous
+b1 <- all_predictions %>%
+  #filter(.draw %in% 1:200) %>% # subset for practice
+  group_by(.row) %>%
+  # mean and CI of all realizations for each lake
+  summarise(mean.flux = mean(f.n2o.Mg.y),
+            LCI_flux = quantile(f.n2o.Mg.y, probs = 0.025),
+            UCI_flux = quantile(f.n2o.Mg.y, probs = 0.975)) %>% 
+  full_join(., # add other data back in
+            all_predictions %>% 
+              filter(.draw == 1) %>%# just 1 realization
+              select(.row, WSA9_NAME, area_ha)) %>%
+  ggplot(., aes(area_ha, mean.flux)) +
+  geom_point(size = 0.1) +
+  geom_errorbar(aes(xmin = area_ha, ymin = LCI_flux,
+                    xmax = area_ha, ymax = UCI_flux),
+                linewidth = 0.1) +
+  scale_x_log10(labels=scales::comma) + 
+  scale_y_continuous(trans = ggallin::pseudolog10_trans, 
+                     breaks =c(-1000, -500, -50, -5, 0, 5, 50, 500, 1000)) +
+  xlab("waterbody size (Ha)") +
+  ylab(expression(N[2]*O~flux~"("*metric~tons~year^-1*")"))
+
+
+# N2O emission rate vs waterbody size continuous
+b2 <- all_predictions %>%
+  #filter(.draw %in% 1:10) %>% # subset for practice
+  group_by(.row) %>% # goup by lake
+  # mean and CI of all realizations for each lake
+  summarise(mean.e = mean(e.n2o.mg.m2.d),
+            LCI_e = quantile(e.n2o.mg.m2.d, probs = 0.025),
+            UCI_e = quantile(e.n2o.mg.m2.d, probs = 0.975)) %>% 
+  full_join(., # add other data back in
+            all_predictions %>% 
+              filter(.draw == 1) %>%# just 1 realization
+              select(.row, WSA9_NAME, area_ha)) %>%
+  ggplot(., aes(area_ha, mean.e)) +
+  geom_point(size = 0.1) +
+  geom_errorbar(aes(xmin = area_ha, ymin = LCI_e,
+                    xmax = area_ha, ymax = UCI_e),
+                linewidth = 0.1) +
+  scale_x_log10(labels=scales::comma) +
+  scale_y_continuous(trans = ggallin::pseudolog10_trans) +
+  xlab("waterbody size (Ha)") +
+  ylab(expression(N[2]*O~emission~rate~"("*mg~N[2]*O~m^-2~day^-1*")"))
+
+
+# National flux by lake size class: point and line range
+b3 <- all_predictions %>%
+  group_by(size_cat, .draw) %>% # group by iteration
+  summarise(mean_f.n2o.Mg.y = sum(f.n2o.Mg.y)) %>% # 2000 means for size cat
+  # now summarize to 1 statistic per size_cat
   summarise( estimate = round(median(mean_f.n2o.Mg.y), 3), 
              LCL = round(quantile(mean_f.n2o.Mg.y, probs = 0.025), 3),
              UCL = round(quantile(mean_f.n2o.Mg.y, probs = 0.975), 3)) %>% 
-  mutate(ecoregion = factor(WSA9_NAME)) %>%
-  mutate(ecoregion = fct_reorder(ecoregion, estimate)) %>%
-  ggplot(aes(x = estimate, y = size_cat)) +
+  ggplot(., aes(x = estimate, y = size_cat)) +
   geom_point() +
   geom_linerange(aes(xmin = LCL, xmax = UCL)) +
   geom_vline(xintercept = 0, color='blue') +
   xlab(expression(N[2]*O~flux~(metric~tons~year^{-1}))) + # 1Mg = 1 metric ton
-    ylab("Lake size class (ha)") +
-  theme_bw() +
-  facet_wrap(~ecoregion, scales = "free")
-ggsave("manuscript/manuscript_figures/n2oFluxBySizeEco.tiff", height = 5.4, width = 9.6)
+  ylab("Lake size class (ha)") +
+  theme_bw() 
+
+# ggpubr::ggarrange(b1, b2, # first two rows
+#                   ggarrange(b3, ncol = 2, nrow=1, labels = "AUTO"), # single plot in 3rd row, only one column
+#                   nrow=3, labels = "AUTO")
+
+ggpubr::ggarrange(b2, b1, b3, ncol = 3, nrow=1, labels = "AUTO")
+ggsave("manuscript/manuscript_figures/n2oFluxAndEmissionRateVsContinuousArea.tiff", width = 8, height = 4)   
 
 }
+
+all_predictions %>%
+  group_by(WSA9_NAME, .draw) %>% # group by iteration
+  summarise(mean_f.n2o.Mg.y = sum(f.n2o.Mg.y)) %>% # 2000 means for size cat
+  # now summarize to 1 statistic per WSA9
+  summarise( estimate = round(median(mean_f.n2o.Mg.y), 3), 
+             LCL = round(quantile(mean_f.n2o.Mg.y, probs = 0.025), 3),
+             UCL = round(quantile(mean_f.n2o.Mg.y, probs = 0.975), 3)) %>% 
+  ggplot(., aes(x = estimate, y = WSA9_NAME)) +
+  geom_point() +
+  geom_linerange(aes(xmin = LCL, xmax = UCL)) +
+  geom_vline(xintercept = 0, color='blue') +
+  xlab(expression(N[2]*O~flux~(metric~tons~year^{-1}))) + # 1Mg = 1 metric ton
+  ylab("Lake size class (ha)") +
+  theme_bw() 
+
+
+
 ## SI Figure 1: N2O emission rate distribution----
+if(!("SIfigure1.tiff" %in% list.files("manuscript/manuscript_figures"))) {
+  
 # density plot by ecoregion
 all_predictions %>%
-  filter(.draw %in% 1:10) %>% # subset for practice
+  #filter(.draw %in% 1:10) %>% # subset for practice
   #mutate(ecoregion = factor(WSA9)) %>%
   #mutate(ecoregion = fct_reorder(ecoregion, preds_sat)) %>%
   ggplot(aes(x = e.n2o.mg.m2.d, group = .draw, color = .draw )) +
   geom_density(aes(y=after_stat(scaled)), show.legend = FALSE) +
-  geom_rug() + 
+  #geom_rug() + 
   xlab(expression("N"[2]*"O"~ "emission"~ "rate" ~ "(mg" ~ N[2]*O ~ m^-2 ~ d^-1 ~ ")")) + 
   ylab("density") +
   facet_wrap(~WSA9_NAME, scales = "free_x") +
@@ -435,6 +543,9 @@ all_predictions %>%
   theme(legend.position = "none")
 
 ggsave("manuscript/manuscript_figures/SIfigure1.tiff", width = 8.5, height = 5)
+
+}
+
 
 # MANUSCRIPT DATA-----
 
@@ -538,7 +649,16 @@ proportionSmallNumber <- all_predictions %>%
   filter(abs(50-area_ha) == min(abs(50-area_ha))) %>% # grab 50Ha lake
   pull(proportion) # extract proportion of all lakes represented by this lake
   
-
+# flux from largest lake size class------
+FluxBySize <- all_predictions %>%
+  group_by(size_cat, .draw) %>% # group by iteration
+  summarise(mean_f.n2o.Mg.y = sum(f.n2o.Mg.y)) %>% # 2000 means for size cat
+  # now summarize to 1 statistic per size_cat
+  summarise( estimate = round(median(mean_f.n2o.Mg.y), 3), 
+             LCL = round(quantile(mean_f.n2o.Mg.y, probs = 0.025), 3),
+             UCL = round(quantile(mean_f.n2o.Mg.y, probs = 0.975), 3))
+  
+  
 # Mean and max emission rates-----
 min.max <- all_predictions %>%
   group_by(.row) %>%
