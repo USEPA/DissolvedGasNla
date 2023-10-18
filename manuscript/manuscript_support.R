@@ -9,12 +9,21 @@ localPath <- Sys.getenv("USERPROFILE")
 
 ## load libraries
 # DMAP not under renv control.  Should probably specify same
-# versions as used for renv library
+# versions as used for renv library, but causing issues.  Just 
+# install newest version.
 if(localPath == "") { # if DMAP, then
-install.packages(c("sf", "tidyverse", "janitor",
-                   "tictoc", "ggpubr", "ggallin",
-                   "devtools"))
-devtools::install_version("USAboundaries", "0.4.0")
+  # require returns FALSE and gives a warning 
+  # (rather than an error as library() does by default) 
+  # if the package does not exist.
+  if(!require("ggallin")) install.packages("ggallin")
+  if(!require("sf")) install.packages("sf")
+  if(!require("tidyverse")) install.packages("tidyverse")
+  if(!require("janitor")) install.packages("janitor")
+  if(!require("tictoc")) install.packages("tictoc")
+  if(!require("pbkrtest")) install.packages("pbkrtest") 
+  if(!require("ggpubr")) install.packages("ggpubr")
+  if(!require("ggallin")) install.packages("ggallin")
+  if(!require("USAboundaries")) install.packages("USAboundaries")
 }
 
 library(sf) # spatial data
@@ -553,12 +562,6 @@ ggsave("manuscript/manuscript_figures/SIfigure1.tiff", width = 8.5, height = 5)
 undersatN2oPercent <- round(((dg %>% dplyr::filter(n2o.src.snk == "sink") %>% 
                          {nrow(.)} / dg %>% distinct(site.id) %>% 
                          {nrow(.)}) * 100), 1)
-
-propN2oSinkMean <- all_predictions %>% 
-  group_by(.draw) %>% 
-  summarise(prop_sat = sum(n2osat < 1) / length(.row)) %>% 
-  summarise(estimate = round(median(prop_sat), 3) * 100) %>% 
-  pull()
 
 propN2oSinkMean <- all_predictions %>% 
   group_by(.draw) %>% 
