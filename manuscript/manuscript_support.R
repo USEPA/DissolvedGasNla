@@ -11,20 +11,27 @@ localPath <- Sys.getenv("USERPROFILE")
 # DMAP not under renv control.  Should probably specify same
 # versions as used for renv library, but causing issues.  Just 
 # install newest version.
-if(localPath == "") { # if DMAP, then
-  # require returns FALSE and gives a warning 
-  # (rather than an error as library() does by default) 
-  # if the package does not exist.
-  if(!require("ggallin")) install.packages("ggallin")
-  if(!require("sf")) install.packages("sf")
-  if(!require("tidyverse")) install.packages("tidyverse")
-  if(!require("janitor")) install.packages("janitor")
-  if(!require("tictoc")) install.packages("tictoc")
-  if(!require("pbkrtest")) install.packages("pbkrtest") 
-  if(!require("ggpubr")) install.packages("ggpubr")
-  if(!require("ggallin")) install.packages("ggallin")
-  if(!require("USAboundaries")) install.packages("USAboundaries")
-}
+# if(localPath == "") { # if DMAP, then
+#   # require returns FALSE and gives a warning 
+#   # (rather than an error as library() does by default) 
+#   # if the package does not exist.
+#   
+#   # older version of dplyr already installed on instance.  The only way I could
+#   # figure out how to update was to use devtools::install_version
+#   if(!require("devtools")) install.packages("devtools")
+#   devtools::install_version("dplyr", "1.1.4", 
+#                             repos = "https://cran.r-project.org") # get newest version
+#   if(!require("ggallin")) install.packages("ggallin")
+#   if(!require("sf")) install.packages("sf")
+#   if(!require("tidyverse")) install.packages("tidyverse")
+#   if(!require("janitor")) install.packages("janitor")
+#   if(!require("tictoc")) install.packages("tictoc")
+#   if(!require("pbkrtest")) install.packages("pbkrtest") 
+#   if(!require("ggpubr")) install.packages("ggpubr")
+#   if(!require("ggallin")) install.packages("ggallin")
+#   if(!require("USAboundaries")) devtools::install_version("USAboundaries", "0.4.0", 
+#                                                 repos = "https://cran.r-project.org/")
+# }
 
 library(sf) # spatial data
 library(tidyverse) # dplyr, ggplot
@@ -430,7 +437,7 @@ p2 <- all_predictions %>%
   #coord_flip() + 
   theme_bw() 
 
-ggsave(plot = p2, filename = "manuscript/manuscript_figures/n2oStarBySize.tiff")
+ggsave(plot = p2, filename = "manuscript/manuscript_figures/n2oStarBySize.tiff", width = 3, height = 3)
 
 # ggpubr::ggarrange(p2, # first column
 #                   ggpubr::ggarrange(p1.cpl, p1.npl, ncol=1, # second column with plots in 2 rows
@@ -444,9 +451,37 @@ ggsave(plot = p2, filename = "manuscript/manuscript_figures/n2oStarBySize.tiff")
 
 ## Figure X:  Flux by lake, emission rate by lake, and nation flux.  VS continuous size-------
 if(!("n2oFluxAndEmissionRateVsContinuousArea.tiff" %in% list.files("manuscript/manuscript_figures"))) {
-
-  #  flux vs waterbody size continuous
-b1 <- all_predictions %>%
+  
+  # N2O emission rate vs waterbody size continuous
+  b1.dat <- all_predictions %>%
+    #filter(.draw %in% 1:10) %>% # subset for practice
+    group_by(.row) %>% # goup by lake
+    # mean and CI of all realizations for each lake
+    summarise(mean.e = mean(e.n2o.mg.m2.d),
+              LCI_e = quantile(e.n2o.mg.m2.d, probs = 0.025),
+              UCI_e = quantile(e.n2o.mg.m2.d, probs = 0.975)) %>% 
+    full_join(., # add other data back in
+              all_predictions %>% 
+                filter(.draw == 1) %>%# just 1 realization
+                select(.row, WSA9_NAME, area_ha)) 
+  
+  b1 <- ggplot(b1.dat, aes(area_ha, mean.e)) +
+    geom_errorbar(aes(xmin = area_ha, ymin = LCI_e,
+                      xmax = area_ha, ymax = UCI_e),
+                  size = 0.1) +
+    geom_point(size = 0.1, color = "red") +
+    scale_x_log10(labels=scales::comma) +
+    scale_y_continuous(trans = ggallin::pseudolog10_trans) +
+    #xlab("waterbody size (Ha)") +
+    #ylab(expression(N[2]*O~emission~rate~"("*mg~N[2]*O~m^-2~day^-1*")")) +
+    ylab(expression(atop(N[2]*O~emission~rate, "("*mg~N[2]*O~m^-2~day^-1*")"))) +  
+    theme_bw()  +
+    theme(panel.grid.major = element_blank(), 
+          panel.grid.minor = element_blank(),
+          axis.title.x = element_blank())
+  
+#  flux vs waterbody size continuous
+b2.dat <- all_predictions %>%
   #filter(.draw %in% 1:200) %>% # subset for practice
   group_by(.row) %>%
   # mean and CI of all realizations for each lake
@@ -456,81 +491,51 @@ b1 <- all_predictions %>%
   full_join(., # add other data back in
             all_predictions %>% 
               filter(.draw == 1) %>%# just 1 realization
-              select(.row, WSA9_NAME, area_ha)) %>%
-  ggplot(., aes(area_ha, mean.flux)) +
-  geom_point(size = 0.1) +
+              select(.row, WSA9_NAME, area_ha))
+
+ b2 <- ggplot(b2.dat, aes(area_ha, mean.flux)) +
   geom_errorbar(aes(xmin = area_ha, ymin = LCI_flux,
                     xmax = area_ha, ymax = UCI_flux),
-                linewidth = 0.1) +
+                size = 0.1) + # size with ggplot 3.3.3.  linewidth with other versions?
+   geom_point(size = 0.1, color = "red") +
   scale_x_log10(labels=scales::comma) + 
   scale_y_continuous(trans = ggallin::pseudolog10_trans, 
                      breaks =c(-1000, -500, -50, -5, 0, 5, 50, 500, 1000)) +
   xlab("waterbody size (Ha)") +
-  ylab(expression(N[2]*O~flux~"("*metric~tons~year^-1*")"))
+  ylab(expression(atop(N[2]*O~flux,"("*metric~tons~year^-1*")"))) +
+  theme_bw()  +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank())
 
 
-# N2O emission rate vs waterbody size continuous
-b2 <- all_predictions %>%
-  #filter(.draw %in% 1:10) %>% # subset for practice
-  group_by(.row) %>% # goup by lake
-  # mean and CI of all realizations for each lake
-  summarise(mean.e = mean(e.n2o.mg.m2.d),
-            LCI_e = quantile(e.n2o.mg.m2.d, probs = 0.025),
-            UCI_e = quantile(e.n2o.mg.m2.d, probs = 0.975)) %>% 
-  full_join(., # add other data back in
-            all_predictions %>% 
-              filter(.draw == 1) %>%# just 1 realization
-              select(.row, WSA9_NAME, area_ha)) %>%
-  ggplot(., aes(area_ha, mean.e)) +
-  geom_point(size = 0.1) +
-  geom_errorbar(aes(xmin = area_ha, ymin = LCI_e,
-                    xmax = area_ha, ymax = UCI_e),
-                linewidth = 0.1) +
-  scale_x_log10(labels=scales::comma) +
-  scale_y_continuous(trans = ggallin::pseudolog10_trans) +
-  xlab("waterbody size (Ha)") +
-  ylab(expression(N[2]*O~emission~rate~"("*mg~N[2]*O~m^-2~day^-1*")"))
 
 
-# National flux by lake size class: point and line range
-b3 <- all_predictions %>%
-  group_by(size_cat, .draw) %>% # group by iteration
-  summarise(mean_f.n2o.Mg.y = sum(f.n2o.Mg.y)) %>% # 2000 means for size cat
-  # now summarize to 1 statistic per size_cat
-  summarise( estimate = round(median(mean_f.n2o.Mg.y), 3), 
-             LCL = round(quantile(mean_f.n2o.Mg.y, probs = 0.025), 3),
-             UCL = round(quantile(mean_f.n2o.Mg.y, probs = 0.975), 3)) %>% 
-  ggplot(., aes(x = estimate, y = size_cat)) +
-  geom_point() +
-  geom_linerange(aes(xmin = LCL, xmax = UCL)) +
-  geom_vline(xintercept = 0, color='blue') +
-  xlab(expression(N[2]*O~flux~(metric~tons~year^{-1}))) + # 1Mg = 1 metric ton
-  ylab("Lake size class (ha)") +
-  theme_bw() 
+
+# # National flux by lake size class: point and line range
+# b3 <- all_predictions %>%
+#   group_by(size_cat, .draw) %>% # group by iteration
+#   summarise(mean_f.n2o.Mg.y = sum(f.n2o.Mg.y)) %>% # 2000 means for size cat
+#   # now summarize to 1 statistic per size_cat
+#   summarise( estimate = round(median(mean_f.n2o.Mg.y), 3), 
+#              LCL = round(quantile(mean_f.n2o.Mg.y, probs = 0.025), 3),
+#              UCL = round(quantile(mean_f.n2o.Mg.y, probs = 0.975), 3)) %>% 
+#   ggplot(., aes(x = estimate, y = size_cat)) +
+#   geom_point() +
+#   geom_linerange(aes(xmin = LCL, xmax = UCL)) +
+#   geom_vline(xintercept = 0, color='blue') +
+#   xlab(expression(N[2]*O~flux~(metric~tons~year^{-1}))) + # 1Mg = 1 metric ton
+#   ylab("Lake size class (ha)") +
+#   theme_bw() 
 
 # ggpubr::ggarrange(b1, b2, # first two rows
 #                   ggarrange(b3, ncol = 2, nrow=1, labels = "AUTO"), # single plot in 3rd row, only one column
 #                   nrow=3, labels = "AUTO")
 
-ggpubr::ggarrange(b2, b1, b3, ncol = 3, nrow=1, labels = "AUTO")
-ggsave("manuscript/manuscript_figures/n2oFluxAndEmissionRateVsContinuousArea.tiff", width = 8, height = 4)   
+# ggpubr::ggarrange(b2, b1, b3, ncol = 3, nrow=1, labels = "AUTO")
+ggpubr::ggarrange(b1, b2, ncol = 1, nrow=2, labels = "AUTO", align = "v") #, hjust = -5, vjust = 2
+ggsave("manuscript/manuscript_figures/n2oFluxAndEmissionRateVsContinuousArea.tiff", width = 8, height = 5)   
 
 }
-
-all_predictions %>%
-  group_by(WSA9_NAME, .draw) %>% # group by iteration
-  summarise(mean_f.n2o.Mg.y = sum(f.n2o.Mg.y)) %>% # 2000 means for size cat
-  # now summarize to 1 statistic per WSA9
-  summarise( estimate = round(median(mean_f.n2o.Mg.y), 3), 
-             LCL = round(quantile(mean_f.n2o.Mg.y, probs = 0.025), 3),
-             UCL = round(quantile(mean_f.n2o.Mg.y, probs = 0.975), 3)) %>% 
-  ggplot(., aes(x = estimate, y = WSA9_NAME)) +
-  geom_point() +
-  geom_linerange(aes(xmin = LCL, xmax = UCL)) +
-  geom_vline(xintercept = 0, color='blue') +
-  xlab(expression(N[2]*O~flux~(metric~tons~year^{-1}))) + # 1Mg = 1 metric ton
-  ylab("Lake size class (ha)") +
-  theme_bw() 
 
 
 
