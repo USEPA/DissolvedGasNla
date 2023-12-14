@@ -31,6 +31,7 @@ localPath <- Sys.getenv("USERPROFILE")
 #   if(!require("ggallin")) install.packages("ggallin")
 #   if(!require("USAboundaries")) devtools::install_version("USAboundaries", "0.4.0", 
 #                                                 repos = "https://cran.r-project.org/")
+#   if(!require("tidybayes")) install.packages("tidybayes")
 # }
 
 library(sf) # spatial data
@@ -40,8 +41,8 @@ library(USAboundaries) # state boundaries
 library(tictoc) # processing time
 library(ggpubr) # multiple plots
 library(ggallin) # psuedlolog transformation for negative values
-
-
+library(USAboundaries) # state boundaries for maps
+library(tidybayes) # prop flux by size figure
 
 # DATA---------------
 ## load sample data (dg object)----
@@ -63,7 +64,7 @@ dg.sf <- st_as_sf(dg, coords = c("map.lon.dd", "map.lat.dd"),
                   crs = 4269) %>% # standard for lat/lon
   st_transform(5070) # project to CONUS ALBERS for plotting
 
-save(national_stats, file = "manuscript/manuscript_files/dg.rda")
+save(national_stats, file = "manuscript/manuscript_files/dg.rda")  # this object not created yet
 
 ## load ecoregions----
 # read in ecoregion polygons
@@ -555,8 +556,12 @@ PropFluxBySize <- all_predictions_ms %>%
 save(PropFluxBySize, file = "manuscript/manuscript_files/PropFluxBySize.rda")
 
 ## Figure on proportion of flux (ratio size class / CONUS)
+############## ROY
+##############
+# OBJECT PropFluxBySize DOES NOT HAVE size_f and size_p_f variables.
+# they were lost during the final summarize above (551-553)
 b3 <- PropFluxBySize %>% 
-  mutate(total_f = size_f / size_p_f) %>% 
+  mutate(total_f = size_f / size_p_f) %>% # CODE BREAKS HERE
   select(size_cat, .draw, total_f, size_f, size_p_f) %>%
   mutate(
     size_cat = fct_recode(as.factor(size_cat),
