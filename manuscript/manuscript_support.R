@@ -347,31 +347,40 @@ if(!("figure2.tiff" %in% list.files("manuscript/manuscript_figures"))) {
   # using xlim to zoom in on values close to 1
   
   dummy <- ecoreg_stats %>%
-    #CPL   NAP   NPL    SAP    SPL   TPL  UWM    WMT    XER
+                    #CPL   NAP   NPL    SAP    SPL   TPL  UWM    WMT    XER
     mutate(dens.med = c(2.5,  4,    3.1,   3.5,   2.5,  3,   3,      2,     2.5),
            dens.mean = c(.5,  3,    2.5,   1.5,   1,    1,   2,      1.5,   1.1),
+           # dens.equ = rep(1, 9),
+           # `median legend` = "median",
+           # `mean legend` = "mean",
+           # `eq legend` = "equilibrium",
            .draw = 1) # needed to match grouping aesthetic in ggplot call
   
   tic() # 60 seconds for 100 draws, and 16 minutes for 2000 draws, on memory intensive DMAP, 2797 secs for 2000 draws on Precision workstation
+  # After spending many hours trying to get the legend right, I gave up.  Write
+  # image to disk, then add legend in powerpoint.
   all_predictions_ms %>%
-    filter(.draw %in% 1:100) %>% # subset for practice
-    ggplot(aes(x = n2osat, group = .draw, color = .draw ) ) +
-    geom_density(show.legend = FALSE) +
+    #filter(.draw %in% 1:100) %>% # subset for practice
+    ggplot(aes(x = n2osat, group = .draw, color = .draw )) +
+    geom_density(show.legend = FALSE) + # this argument doesn't work when faceted, hence guides call below
     geom_vline(xintercept = 1, color = "red") +
     geom_segment(data = dummy,
-                 aes(x = post_m_mean_sat, xend = post_m_mean_sat, 
+                 aes(x = post_m_mean_sat, xend = post_m_mean_sat,
                      y = 0, yend = dens.mean),
-                 linetype = "solid") +
+                 color = "black", linetype = "solid") +
     geom_segment(data = dummy,
-                 aes(x = post_m_median_sat, xend = post_m_median_sat, 
+                 aes(x = post_m_median_sat, xend = post_m_median_sat,
                      y = 0, yend = dens.med),
-                 linetype = "dashed") +
-    ylab ("density") + 
+                     color = "black", linetype = "dotted") +
+    # geom_segment(#data = dummy,
+    #              aes(x = dens.equ, xend = dens.equ,
+    #                  y = 0, yend = 4, linetype = `eq legend`),
+    #              color = "red") +
+    ylab ("density") +
     xlab(expression(N[2]*O~saturation~ratio)) +
     xlim(0,3) + # data range is 0-600, but sample max is 30
     facet_wrap(~WSA9_NAME) +
-    theme_bw() +
-    theme(legend.position = "none")
+    theme_bw()
   toc()
   ggsave("manuscript/manuscript_figures/figure2.tiff", width = 8.5, height = 5)
   
