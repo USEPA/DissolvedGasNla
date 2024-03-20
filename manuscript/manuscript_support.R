@@ -106,7 +106,7 @@ states <- USAboundaries::us_states() %>%
 
 
 ## load population data----
-#tic() # 7.6min on DMAP
+#tic() # 7.6min on DMAP.  5 minutes on Dell Precision workstation
 if(localPath == ""){ # if DMAP, then
   load("../../shared/jbeaulie/all_predictions.rda")
 } else { # if not DMAP
@@ -328,7 +328,7 @@ if(!("figure1.png" %in% list.files("manuscript/manuscript_figures"))) {
     # https://aosmith.rbind.io/2020/07/09/ggplot2-override-aes/
     scale_fill_manual("Ecoregion", values = cols,
                       guide = guide_legend(override.aes = list(shape = NA))) +
-    scale_color_manual(values = c("white", "black"), name = "source/sink") +
+    scale_color_manual(values = c("grey", "black"), name = "source/sink") +
     scale_size(name = expression(N[2]*O~(nM)),
                range = c(0.1, 10), # custom size range
                breaks = c(1, 10, 25, 50, 100)) + # custom breaks
@@ -354,7 +354,7 @@ if(!("figure2.tiff" %in% list.files("manuscript/manuscript_figures"))) {
   
   tic() # 60 seconds for 100 draws, and 16 minutes for 2000 draws, on memory intensive DMAP, 2797 secs for 2000 draws on Precision workstation
   all_predictions_ms %>%
-    #filter(.draw %in% 1:100) %>% # subset for practice
+    filter(.draw %in% 1:100) %>% # subset for practice
     ggplot(aes(x = n2osat, group = .draw, color = .draw ) ) +
     geom_density(show.legend = FALSE) +
     geom_vline(xintercept = 1, color = "red") +
