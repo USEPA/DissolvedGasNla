@@ -41,7 +41,6 @@ library(USAboundaries) # state boundaries
 library(tictoc) # processing time
 library(ggpubr) # multiple plots
 library(ggallin) # psuedlolog transformation for negative values
-library(USAboundaries) # state boundaries for maps
 library(tidybayes) # prop flux by size figure
 
 # DATA---------------
@@ -489,7 +488,7 @@ if(!("n2oStarBySize.tiff" %in% list.files("manuscript/manuscript_figures"))) {
   
 }
 
-## Figure X:  Flux by lake, emission rate by lake, and nation flux.  VS continuous size-------
+## Figure X:  Flux by lake, emission rate by lake, and national flux VS continuous size-------
 if(!("n2oFluxAndEmissionRateVsContinuousArea.tiff" %in% list.files("manuscript/manuscript_figures"))) {
   
   # Predicted (mean, L95CI, U95CI of PPD) waterbody N2O emission rates vs waterbody size continuous 
