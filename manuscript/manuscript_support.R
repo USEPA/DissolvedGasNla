@@ -525,7 +525,7 @@ if(!("n2oFluxAndEmissionRateVsContinuousArea.tiff" %in% list.files("manuscript/m
   b2 <- ggplot(b2.dat, aes(x = area_ha, y = post_m_pred)) +
     geom_errorbar(aes(xmin = area_ha, ymin = LCL_pred,
                       xmax = area_ha, ymax = UCL_pred),
-                  size = 0.1) + # size with ggplot 3.3.3.  linewidth with other versions?
+                  linewidth = 0.1) + # size with ggplot 3.3.3.  linewidth with other versions?
     geom_point(size = 0.1, color = "red") +
     scale_x_log10(labels=scales::comma) + 
     scale_y_continuous(trans = ggallin::pseudolog10_trans, 
@@ -592,12 +592,15 @@ if(!("n2oFluxAndEmissionRateVsContinuousArea.tiff" %in% list.files("manuscript/m
     group_by(.row) %>% 
     mean_qi()
 
-  b3 <-  ggplot(b3.dat, aes(x = area_ha, y = p_total_f, ymin = p_total_f.lower, ymax = p_total_f.upper)) +
-    tidybayes::geom_pointinterval(point_color = 'red', point_size = 0.75, linewidth = 0.5) + 
+  b3 <-  ggplot(b3.dat, aes(x = area_ha, y = p_total_f)) +
+    geom_errorbar(aes(xmin = area_ha, ymin = p_total_f.lower,
+                      xmax = area_ha, ymax = p_total_f.upper),
+                  linewidth = 0.1) + 
+    geom_point(size = 0.1, color = "red") +
     scale_x_log10(labels = scales::comma) +
     coord_cartesian(ylim = c(-3, 3)) +
     xlab("Waterbody size (ha)") +
-    ylab(expression(atop(Proportion~of, CONUS~flux))) +
+    ylab(expression(atop(Proportion, of~CONUS~flux))) +
     theme_bw()  +
     theme(panel.grid.major = element_blank(), 
           panel.grid.minor = element_blank())
