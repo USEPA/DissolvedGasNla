@@ -319,7 +319,9 @@ save(national_stats, file = "manuscript/manuscript_files/national_stats.rda")
 if(!("figure1.png" %in% list.files("manuscript/manuscript_figures"))) {
   ggplot() +
     geom_sf(data = ecoR, color = NA, aes(fill = WSA9_NAME)) +
-    geom_sf(data = dg.sf %>% filter(!is.na(n2o.src.snk)),
+    geom_sf(data = dg.sf %>% 
+              filter(!is.na(n2o.src.snk), sitetype == "PROB", visit.no == 1) %>%
+              arrange(desc(n2o.src.snk)), # grey on top of black
             aes(size = dissolved.n2o.nmol, color = n2o.src.snk),
             show.legend = "point") +
     geom_sf(data = states, fill = NA, color = "cornsilk3", size = 0.1) +
