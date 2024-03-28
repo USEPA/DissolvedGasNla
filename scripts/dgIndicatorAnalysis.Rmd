@@ -59,6 +59,7 @@ The dissolved gas data were currated the 'NLA' dissolved gas project in RStudio.
 
 ```
 
+## Analytical uncertainty
 
 
 The data file contains `r dg %>% distinct(site.id, visit.no) %>% summarize(n = n()) %>% pull()` unique sampling trips defined by unique combinations of 'site.id' and 'visit.no'.  There were `r dg %>% distinct(site.id) %>% summarize(n = n()) %>% pull()` waterbodies sampled, `r dg %>% filter(visit.no == 2) %>% summarize(n = n()) %>% pull()` of which were sampled twice. The primary response variables are the concentrations of CO~2~, CH~4~, and N~2~O dissolved in the surface water of each waterbody.  Concentration is expressed in both mass based units (umol/L, nmol/L: dissolved.co2, dissolved.ch4, dissolved.n2o) and as a saturation ratio (co2.sat.ratio, ch4.sat.ratio, n2o.sat.ratio).  Saturation ratio is defined as the ratio of the measured concentration to that expected if the waterbody were in equilibrium with the atmosphere.  A value of 1 indicates equilibrium, values < 1 indicate undersaturation and values > 1 indicate supersaturation.  Undersaturated waterbodies function as a sink for the atmospheric gas whereas supersaturated waterbodies function as a source.

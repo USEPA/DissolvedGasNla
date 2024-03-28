@@ -3,16 +3,18 @@ title: "Evaluating sensitivity to measurement error in dissolved gas measurement
 author: "Roy Martin, Jake Beaulieu, Michael McManus"
 date: "`r Sys.Date()`"
 output:
-  html_notebook: 
-    depth: 4
-    fig_caption: yes
-    number_sections: yes
-    toc: yes
-    toc_float: yes
+  html_document:
+    toc: true
+    df_print: paged
   pdf_document:
-    toc: yes
-#bibliography: RWM_Endnote_Library.bib
-link-citations: yes
+    toc: true
+  html_notebook:
+    depth: 4
+    fig_caption: true
+    number_sections: true
+    toc: true
+    toc_float: true
+link-citations: true
 ---
 
 <style>
@@ -30,11 +32,11 @@ In this document we explore a range of models for fitting dissolved $\text{N}_2\
 # Setup R
 ```{r setup_1, include=FALSE, echo=FALSE}
 library(knitr)
-opts_knit$set(root.dir = "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/scripts")
-
-#set directories and R package library
-setwd("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/scripts")
-.libPaths("C:/Users/rmartin/Desktop/R/library")
+# opts_knit$set(root.dir = "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/scripts")
+# 
+# #set directories and R package library
+# setwd("C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/scripts")
+# .libPaths("C:/Users/rmartin/Desktop/R/library")
 ```
 
 ```{r load_packages, warning=FALSE, message=FALSE}
@@ -45,6 +47,9 @@ library(tidyverse)
 library(ggplot2)
 library(ggExtra)
 library(gridExtra)
+library(readxl)
+library(janitor)
+library(sf)
 
 options(mc.cores = parallel::detectCores())
 options( max.print = 2000 )
@@ -114,53 +119,198 @@ firstup <- function(x) {
 
 The full equation for estimating the concentration (nM) of $N_20$ gas dissolved in water is:
 
-$$C = 10^{-6}B \frac{V_{air}(Mr_h - Mr_r)}{(8.3144598 * K * V_{water}) + H^{\theta} \exp( 2700 * ( \frac{1}{K} - \frac{1}{298.15}) * Mr_h}$$
+$$C = 1^{-6}B \frac{V_{air}(Mr_h - Mr_r)}{(8.3144598 * K * V_{water}) + H^{\theta} \exp( 2700 * ( \frac{1}{K} - \frac{1}{298.15}) * Mr_h}$$
 
 # Set up model for simulating true value
 
 ```{r setvars_and_check}
+load(paste0(localPath, "\\Environmental Protection Agency (EPA)",
+            "\\ORD NLA17 Dissolved Gas - Documents\\",
+            "inputData\\dg.2021-02-01.RData"))
+
+# summary of measured N2O ppm in equilibrated headspace gas
+dg %>%
+  group_by(sample.source) %>%
+  summarize(mean_n2O = mean(n2o.ppm.gc, na.rm = TRUE),
+          median_n2o = median(n2o.ppm.gc, na.rm = TRUE)) #mean = 0.36, median = 0.31
+
+#    mean_n2o  median_n2o
+#AIR	0.3093312	0.3104941		
+#DG	 0.3618681	0.3067609	
+
+
 B <- 99 # barometric pressure (kPa)
-V_g <- 20 # volume of reference gas in headspace
-V_w <- 40 # volume of water below headspace
+V_g <- 35 # volume of reference gas in headspace
+V_w <- 105 # volume of water below headspace
 T_c <- 23 # temperature ( C )
-C_e <- 0.055 # gas mixture ratio in headspace
-C_a <- 0.091 # gas mixture ratio in reference
+C_e <- 0.307 # gas mixture ratio in headspace
+C_a <- 0.310 # gas mixture ratio in reference
 H <- 0.00024 #mol m-3 Pa, range: 0.00018 - 0.00025; Henry's law constant
 
-C <- 10e-6 * B * ( V_g * ( C_e - C_a ) / ( 8.3144598 * ( T_c + 273.15 ) * V_w ) + H * exp( 2700 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) * C_e ) 
+C <- 1e-6 * B * ( V_g * ( C_e - C_a ) / ( 8.3144598 * ( T_c + 273.15 ) * V_w ) + H * exp( 2700 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) * C_e ) 
 
 C <- C * 1e9 #convert mol to nmol
 
-round( C, 1 )
+round( C, 1 ) 
+
+```
+# Define GC measurement error
+Measurement error will be defined as standard deviation of repeated analysis of analytical standards throughout the period of time that the NLA2017 samples were analyzed.
+
+```{r get_gc_error}
+# READ GC DATA----------------
+##########################################################################
+#       Code is commented out because collaborators may not have access  #
+#       to the file paths. The calculated standard deviation is hard     #
+#       coded below.
+##########################################################################
+
+# Below we read raw GC data into the environment, extract repeat analysis of
+# an analytical standard, then calculate the standard deviation of the replicate
+# measurements.
+
+# gc.1 <- read_excel("L:/Lab/Lablan/GHG/GC/2017Data/17_06_29_STD_ECD_FID_UNK.xlsx", 
+#                    trim_ws = TRUE, skip=59) 
+# gc.2 <- read_excel("L:/Lab/Lablan/GHG/GC/2017Data/17_07_25_UNK_STD_ECD_FID.xlsx", 
+#                    trim_ws = TRUE, skip=59)
+# gc.3 <- read_excel("L:/Lab/Lablan/GHG/GC/2017Data/17_08_02_UNK_STD_ECD_FID.xlsx", 
+#                    trim_ws = TRUE, skip=50)
+# gc.4 <- read_excel("L:/Lab/Lablan/GHG/GC/2017Data/17_08_04_UNK_STD_ECD_FID.xlsx", 
+#                    trim_ws = TRUE, skip=50)
+# gc.5 <- read_excel("L:/Lab/Lablan/GHG/GC/2017Data/17_08_16_Dgas_UNK_STD_ECD_FID.xlsx", 
+#                    trim_ws = TRUE, skip=62)
+# gc.6 <- read_excel("L:/Lab/Lablan/GHG/GC/2017Data/17_08_21_UNK_STD_ECD_FID.xlsx", 
+#                    trim_ws = TRUE, skip=62)
+# gc.7 <- read_excel("L:/Lab/Lablan/GHG/GC/2017Data/17_08_31_UNK_STD_ECD_FID2.xlsx", 
+#                    trim_ws = TRUE, skip=65)
+# gc.8 <- read_excel("L:/Lab/Lablan/GHG/GC/2017Data/17_09_14_UNK_STD_ECD_FID.xlsx", 
+#                    trim_ws = TRUE, skip=62)
+# gc.9 <- read_excel("L:/Lab/Lablan/GHG/GC/2017Data/17_09_19_STD_UNK_ECD_FID_TCD.xlsx", 
+#                    trim_ws = TRUE, skip=102)
+# gc.10 <- read_excel("L:/Lab/Lablan/GHG/GC/2017Data/17_09_28_UNK_STD_ECD_FID.xlsx", 
+#                    trim_ws = TRUE, skip=50)
+# gc.11 <- read_excel("L:/Lab/Lablan/GHG/GC/2017Data/17_10_11_UNK_STD_ECD_FID_Dgas.xlsx", 
+#                     trim_ws = TRUE, skip=67)
+# gc.12 <- read_excel("L:/Lab/Lablan/GHG/GC/2017Data/17_10_17_UNK_STD_ECD_FID_Dgas.xlsx", 
+#                     trim_ws = TRUE, skip=67)
+# gc.13 <- read_excel("L:/Lab/Lablan/GHG/GC/2017Data/17_12_20_STD_UNK_ECD_FID.xlsx", 
+#                     trim_ws = TRUE, skip=67)
+# gc.14 <- read_excel("L:/Lab/Lablan/GHG/GC/2017Data/18_01_03_AIR_UNK_STD_ECD_FID.xlsx", 
+#                     trim_ws = TRUE, skip=48)
+# gc.15 <- read_excel("L:/Lab/Lablan/GHG/GC/2017Data/18_01_09_FID_ECD_STD.xlsx", 
+#                     trim_ws = TRUE, skip=48)
+# gc.16 <- read_excel("L:/Lab/Lablan/GHG/GC/2017Data/18_01_16_UNK_STD_ECD_FID.xlsx", 
+#                     trim_ws = TRUE, skip=48)
+# gc.17 <- read_excel("L:/Lab/Lablan/GHG/GC/2017Data/18_01_22_UNK_STD_ECD_FID.xlsx", 
+#                     trim_ws = TRUE, skip=60)
+# gc.18 <- read_excel("L:/Lab/Lablan/GHG/GC/2017Data/18_01_31_STD_UNK_ECD_FID_TCD.xlsx", 
+#                     trim_ws = TRUE, skip=102)
+# gc.19 <- read_excel("L:/Lab/Lablan/GHG/GC/2017Data/18_02_05_UNK_STD_ECD_FID_Dgas.xlsx", 
+#                     trim_ws = TRUE, skip=67)
+# gc.20 <- read_excel("L:/Lab/Lablan/GHG/GC/2017Data/18_02_09_UNK_STD_ECD_FID_Dgas.xlsx", 
+#                     trim_ws = TRUE, skip=67)
+# gc.21 <- read_excel("L:/Lab/Lablan/GHG/GC/2017Data/18_02_12_UNK_STD_ECD_FID_Dgas.xlsx", 
+#                     trim_ws = TRUE, skip=67)
+# gc.22 <- read_excel("L:/Lab/Lablan/GHG/GC/2017Data/18_02_16_UNK_STD_ECD_FID_Dgas.xlsx", 
+#                     trim_ws = TRUE, skip=67)
+# gc.23 <- read_excel("L:/Lab/Lablan/GHG/GC/2017Data/18_02_20_UNK_STD_ECD_FID_Dgas.xlsx", 
+#                     trim_ws = TRUE, skip=67)
+# gc.24 <- read_excel("L:/Lab/Lablan/GHG/GC/2017Data/17_04_25_UNK_STD_ECD_FID.xlsx", 
+#                     trim_ws = TRUE, skip=72)
+# gc.25 <- read_excel("L:/Lab/Lablan/GHG/GC/2017Data/18_02_23_UNK_STD_ECD_FID_Dgas.xlsx", 
+#                     trim_ws = TRUE, skip=67)
+# gc.26 <- read_excel("L:/Lab/Lablan/GHG/GC/2017Data/18_02_27_UNK_STD_ECD_FID_DP.xlsx", 
+#                     trim_ws = TRUE, skip=72)
+# gc.27 <- read_excel("L:/Lab/Lablan/GHG/GC/2017Data/18_03_05_Trap_6ml.xlsx", 
+#                     trim_ws = TRUE, skip=104)
+# # Merge gas data
+# gc.all <- Reduce(function(...) merge(..., all=T),
+#                   list(gc.1, gc.2, gc.3, gc.4, gc.5, gc.6, gc.7, 
+#                        gc.8, gc.9, gc.10, gc.11, gc.12, gc.13, gc.14, gc.15, 
+#                        gc.16, gc.17, gc.18, gc.19, gc.20, gc.21, gc.22, gc.23, 
+#                        gc.24, gc.25, gc.26, gc.27)) %>%
+#   janitor::clean_names()
+# 
+# 
+# # Format gas data
+# gc.std <- gc.all %>% 
+#   select( sample, contains("n2O")) %>%
+#   filter(grepl("std", sample, ignore.case = TRUE)) %>% # only keep standards
+#   mutate(sample = tolower(sample), # simplify formatting
+#          # we have multiple injections of this 1.8 Prax Air standard
+#          sample = case_when(grepl("1.8 prax", sample, ignore.case = TRUE) ~ "1.8prax",
+#                             TRUE ~ sample))
+# 
+# # with some invenstigating we could pull out multiple standards used
+# # across and within runs to calculate standard deviation, but the 27
+# # replicate injections of the 1.8 prax standard is low hanging fruit
+# gc.prax <- gc.std %>%
+#   filter(sample == "1.8prax")
+# 
+# gc.prax %>%
+#   ggplot(aes(x = n2o_ppm)) +
+#   geom_histogram()
+# 
+# n2o_sd <- sd(gc.prax$n2o_ppm) # 0.007872511ppm
+n2o_sd <- 0.007872511
+
+# # begin digging for other standards to work with
+# gc.std %>%
+#   filter(grepl("3p", sample, ignore.case = TRUE)) %>%
+#   ggplot(aes(sample,n2o_ppm)) +
+#   geom_point()
+# 
+# # list items 17 and 18 contain "m3p chk std"
+# # see if these are same standards
+# map(list(gc.1, gc.2, gc.3, gc.4, gc.5, gc.6, gc.7, 
+#          gc.8, gc.9, gc.10, gc.11, gc.12, gc.13, gc.14, gc.15, 
+#          gc.16, gc.17, gc.18, gc.19, gc.20, gc.21, gc.22, gc.23, 
+#          gc.24, gc.25, gc.26, gc.27),
+#     function(x) {
+#       x %>% janitor::clean_names(.) %>% 
+#         filter(grepl("m3p chk std", sample, ignore.case = TRUE))
+#     })
+# 
+# table(gc.std$sample)
+
+
+
 
 ```
 
 # Simulate measurement error for gas measured in water
 ```{r simulate_me_Ce, message=F}
-C_me <- rep( NA, 1e4 )
+C_me <- rep( NA, 1e4 ) # "me" is "measured" gas in headspace. empty vector
 
-C_e_me <- rnorm( 1e4, C_e, 0.001 ) #m.e. in measured gas in headspace
+# this simulates measurement error on GC.
+# assume TRUE value is C_e and error is simulated with with sd of replicate GC measurements
+C_e_me <- rnorm( 1e4, C_e, n2o_sd ) # me in measured gas in headspace.
+                                   # add random error to measured concentration
 
 for( i in 1:length( C_me ) ){
-  C_me[ i ] <- 10e-6 * B * ( V_g * ( C_e_me[ i ] - C_a ) / ( 8.3144598 * ( T_c + 273.15 ) * V_w ) + H * exp( 2700 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) * C_e_me[ i ] )
+  C_me[ i ] <- 1e-6 * B * ( V_g * ( C_e_me[ i ] - C_a ) / ( 8.3144598 * ( T_c + 273.15 ) * V_w ) + H * exp( 2700 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) * C_e_me[ i ] )
 }
 
-qplot( x = C_e_me ) +  
+# combine into dataframe for ggplot. qplot, which acceptes vectors,
+# was deprecated in ggplot 3.4.0
+C_df <- tibble(C_me = C_me, C_e_me = C_e_me)
+
+ggplot(C_df, aes(x = C_e_me )) +  
   geom_histogram( binwidth = 0.0001 ) + 
   geom_vline( xintercept = C_e , color = 'red' ) + 
-  ggtitle( "Simulated measurement error in water gas concentration") +
-  xlab( "concentration (?)")
+  ggtitle( "Simulated measurement error in equilibrated gas concentration") +
+  xlab( "concentration (nmol L-1)")
 
-qplot( x = C_me * 1e9 ) +  
+ggplot(C_df, aes(x = C_me * 1e9 )) +  
   geom_histogram( binwidth = 0.01 ) + 
   geom_vline( xintercept = C , color = 'red' ) + 
-  ggtitle( "Uncertainty in N20 concentration due to measurment error") +
+  ggtitle( "Uncertainty in dissolved N2O concentration due to GC measurment error \nof equilibrated headspace") +
   xlab( "concentration (nMol)")
 
-qplot( x = C_me * 1e9 - C ) +  
+ggplot(C_df, aes(x = C_me * 1e9 - C )) +  
   geom_histogram( binwidth = 0.01 ) + 
   geom_vline( xintercept = 0 , color = 'red' ) + 
-  ggtitle( "Uncertainty in N20 concentration due to measurment error") +
+  ggtitle( "Uncertainty in dissolved N2O concentration due to GC measurment error \nof equilibrated headspace") +
   xlab( "absolute error (nMol)")
 ```
 
@@ -169,28 +319,32 @@ qplot( x = C_me * 1e9 - C ) +
 ```{r simulate_me_Ca, message=F}
 C_me <- rep( NA, 1e4 )
 
-C_a_me <- rnorm( 1e4, C_a, 0.001 ) #m.e. in measured gas in air
+C_a_me <- rnorm( 1e4, C_a, n2o_sd ) #m.e. in measured gas in air
 
 for( i in 1:length( C_me ) ){
-  C_me[ i ] <- 10e-6 * B * ( V_g * ( C_e - C_a_me[ i ] ) / ( 8.3144598 * ( T_c + 273.15 ) * V_w ) + H * exp( 2700 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) * C_e )
+  C_me[ i ] <- 1e-6 * B * ( V_g * ( C_e - C_a_me[ i ] ) / ( 8.3144598 * ( T_c + 273.15 ) * V_w ) + H * exp( 2700 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) * C_e )
 }
 
-qplot( x = C_a_me ) +  
+# combine into dataframe for ggplot. qplot, which accepts vectors,
+# was deprecated in ggplot 3.4.0
+Ca_df <- tibble(C_me = C_me, C_a_me = C_a_me)
+
+ggplot(Ca_df, aes(x = C_a_me )) +  
   geom_histogram( binwidth = 0.0001 ) + 
   geom_vline( xintercept = C_a , color = 'red' ) + 
   ggtitle( "Simulated measurement error in air gas concentration") +
   xlab( "concentration (?)")
 
-qplot( x = C_me * 1e9 ) +  
-  geom_histogram( binwidth = 0.01 ) + 
+ggplot(Ca_df, aes(x = C_me * 1e9 )) +  
+  geom_histogram( binwidth = 0.001 ) + 
   geom_vline( xintercept = C , color = 'red' ) + 
-  ggtitle( "Uncertainty in N20 concentration due to measurment error") +
+  ggtitle( "Uncertainty in dissolved N2O concentration due to GC measurment error \nof N2O in air") +
   xlab( "concentration (nMol)")
 
-qplot( x = C_me * 1e9 - C ) +  
+ggplot(Ca_df, aes(x = C_me * 1e9 - C )) +  
   geom_histogram( binwidth = 0.01 ) + 
   geom_vline( xintercept = 0 , color = 'red' ) + 
-  ggtitle( "Uncertainty in N20 concentration due to measurment error") +
+  ggtitle( "Uncertainty in N2O concentration due to GC measurment error \nof N2O in air") +
   xlab( "absolute error (nMol)")
 ```
 
@@ -199,19 +353,24 @@ qplot( x = C_me * 1e9 - C ) +
 C_me <- rep( NA, 1e4 )
 
 for( i in 1:length( C_me ) ){
-  C_me[ i ] <- 10e-6 * B * ( V_g * ( C_e_me[ i ] - C_a_me[ i ] ) / ( 8.3144598 * ( T_c + 273.15 ) * V_w ) + H * exp( 2700 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) * C_e_me[ i ] )
+  C_me[ i ] <- 1e-6 * B * ( V_g * ( C_e_me[ i ] - C_a_me[ i ] ) / ( 8.3144598 * ( T_c + 273.15 ) * V_w ) + H * exp( 2700 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) * C_e_me[ i ] )
 }
 
-qplot( x = C_me * 1e9 ) +  
+# combine into dataframe for ggplot. qplot, which acceptes vectors,
+# was deprecated in ggplot 3.4.0
+C_df <- tibble(C_me = C_me)
+
+ggplot(C_df, aes(x = C_me * 1e9 )) +  
   geom_histogram( binwidth = 0.01 ) + 
   geom_vline( xintercept = C , color = 'red' ) + 
-  ggtitle( "Uncertainty in N20 concentration due to measurment error") +
+  ggtitle( "Uncertainty in dissolved N2O concentration due to GC measurment error \nof 
+           N2O in equilibrated headspace and air") +
   xlab( "concentration (nMol)")
 
-qplot( x = C_me * 1e9 - C ) +  
+ggplot(C_df, aes(x = C_me * 1e9 - C )) +  
   geom_histogram( binwidth = 0.01 ) + 
   geom_vline( xintercept = 0 , color = 'red' ) + 
-  ggtitle( "Uncertainty in N20 concentration due to measurment error") +
+  ggtitle( "Uncertainty in dissolved N2O concentration due to GC measurment error \nof N2O in equilibrated headspace and air") +
   xlab( "absolute error (nMol)")
 ```
 
@@ -219,28 +378,36 @@ qplot( x = C_me * 1e9 - C ) +
 ```{r simulate_me_T_c, message=F}
 C_me <- rep( NA, 1e4 )
 
-T_c_me <- rnorm( 1e4, T_c, 0.1 ) #m.e. in measured water temp
+# How to get standard deviation of temperature measurement?
+# calibration certificate reports an uncertainty of +/-0.058C
+# take standard deviation of simulated measurements with specified uncertainty
+T_c_sd <- sd(runif(n = 1e4, min = T_c - 0.058, max = T_c + 0.058)) # calibration certificate reports an uncertainty of +/-0.058C
+T_c_me <- rnorm( 1e4, T_c, T_c_sd ) #m.e. in measured water temp
 
 for( i in 1:length( C_me ) ){
-  C_me[ i ] <- 10e-6 * B * ( V_g * ( C_e - C_a ) / ( 8.3144598 * ( T_c_me[ i ] + 273.15 ) * V_w ) + H * exp( 2700 * ( 1 / ( T_c_me[ i ] + 273.15 ) - 1 / 298.15 ) ) * C_e )
+  C_me[ i ] <- 1e-6 * B * ( V_g * ( C_e - C_a ) / ( 8.3144598 * ( T_c_me[ i ] + 273.15 ) * V_w ) + H * exp( 2700 * ( 1 / ( T_c_me[ i ] + 273.15 ) - 1 / 298.15 ) ) * C_e )
 }
 
-qplot( x = T_c_me ) +  
+# combine into dataframe for ggplot. qplot, which acceptes vectors,
+# was deprecated in ggplot 3.4.0
+C_df <- tibble(C_me = C_me, T_c_me = T_c_me)
+
+ggplot(C_df, aes(x = T_c_me )) +  
   geom_histogram( binwidth = 0.01 ) + 
   geom_vline( xintercept = T_c , color = 'red' ) + 
   ggtitle( "Simulated measurement error in temperature") +
   xlab( "temperature (C)")
 
-qplot( x = C_me * 1e9 ) +  
-  geom_histogram( binwidth = 0.01 ) + 
+ggplot(C_df, aes( x = C_me * 1e9 )) +  
+  geom_histogram( binwidth = 0.001 ) + 
   geom_vline( xintercept = C , color = 'red' ) + 
-  ggtitle( "Uncertainty in N20 concentration due to measurment error") +
+  ggtitle( "Uncertainty in dissolved N2O concentration due to water temperature \nmeasurment error") +
   xlab( "concentration (nMol)")
 
-qplot( x = C_me * 1e9 - C ) +  
-  geom_histogram( binwidth = 0.01 ) + 
+ggplot(C_df, aes( x = C_me * 1e9 - C )) +  
+  geom_histogram( binwidth = 0.001 ) + 
   geom_vline( xintercept = 0 , color = 'red' ) + 
-  ggtitle( "Uncertainty in N20 concentration due to measurment error") +
+  ggtitle( "Uncertainty in dissolved N2O concentration due to water temperature \nmeasurment error") +
   xlab( "absolute error (nMol)")
 ```
 
@@ -249,28 +416,44 @@ qplot( x = C_me * 1e9 - C ) +
 ```{r simulate_me_B, message=F}
 C_me <- rep( NA, 1e4 )
 
-B_me <- rnorm( 1e4, B, 0.25 ) #m.e. in measured water temp
+# How to get standard deviation of barometric pressure?
+# The manual reports an "accuracy" of +/-3 mm Hg (+/-0.4kPa)
+# take standard deviation of simulated measurements with specified uncertainty
+B_sd <- sd(runif(n = 1e4, min = B - 0.4, max = B + 0.4)) # calibration certificate reports an uncertainty of +/-0.058C
+B_me <- rnorm( 1e4, B, 0.25 ) #m.e. in measured barometric pressure
 
 for( i in 1:length( C_me ) ){
-  C_me[ i ] <- 10e-6 * B_me[ i ] * ( V_g * ( C_e - C_a ) / ( 8.3144598 * ( T_c + 273.15 ) * V_w ) + H * exp( 2700 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) * C_e )
+  C_me[ i ] <- 1e-6 * B_me[ i ] * ( V_g * ( C_e - C_a ) / ( 8.3144598 * ( T_c + 273.15 ) * V_w ) + H * exp( 2700 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) * C_e )
 }
 
-qplot( x = B_me ) +  
+# combine into dataframe for ggplot. qplot, which accepts vectors,
+# was deprecated in ggplot 3.4.0
+C_df <- tibble(C_me = C_me, B_me = B_me, B_ru = runif(n = 1e4, min = B - 0.4, max = B + 0.4))
+
+
+ggplot(C_df, aes( x = B_me )) +  
   geom_histogram( binwidth = 0.01 ) + 
   geom_vline( xintercept = B , color = 'red' ) + 
   ggtitle( "Simulated measurement error in barometric pressure") +
   xlab( "barometric pressure (kPa)")
 
-qplot( x = C_me * 1e9 ) +  
+
+ggplot(C_df, aes( x = B_ru )) +  
   geom_histogram( binwidth = 0.01 ) + 
+  geom_vline( xintercept = B , color = 'red' ) + 
+  ggtitle( "Simulated measurement error in barometric pressure") +
+  xlab( "barometric pressure (kPa)")
+
+ggplot(C_df, aes( x = C_me * 1e9 )) +  
+  geom_histogram( binwidth = 0.001 ) + 
   geom_vline( xintercept = C , color = 'red' ) + 
-  ggtitle( "Uncertainty in N20 concentration due to measurment error") +
+  ggtitle( "Uncertainty in dissolved N2O concentration due to barometric pressure \nmeasurment error") +
   xlab( "concentration (nMol)")
 
-qplot( x = C_me * 1e9 - C ) +  
-  geom_histogram( binwidth = 0.01 ) + 
+ggplot(C_df, aes( x = C_me * 1e9 - C )) +  
+  geom_histogram( binwidth = 0.001 ) + 
   geom_vline( xintercept = 0 , color = 'red' ) + 
-  ggtitle( "Uncertainty in N20 concentration due to measurment error") +
+  ggtitle( "Uncertainty in dissolved N2O concentration due to barometric pressure \nmeasurment error") +
   xlab( "absolute error (nMol)")
 ```
 
@@ -280,28 +463,32 @@ qplot( x = C_me * 1e9 - C ) +
 C_me <- rep( NA, 1e4 )
 
 V_w_me <- rnorm( 1e4, V_w, 1 ) #m.e. in measured water volume
-V_g_me <- 60 - V_w_me
+V_g_me <- 140 - V_w_me
 
 for( i in 1:length( C_me ) ){
-  C_me[ i ] <- 10e-6 * B * ( V_g_me[ i ] * ( C_e - C_a ) / ( 8.3144598 * ( T_c + 273.15 ) * V_w_me[ i ] ) + H * exp( 2700 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) * C_e )
+  C_me[ i ] <- 1e-6 * B * ( V_g_me[ i ] * ( C_e - C_a ) / ( 8.3144598 * ( T_c + 273.15 ) * V_w_me[ i ] ) + H * exp( 2700 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) * C_e )
 }
 
-qplot( x = V_w_me ) +  
+# combine into dataframe for ggplot. qplot, which accepts vectors,
+# was deprecated in ggplot 3.4.0
+C_df <- tibble(C_me = C_me, V_w_me = V_w_me)
+
+ggplot(C_df, aes( x = V_w_me )) +  
   geom_histogram( binwidth = 0.01 ) + 
   geom_vline( xintercept = V_w , color = 'red' ) + 
   ggtitle( "Simulated measurement error in water volume") +
   xlab( "water vol (mL)")
 
-qplot( x = C_me * 1e9 ) +  
-  geom_histogram( binwidth = 0.01 ) + 
+ggplot(C_df, aes( x = C_me * 1e9 )) +  
+  geom_histogram( binwidth = 0.0001 ) + 
   geom_vline( xintercept = C , color = 'red' ) + 
-  ggtitle( "Uncertainty in N20 concentration due to measurment error") +
+  ggtitle( "Uncertainty in dissollved N2O concentration due to water volume \nmeasurment error") +
   xlab( "concentration (nMol)")
 
-qplot( x = C_me * 1e9 - C ) +  
-  geom_histogram( binwidth = 0.01 ) + 
+ggplot(C_df, aes( x = C_me * 1e9 - C )) +  
+  geom_histogram( binwidth = 0.0001 ) + 
   geom_vline( xintercept = 0 , color = 'red' ) + 
-  ggtitle( "Uncertainty in N20 concentration due to measurment error") +
+  ggtitle( "Uncertainty in N2O concentration due to measurment error") +
   xlab( "absolute error (nMol)")
 ```
 
@@ -311,19 +498,116 @@ qplot( x = C_me * 1e9 - C ) +
 C_me <- rep( NA, 1e4 )
 
 for( i in 1:length( C_me ) ){
-  C_me[ i ] <- 10e-6 * B_me[ i ] * ( V_g_me[ i ] * ( C_e_me[ i ] - C_a_me[ i ] ) / ( 8.3144598 * ( T_c_me[ i ] + 273.15 ) * V_w_me[ i ] ) + H * exp( 2700 * ( 1 / ( T_c_me[ i ] + 273.15 ) - 1 / 298.15 ) ) * C_e )
+  C_me[ i ] <- 1e-6 * B_me[ i ] * ( V_g_me[ i ] * ( C_e_me[ i ] - C_a_me[ i ] ) / ( 8.3144598 * ( T_c_me[ i ] + 273.15 ) * V_w_me[ i ] ) + H * exp( 2700 * ( 1 / ( T_c_me[ i ] + 273.15 ) - 1 / 298.15 ) ) * C_e )
 }
 
+# combine into dataframe for ggplot. qplot, which accepts vectors,
+# was deprecated in ggplot 3.4.0
+C_df <- tibble(C_me = C_me)
 
-qplot( x = C_me * 1e9 ) +  
+ggplot(C_df, aes( x = C_me * 1e9 )) +  
   geom_histogram( binwidth = 0.01 ) + 
   geom_vline( xintercept = C , color = 'red' ) + 
-  ggtitle( "Uncertainty in N20 concentration due to measurment error") +
+  ggtitle( "Uncertainty in dissolved N2O concentration due to cumulative \nmeasurment errors") +
   xlab( "concentration (nMol)")
 
-qplot( x = C_me * 1e9 - C ) +  
+ggplot(C_df, aes( x = C_me * 1e9 - C )) +  
   geom_histogram( binwidth = 0.01 ) + 
   geom_vline( xintercept = 0 , color = 'red' ) + 
-  ggtitle( "Uncertainty in N20 concentration due to measurment error") +
+  ggtitle( "Uncertainty in dissolved N2O concentration due to cumulative \nmeasurment errors") +
   xlab( "absolute error (nMol)")
+
+# standard deviation of a measurement is:
+sd(C_me* 1e9) # 0.15 nmol L-1, as compared to 1.25 nmol L-1 in Webb et al.
+
+# the 95% CI is therefore the computed value +/- 2 standard deviations
+sd(C_me* 1e9) * 2 # +/- 0.302 nmol N2O
 ```
+
+# Incorporate measurement uncertainty into source/sink status
+The standard deviation of dissolved gas concentration measurements is `r sd(C_me* 1e9)`nM which compares well to 1.25nM reported by Webb et al.  The 95% confidence interval is calculated as +/-2sd, which in this case is `r sd(C_me* 1e9) * 2`nM.  Therefore any dissolved gas concentration that is within `r sd(C_me* 1e9) * 2`nM of the equilibrium value cannot be determined as a source or a sink.
+
+
+```{r map_table, message=F}
+# two standard deviations = 0.3019449
+# 95% CI is therefore x+/-0.3019449
+
+dg <- dg %>%
+  mutate(n2o.src.snk.with.error = case_when(
+    abs(dissolved.n2o.nmol - sat.n2o.nmol) > sd(C_me* 1e9) * 2 ~ n2o.src.snk,
+    TRUE ~ "undetermined")) 
+
+dg %>% 
+  filter(sample.source == "DG", visit.no == 1, sitetype == "PROB") %>%
+  {table(.$n2o.src.snk.with.error)} %>%
+  kable(digits = 2, caption = "Number of lakes classified as source/sink")
+
+dg %>% 
+  filter(sample.source == "DG", visit.no == 1, sitetype == "PROB") %>%
+  {prop.table(table(.$n2o.src.snk.with.error))} %>%
+  kable(digits = 2, caption = "Proportion of lakes classified as source/sink")
+
+## load ecoregions----
+# read in ecoregion polygons
+ecoR <- st_read(dsn = paste0(localPath, 
+                             "/Environmental Protection Agency (EPA)/",
+                             "ORD NLA17 Dissolved Gas - Documents/inputData"),
+                layer = "aggr_ecoregions_simple",
+                quiet = TRUE)
+
+# Check CRS
+#st_crs(ecoR) # 3857
+ecoR <- st_transform(ecoR, 5070) # convert to CONUS Albers
+#st_crs(ecoR) # 5070
+
+# SET UP CUSTOM COLORS FOR ECOREGIONS
+# Custom color pallette for ecoregion polygons. Attempted to mirror
+# https://www.epa.gov/national-aquatic-resource-surveys/
+# ecoregional-results-national-lakes-assessment-2012
+cols <- c("Coastal Plains" = "orange1",
+          "Northern Appalachians" = "lightpink1",
+          "Northern Plains" = "darksalmon",
+          "Southern Appalachians" = "mediumturquoise",
+          "Southern Plains" = "khaki4",
+          "Temperate Plains" = "forestgreen", 
+          "Upper Midwest" = "deepskyblue4",
+          "Western Mountains" = "saddlebrown",
+          "Xeric" = "lightskyblue4")
+
+
+## Load state boundaries----
+states <- USAboundaries::us_states() %>%
+  dplyr::filter(!state_name %in% c("Alaska", "District of Columbia", "Hawaii", "Puerto Rico")) %>%
+  st_transform(5070) # convert to CONUS Albers
+ 
+# To enable spatial analysis of the data, the dataframe will be converted to a 
+# 'simple features' (sf) object.
+# Define coordinates
+coords <- data.frame(longitude = dg$map.lon.dd, latitude = dg$map.lat.dd)
+
+dg.sf <- st_as_sf(dg, coords = c("map.lon.dd", "map.lat.dd"), 
+                  crs = 4269) %>% # standard for lat/lon
+  st_transform(5070) # project to CONUS ALBERS for plotting
+
+
+## Map
+ggplot() +
+    geom_sf(data = ecoR, color = NA, aes(fill = WSA9_NAME)) +
+    geom_sf(data = dg.sf %>% 
+              filter(!is.na(n2o.src.snk), sitetype == "PROB", visit.no == 1) %>%
+              arrange(desc(n2o.src.snk.with.error)), # grey on top of black
+            aes(size = dissolved.n2o.nmol, color = n2o.src.snk.with.error),
+            show.legend = "point") +
+    geom_sf(data = states, fill = NA, color = "cornsilk3", size = 0.1) +
+    # guide argument below removes points from the boxes in the ecoregion legend
+    # https://aosmith.rbind.io/2020/07/09/ggplot2-override-aes/
+    scale_fill_manual("Ecoregion", values = cols,
+                      guide = guide_legend(override.aes = list(shape = NA))) +
+    scale_color_manual(values = c("grey", "black", "orange"), name = "source/sink") +
+    scale_size(name = expression(N[2]*O~(nM)),
+               range = c(0.1, 10), # custom size range
+               breaks = c(1, 10, 25, 50, 100)) + # custom breaks
+    theme(legend.key.size = unit(0.4, "cm"), # size of boxes in legend
+          legend.title = element_text(size = 8))
+```
+
