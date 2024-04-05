@@ -154,7 +154,7 @@ C <- C * 1e9 #convert mol to nmol
 round( C, 1 ) 
 
 ```
-# Define GC measurement error
+## Define GC measurement error
 Measurement error will be defined as standard deviation of repeated analysis of analytical standards throughout the period of time that the NLA2017 samples were analyzed.
 
 ```{r get_gc_error}
@@ -278,7 +278,7 @@ n2o_sd <- 0.007872511
 
 ```
 
-# Simulate measurement error for gas measured in water
+## Simulate measurement error in GC measurement of N2O in equilibrated headspace
 ```{r simulate_me_Ce, message=F}
 C_me <- rep( NA, 1e4 ) # "me" is "measured" gas in headspace. empty vector
 
@@ -315,7 +315,7 @@ ggplot(C_df, aes(x = C_me * 1e9 - C )) +
 ```
 
 
-# Simulate measurement error for gas measured in air
+## Simulate measurement error for GC measurement of N2O in air
 ```{r simulate_me_Ca, message=F}
 C_me <- rep( NA, 1e4 )
 
@@ -348,7 +348,7 @@ ggplot(Ca_df, aes(x = C_me * 1e9 - C )) +
   xlab( "absolute error (nMol)")
 ```
 
-# Simulate measurement error in $C_e$ and $C_a$
+## Simulate measurement error in $C_e$ and $C_a$
 ```{r simulate_me_Ca_Ce, message=F}
 C_me <- rep( NA, 1e4 )
 
@@ -374,7 +374,7 @@ ggplot(C_df, aes(x = C_me * 1e9 - C )) +
   xlab( "absolute error (nMol)")
 ```
 
-# Simulate measurement error in water temperature
+## Simulate measurement error in water temperature
 ```{r simulate_me_T_c, message=F}
 C_me <- rep( NA, 1e4 )
 
@@ -412,7 +412,7 @@ ggplot(C_df, aes( x = C_me * 1e9 - C )) +
 ```
 
 
-# Simulate measurement error in barometric pressure
+## Simulate measurement error in barometric pressure
 ```{r simulate_me_B, message=F}
 C_me <- rep( NA, 1e4 )
 
@@ -458,7 +458,7 @@ ggplot(C_df, aes( x = C_me * 1e9 - C )) +
 ```
 
 
-# Simulate measurement error in water volume
+## Simulate measurement error in water volume
 ```{r simulate_me_V_w, message=F}
 C_me <- rep( NA, 1e4 )
 
@@ -493,7 +493,7 @@ ggplot(C_df, aes( x = C_me * 1e9 - C )) +
 ```
 
 
-# Simulate measurement error for all observables
+## Simulate measurement error for all observables
 ```{r simulate_me_all, message=F}
 C_me <- rep( NA, 1e4 )
 
@@ -521,11 +521,11 @@ ggplot(C_df, aes( x = C_me * 1e9 - C )) +
 sd(C_me* 1e9) # 0.15 nmol L-1, as compared to 1.25 nmol L-1 in Webb et al.
 
 # the 95% CI is therefore the computed value +/- 2 standard deviations
-sd(C_me* 1e9) * 2 # +/- 0.302 nmol N2O
+sd(C_me* 1e9) * 1.96 # +/- 0.302 nmol N2O
 ```
 
-# Incorporate measurement uncertainty into source/sink status
-The standard deviation of dissolved gas concentration measurements is `r sd(C_me* 1e9)`nM which compares well to 1.25nM reported by Webb et al.  The 95% confidence interval is calculated as +/-2sd, which in this case is `r sd(C_me* 1e9) * 2`nM.  Therefore any dissolved gas concentration that is within `r sd(C_me* 1e9) * 2`nM of the equilibrium value cannot be determined as a source or a sink.
+## Incorporate measurement uncertainty into source/sink status
+The standard deviation of dissolved gas concentration measurements is `r sd(C_me* 1e9)`nM which compares well to 1.25nM reported by Webb et al.  The 95% confidence interval is calculated as +/-2sd, which in this case is `r sd(C_me* 1e9) * 1.96`nM.  Therefore any dissolved gas concentration that is within `r sd(C_me* 1e9) * 1.96`nM of the equilibrium value cannot be determined as a source or a sink.
 
 
 ```{r map_table, message=F}
@@ -534,7 +534,7 @@ The standard deviation of dissolved gas concentration measurements is `r sd(C_me
 
 dg <- dg %>%
   mutate(n2o.src.snk.with.error = case_when(
-    abs(dissolved.n2o.nmol - sat.n2o.nmol) > sd(C_me* 1e9) * 2 ~ n2o.src.snk,
+    abs(dissolved.n2o.nmol - sat.n2o.nmol) > sd(C_me* 1e9) * 1.96 ~ n2o.src.snk,
     TRUE ~ "undetermined")) 
 
 dg %>% 
@@ -610,4 +610,150 @@ ggplot() +
     theme(legend.key.size = unit(0.4, "cm"), # size of boxes in legend
           legend.title = element_text(size = 8))
 ```
+# Set up model for simulating true saturation concentration
 
+The full equation for estimating the concentration (nM) of $N_20$ gas dissolved in water that is in equilibrium with the atmosphere is:
+
+$$C = 1^{-6}B*C_{air}*exp(2700* \frac{1}{Tc} -  \frac{1}{298.15})$$
+```{r c_sat}
+C_sat <- C_a * B * 1e-6 * (H  * exp(2700*(1/(T_c + 273.15) - 1/298.15))) 
+
+C_sat <- C_sat * 1e9 #convert mol to nmol
+
+
+```
+
+
+## Simulate measurement error in GC measurement of N2O in air
+```{r simulate_me_sat_C_a, message=F}
+C_me_sat <- rep( NA, 1e4 )
+
+C_a_me <- rnorm( 1e4, C_a, n2o_sd ) #m.e. in measured gas in air
+
+
+for( i in 1:length( C_me_sat ) ){
+    C_me_sat[i] <- C_a_me[i] * B * 1e-6 * (H  * exp(2700*(1/(T_c + 273.15) - 1/298.15)))
+}
+
+# combine into dataframe for ggplot. qplot, which accepts vectors,
+# was deprecated in ggplot 3.4.0
+C_sat_df <- tibble(C_me_sat = C_me_sat, C_a_me = C_a_me)
+
+ggplot(C_sat_df, aes(x = C_a_me )) +  
+  geom_histogram( binwidth = 0.0001 ) + 
+  geom_vline( xintercept = C_a , color = 'red' ) + 
+  ggtitle( "Simulated measurement error in air gas concentration") +
+  xlab( "concentration (ppm)")
+
+ggplot(C_sat_df, aes(x = C_me_sat * 1e9 )) +  
+  geom_histogram( binwidth = 0.01 ) + 
+  geom_vline( xintercept = C_sat , color = 'red' ) + 
+  ggtitle( "Uncertainty in saturated N2O concentration due to GC measurment error \nof N2O in air") +
+  xlab( "concentration (nMol)")
+
+ggplot(C_sat_df, aes(x = C_me_sat * 1e9 - C_sat )) +  
+  geom_histogram( binwidth = 0.01 ) + 
+  geom_vline( xintercept = 0 , color = 'red' ) + 
+  ggtitle( "Uncertainty in saturated N2O concentration due to GC measurment error \nof N2O in air") +
+  xlab( "absolute error (nMol)")
+```    
+
+
+
+## Simulate measurement error in water temperature
+```{r simulate_me_sat_T_c, message=F}
+C_me_sat <- rep( NA, 1e4 )
+
+for( i in 1:length( C_me_sat ) ){
+    C_me_sat[i] <- C_a * B * 1e-6 * (H  * exp(2700*(1/(T_c_me[ i ] + 273.15) - 1/298.15)))
+}
+
+# combine into dataframe for ggplot. qplot, which acceptes vectors,
+# was deprecated in ggplot 3.4.0
+C_sat_df <- tibble(C_me_sat = C_me_sat, T_c_me = T_c_me)
+
+
+ggplot(C_sat_df, aes(x = T_c_me )) +  
+  geom_histogram( binwidth = 0.01 ) + 
+  geom_vline( xintercept = T_c , color = 'red' ) + 
+  ggtitle( "Simulated measurement error in temperature") +
+  xlab( "temperature (C)")
+
+ggplot(C_sat_df, aes( x = C_me_sat * 1e9 )) +  
+  geom_histogram( binwidth = 0.001 ) + 
+  geom_vline(xintercept = C_sat , color = 'red' ) + 
+  ggtitle( "Uncertainty in saturated N2O concentration due to water temperature \nmeasurment error") +
+  xlab( "concentration (nMol)")
+
+ggplot(C_sat_df, aes( x = C_me_sat * 1e9 - C_sat )) +  
+  geom_histogram( binwidth = 0.001 ) + 
+  geom_vline( xintercept = 0 , color = 'red' ) + 
+  ggtitle( "Uncertainty in saturated N2O concentration due to water temperature \nmeasurment error" ) +
+  xlab( "absolute error (nMol)")
+```
+
+
+## Simulate measurement error in barometric pressure
+```{r simulate_me_sat_B, message=F}
+C_me_sat <- rep( NA, 1e4 )
+
+for( i in 1:length( C_me_sat ) ){
+    C_me_sat[i] <- C_a * B_me[ i ] * 1e-6 * (H  * exp(2700*(1/(T_c + 273.15) - 1/298.15)))
+}
+
+# combine into dataframe for ggplot. qplot, which accepts vectors,
+# was deprecated in ggplot 3.4.0
+C_sat_df <- tibble(C_me_sat = C_me_sat, B_me = B_me)
+
+
+ggplot(C_sat_df, aes( x = B_me )) +  
+  geom_histogram( binwidth = 0.01 ) + 
+  geom_vline( xintercept = B , color = 'red' ) + 
+  ggtitle( "Simulated measurement error in barometric pressure") +
+  xlab( "barometric pressure (kPa)")
+
+ggplot(C_sat_df, aes( x = C_me_sat * 1e9 )) +  
+  geom_histogram( binwidth = 0.001 ) + 
+  geom_vline( xintercept = C_sat , color = 'red' ) + 
+  ggtitle( "Uncertainty in saturated N2O concentration due to barometric pressure \nmeasurment error") +
+  xlab( "concentration (nMol)")
+
+ggplot(C_sat_df, aes( x = C_me_sat * 1e9 - C_sat )) +  
+  geom_histogram( binwidth = 0.001 ) + 
+  geom_vline( xintercept = 0 , color = 'red' ) + 
+  ggtitle( "Uncertainty in saturated N2O concentration due to barometric pressure \nmeasurment error") +
+  xlab( "absolute error (nMol)")
+```
+
+
+
+## Simulate measurement error for all observables
+```{r simulate_me_sat_all, message=F}
+C_me_sat <- rep( NA, 1e4 )
+
+for( i in 1:length( C_me_sat ) ){
+    C_me_sat[i] <- C_a_me[ i ] * B_me[ i ] * 1e-6 * (H  * exp(2700*(1/(T_c_me[ i ] + 273.15) - 1/298.15)))
+}
+
+# combine into dataframe for ggplot. qplot, which accepts vectors,
+# was deprecated in ggplot 3.4.0
+C_sat_df <- tibble(C_me_sat = C_me_sat)
+
+ggplot(C_sat_df, aes( x = C_me_sat * 1e9 )) +  
+  geom_histogram( binwidth = 0.01 ) + 
+  geom_vline( xintercept = C_sat , color = 'red' ) + 
+  ggtitle( "Uncertainty in saturated N2O concentration due to cumulative \nmeasurment errors") +
+  xlab( "concentration (nMol)")
+
+ggplot(C_sat_df, aes( x = C_me_sat * 1e9 - C_sat )) +  
+  geom_histogram( binwidth = 0.001 ) + 
+  geom_vline( xintercept = 0 , color = 'red' ) + 
+  ggtitle( "Uncertainty in saturated N2O concentration due to cumulative \nmeasurment errors") +
+  xlab( "absolute error (nMol)")
+
+# standard deviation of a measurement is:
+sd(C_me_sat* 1e9) # 0.20 nmol L-1
+
+# the 95% CI is therefore the computed value +/- 2 standard deviations
+sd(C_me_sat * 1e9) * 1.96 # +/- 0.395 nmol N2O
+```
