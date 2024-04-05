@@ -614,7 +614,7 @@ ggplot() +
 
 The full equation for estimating the concentration (nM) of $N_20$ gas dissolved in water that is in equilibrium with the atmosphere is:
 
-$$C = 1^{-6}B*C_{air}*exp(2700* \frac{1}{Tc} -  \frac{1}{298.15})$$
+$$C_{sat} = 1^{-6}B*C_{air}*(H^{\theta}*exp(2700* \frac{1}{Tc} -  \frac{1}{298.15}))$$
 ```{r c_sat}
 C_sat <- C_a * B * 1e-6 * (H  * exp(2700*(1/(T_c + 273.15) - 1/298.15))) 
 
@@ -757,3 +757,53 @@ sd(C_me_sat* 1e9) # 0.20 nmol L-1
 # the 95% CI is therefore the computed value +/- 2 standard deviations
 sd(C_me_sat * 1e9) * 1.96 # +/- 0.395 nmol N2O
 ```
+
+# Set up model for simulating true saturation ratio
+
+
+The full equation for estimating the saturation ratio of $N_20$ gas dissolved in water is:
+
+$$C_ratio = \frac{1^{-6}B \frac{V_{air}(Mr_h - Mr_r)}{(8.3144598 * K * V_{water}) + H^{\theta} \exp( 2700 * ( \frac{1}{K} - \frac{1}{298.15}) * Mr_h}}{1^{-6}B*C_{air}*exp(2700* \frac{1}{Tc} -  \frac{1}{298.15})}$$
+
+``` {r}
+
+C_ratio <- (1e-6 * B * ( V_g * ( C_e - C_a ) / ( 8.3144598 * ( T_c + 273.15 ) * V_w ) + H * exp( 2700 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) * C_e )) /
+  (C_a * B * 1e-6 * (H  * exp(2700*(1/(T_c + 273.15) - 1/298.15)))) 
+
+```
+## Simulate measurement error for all observables
+```{r simulate_me_ratio_all, message=F}
+C_me_ratio <- rep( NA, 1e4 )
+
+for( i in 1:length( C_me_ratio ) ){
+C_me_ratio[ i ] <- (1e-6 * B_me[i] * ( V_g_me[i] * ( C_e_me[i] - C_a_me[i] ) / ( 8.3144598 * ( T_c_me[i] + 273.15 ) * V_w_me[i] ) + H * exp( 2700 * ( 1 / ( T_c_me[i] + 273.15 ) - 1 / 298.15 ) ) * C_e_me[i] )) /
+  (C_a_me[i] * B_me[i] * 1e-6 * (H  * exp(2700*(1/(T_c_me[i] + 273.15) - 1/298.15)))) 
+}
+
+
+# combine into dataframe for ggplot. qplot, which accepts vectors,
+# was deprecated in ggplot 3.4.0
+C_ratio_df <- tibble(C_me_ratio = C_me_ratio)
+
+ggplot(C_ratio_df, aes( x = C_me_ratio )) +  
+  geom_histogram( binwidth = 0.01 ) + 
+  geom_vline( xintercept = C_ratio , color = 'red' ) + 
+  ggtitle( "Uncertainty in N2O saturation ratio due to cumulative \nmeasurment errors") +
+  xlab( "saturation ratio")
+
+ggplot(C_ratio_df, aes( x = C_me_ratio - C_ratio )) +  
+  geom_histogram( binwidth = 0.001 ) + 
+  geom_vline( xintercept = 0 , color = 'red' ) + 
+  ggtitle( "Uncertainty in N2O saturation ratio due to cumulative \nmeasurment errors") +
+  xlab( "absolute error (saturation ratio)")
+
+# standard deviation of a saturation ratio value s:
+sd(C_me_ratio) # 0.0.05479
+
+# the 95% CI is therefore the computed value +/- 2 standard deviations
+sd(C_me_ratio) * 1.96 # +/- 0.1073
+
+# so any ratio within 0.1073 of 1.0 cannot be discerned as a source or sink?
+```
+
+
