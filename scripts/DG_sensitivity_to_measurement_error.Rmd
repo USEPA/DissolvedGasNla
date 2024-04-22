@@ -17,6 +17,7 @@ output:
 link-citations: true
 ---
 
+```{=html}
 <style>
 .vscroll-plot {
     width: 800px;
@@ -25,11 +26,13 @@ link-citations: true
     overflow-x: hidden;
 }
 </style>
-
+```
 # Background
+
 In this document we explore a range of models for fitting dissolved $\text{N}_2\text{O}$ data observed as part of the 2017 National Lakes Assessment (NLA).
 
 # Setup R
+
 ```{r setup_1, include=FALSE, echo=FALSE}
 library(knitr)
 # opts_knit$set(root.dir = "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/scripts")
@@ -54,7 +57,6 @@ library(sf)
 options(mc.cores = parallel::detectCores())
 options( max.print = 2000 )
 ```
-
 
 ```{r utility_functions, include=FALSE}
 # Identify local path for each user
@@ -121,7 +123,7 @@ The full equation for estimating the concentration (nM) of $N_20$ gas dissolved 
 
 $$C = 1^{-6}B \frac{V_{air}(Mr_h - Mr_r)}{(8.3144598 * K * V_{water}) + H^{\theta} \exp( 2700 * ( \frac{1}{K} - \frac{1}{298.15}) * Mr_h}$$
 
-# Set up model for simulating true value
+# Set up model for simulating true dissolved N2O value
 
 ```{r setvars_and_check}
 load(paste0(localPath, "\\Environmental Protection Agency (EPA)",
@@ -144,17 +146,20 @@ V_g <- 35 # volume of reference gas in headspace
 V_w <- 105 # volume of water below headspace
 T_c <- 23 # temperature ( C )
 C_e <- 0.307 # gas mixture ratio in headspace
-C_a <- 0.310 # gas mixture ratio in reference
-H <- 0.00024 #mol m-3 Pa, range: 0.00018 - 0.00025; Henry's law constant
+C_a_n2o <- 0.310 # gas mixture ratio in reference
+H_n2o <- 0.00024 #mol m-3 Pa, range: 0.00018 - 0.00025; Henry's law constant
+H_ar <- 0.000014 #mol m-3 Pa, range: 0.000013 - 0.000016; Henry's law constant
 
-C <- 1e-6 * B * ( V_g * ( C_e - C_a ) / ( 8.3144598 * ( T_c + 273.15 ) * V_w ) + H * exp( 2700 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) * C_e ) 
+C <- 1e-6 * B * ( V_g * ( C_e - C_a_n2o ) / ( 8.3144598 * ( T_c + 273.15 ) * V_w ) + H_n2o * exp( 2700 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) * C_e ) 
 
 C <- C * 1e9 #convert mol to nmol
 
 round( C, 1 ) 
 
 ```
+
 ## Define GC measurement error
+
 Measurement error will be defined as standard deviation of repeated analysis of analytical standards throughout the period of time that the NLA2017 samples were analyzed.
 
 ```{r get_gc_error}
@@ -252,7 +257,7 @@ Measurement error will be defined as standard deviation of repeated analysis of 
 #   geom_histogram()
 # 
 # n2o_sd <- sd(gc.prax$n2o_ppm) # 0.007872511ppm
-n2o_sd <- 0.007872511
+n2o_sd_epa <- 0.007872511 # from AWBERC GC
 
 # # begin digging for other standards to work with
 # gc.std %>%
@@ -279,16 +284,17 @@ n2o_sd <- 0.007872511
 ```
 
 ## Simulate measurement error in GC measurement of N2O in equilibrated headspace
+
 ```{r simulate_me_Ce, message=F}
 C_me <- rep( NA, 1e4 ) # "me" is "measured" gas in headspace. empty vector
 
 # this simulates measurement error on GC.
 # assume TRUE value is C_e and error is simulated with with sd of replicate GC measurements
-C_e_me <- rnorm( 1e4, C_e, n2o_sd ) # me in measured gas in headspace.
+C_e_me <- rnorm( 1e4, C_e, n2o_sd_epa ) # me in measured gas in headspace.
                                    # add random error to measured concentration
 
 for( i in 1:length( C_me ) ){
-  C_me[ i ] <- 1e-6 * B * ( V_g * ( C_e_me[ i ] - C_a ) / ( 8.3144598 * ( T_c + 273.15 ) * V_w ) + H * exp( 2700 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) * C_e_me[ i ] )
+  C_me[ i ] <- 1e-6 * B * ( V_g * ( C_e_me[ i ] - C_a_n2o ) / ( 8.3144598 * ( T_c + 273.15 ) * V_w ) + H_n2o * exp( 2700 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) * C_e_me[ i ] )
 }
 
 # combine into dataframe for ggplot. qplot, which acceptes vectors,
@@ -314,24 +320,24 @@ ggplot(C_df, aes(x = C_me * 1e9 - C )) +
   xlab( "absolute error (nMol)")
 ```
 
-
 ## Simulate measurement error for GC measurement of N2O in air
+
 ```{r simulate_me_Ca, message=F}
 C_me <- rep( NA, 1e4 )
 
-C_a_me <- rnorm( 1e4, C_a, n2o_sd ) #m.e. in measured gas in air
+C_a_n2o_me <- rnorm( 1e4, C_a_n2o, n2o_sd_epa ) #m.e. in measured gas in air
 
 for( i in 1:length( C_me ) ){
-  C_me[ i ] <- 1e-6 * B * ( V_g * ( C_e - C_a_me[ i ] ) / ( 8.3144598 * ( T_c + 273.15 ) * V_w ) + H * exp( 2700 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) * C_e )
+  C_me[ i ] <- 1e-6 * B * ( V_g * ( C_e - C_a_n2o_me[ i ] ) / ( 8.3144598 * ( T_c + 273.15 ) * V_w ) + H_n2o * exp( 2700 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) * C_e )
 }
 
 # combine into dataframe for ggplot. qplot, which accepts vectors,
 # was deprecated in ggplot 3.4.0
-Ca_df <- tibble(C_me = C_me, C_a_me = C_a_me)
+Ca_df <- tibble(C_me = C_me, C_a_n2o_me = C_a_n2o_me)
 
-ggplot(Ca_df, aes(x = C_a_me )) +  
+ggplot(Ca_df, aes(x = C_a_n2o_me )) +  
   geom_histogram( binwidth = 0.0001 ) + 
-  geom_vline( xintercept = C_a , color = 'red' ) + 
+  geom_vline( xintercept = C_a_n2o , color = 'red' ) + 
   ggtitle( "Simulated measurement error in air gas concentration") +
   xlab( "concentration (?)")
 
@@ -348,12 +354,13 @@ ggplot(Ca_df, aes(x = C_me * 1e9 - C )) +
   xlab( "absolute error (nMol)")
 ```
 
-## Simulate measurement error in $C_e$ and $C_a$
+## Simulate measurement error in $C_e$ and $C_a_n2o$
+
 ```{r simulate_me_Ca_Ce, message=F}
 C_me <- rep( NA, 1e4 )
 
 for( i in 1:length( C_me ) ){
-  C_me[ i ] <- 1e-6 * B * ( V_g * ( C_e_me[ i ] - C_a_me[ i ] ) / ( 8.3144598 * ( T_c + 273.15 ) * V_w ) + H * exp( 2700 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) * C_e_me[ i ] )
+  C_me[ i ] <- 1e-6 * B * ( V_g * ( C_e_me[ i ] - C_a_n2o_me[ i ] ) / ( 8.3144598 * ( T_c + 273.15 ) * V_w ) + H_n2o * exp( 2700 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) * C_e_me[ i ] )
 }
 
 # combine into dataframe for ggplot. qplot, which acceptes vectors,
@@ -375,6 +382,7 @@ ggplot(C_df, aes(x = C_me * 1e9 - C )) +
 ```
 
 ## Simulate measurement error in water temperature
+
 ```{r simulate_me_T_c, message=F}
 C_me <- rep( NA, 1e4 )
 
@@ -385,10 +393,10 @@ T_c_sd <- sd(runif(n = 1e4, min = T_c - 0.058, max = T_c + 0.058)) # calibration
 T_c_me <- rnorm( 1e4, T_c, T_c_sd ) #m.e. in measured water temp
 
 for( i in 1:length( C_me ) ){
-  C_me[ i ] <- 1e-6 * B * ( V_g * ( C_e - C_a ) / ( 8.3144598 * ( T_c_me[ i ] + 273.15 ) * V_w ) + H * exp( 2700 * ( 1 / ( T_c_me[ i ] + 273.15 ) - 1 / 298.15 ) ) * C_e )
+  C_me[ i ] <- 1e-6 * B * ( V_g * ( C_e - C_a_n2o ) / ( 8.3144598 * ( T_c_me[ i ] + 273.15 ) * V_w ) + H_n2o * exp( 2700 * ( 1 / ( T_c_me[ i ] + 273.15 ) - 1 / 298.15 ) ) * C_e )
 }
 
-# combine into dataframe for ggplot. qplot, which acceptes vectors,
+# combine into dataframe for ggplot. qplot, which accepts vectors,
 # was deprecated in ggplot 3.4.0
 C_df <- tibble(C_me = C_me, T_c_me = T_c_me)
 
@@ -411,24 +419,43 @@ ggplot(C_df, aes( x = C_me * 1e9 - C )) +
   xlab( "absolute error (nMol)")
 ```
 
-
 ## Simulate measurement error in barometric pressure
+
 ```{r simulate_me_B, message=F}
 C_me <- rep( NA, 1e4 )
 
 # How to get standard deviation of barometric pressure?
-# The manual reports an "accuracy" of +/-3 mm Hg (+/-0.4kPa)
-# take standard deviation of simulated measurements with specified uncertainty
-B_sd <- sd(runif(n = 1e4, min = B - 0.4, max = B + 0.4)) # calibration certificate reports an uncertainty of +/-0.058C
-B_me <- rnorm( 1e4, B, 0.25 ) #m.e. in measured barometric pressure
+# The manual reports an "accuracy" of +/-3 mm Hg (+/-0.4kPa), but EPA calibration
+# checks performed in the AWBERC metrology lab demonstrate much greater precision.
+# below we calculat sd of replicate measurements made with 15 different barometers.
+# we then take the mean of the 15 sd values.
+
+#2023 barometer verification in AWBERC metrology lab
+B_sd <- mean(
+  sd(c(999,998.6)*0.1), # YSI ProDSS
+  sd(c(1000.848, 1000.848)*0.1), # EXO 21G104022
+  sd(c(1000.982, 1000.982)*0.1), # EXO 18H111572
+  sd(c(1000.982, 1000.982)*0.1), # EXO 22F105975
+  sd(c(1001.382, 1001.382)*0.1), # EXO 21K100162
+  sd(c(1000.98, 1000.85)*0.1), # EXO 21F103579
+  sd(c(1000.31, 1000.44)*0.1), # MDS 16D100327
+  sd(c(1001.25, 1001.25)*0.1), # MDS 12F102618
+  sd(c(1000, 1000)*0.1), # MDS 16D100328
+  sd(c(1002, 1002)*0.1), # MDS 02K599 AF
+  sd(c(1003,1003)*0.1), # MDS 12J0793 AF
+  sd(c(1000.85,1000.85)*0.1), # MDS 16E100831
+  sd(c(1000.32, 1000.32)*0.1), # MDS 12F102619
+  sd(c(1002, 1002)*0.1)) # MDS 15F104725
+
+B_me <- rnorm( 1e4, B, B_sd ) #m.e. in measured barometric pressure
 
 for( i in 1:length( C_me ) ){
-  C_me[ i ] <- 1e-6 * B_me[ i ] * ( V_g * ( C_e - C_a ) / ( 8.3144598 * ( T_c + 273.15 ) * V_w ) + H * exp( 2700 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) * C_e )
+  C_me[ i ] <- 1e-6 * B_me[ i ] * ( V_g * ( C_e - C_a_n2o ) / ( 8.3144598 * ( T_c + 273.15 ) * V_w ) + H_n2o * exp( 2700 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) * C_e )
 }
 
 # combine into dataframe for ggplot. qplot, which accepts vectors,
 # was deprecated in ggplot 3.4.0
-C_df <- tibble(C_me = C_me, B_me = B_me, B_ru = runif(n = 1e4, min = B - 0.4, max = B + 0.4))
+C_df <- tibble(C_me = C_me, B_me = B_me)
 
 
 ggplot(C_df, aes( x = B_me )) +  
@@ -437,12 +464,6 @@ ggplot(C_df, aes( x = B_me )) +
   ggtitle( "Simulated measurement error in barometric pressure") +
   xlab( "barometric pressure (kPa)")
 
-
-ggplot(C_df, aes( x = B_ru )) +  
-  geom_histogram( binwidth = 0.01 ) + 
-  geom_vline( xintercept = B , color = 'red' ) + 
-  ggtitle( "Simulated measurement error in barometric pressure") +
-  xlab( "barometric pressure (kPa)")
 
 ggplot(C_df, aes( x = C_me * 1e9 )) +  
   geom_histogram( binwidth = 0.001 ) + 
@@ -457,8 +478,8 @@ ggplot(C_df, aes( x = C_me * 1e9 - C )) +
   xlab( "absolute error (nMol)")
 ```
 
-
 ## Simulate measurement error in water volume
+
 ```{r simulate_me_V_w, message=F}
 C_me <- rep( NA, 1e4 )
 
@@ -466,7 +487,7 @@ V_w_me <- rnorm( 1e4, V_w, 1 ) #m.e. in measured water volume
 V_g_me <- 140 - V_w_me
 
 for( i in 1:length( C_me ) ){
-  C_me[ i ] <- 1e-6 * B * ( V_g_me[ i ] * ( C_e - C_a ) / ( 8.3144598 * ( T_c + 273.15 ) * V_w_me[ i ] ) + H * exp( 2700 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) * C_e )
+  C_me[ i ] <- 1e-6 * B * ( V_g_me[ i ] * ( C_e - C_a_n2o ) / ( 8.3144598 * ( T_c + 273.15 ) * V_w_me[ i ] ) + H_n2o * exp( 2700 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) * C_e )
 }
 
 # combine into dataframe for ggplot. qplot, which accepts vectors,
@@ -492,13 +513,13 @@ ggplot(C_df, aes( x = C_me * 1e9 - C )) +
   xlab( "absolute error (nMol)")
 ```
 
-
 ## Simulate measurement error for all observables
+
 ```{r simulate_me_all, message=F}
 C_me <- rep( NA, 1e4 )
 
 for( i in 1:length( C_me ) ){
-  C_me[ i ] <- 1e-6 * B_me[ i ] * ( V_g_me[ i ] * ( C_e_me[ i ] - C_a_me[ i ] ) / ( 8.3144598 * ( T_c_me[ i ] + 273.15 ) * V_w_me[ i ] ) + H * exp( 2700 * ( 1 / ( T_c_me[ i ] + 273.15 ) - 1 / 298.15 ) ) * C_e )
+  C_me[ i ] <- 1e-6 * B_me[ i ] * ( V_g_me[ i ] * ( C_e_me[ i ] - C_a_n2o_me[ i ] ) / ( 8.3144598 * ( T_c_me[ i ] + 273.15 ) * V_w_me[ i ] ) + H_n2o * exp( 2700 * ( 1 / ( T_c_me[ i ] + 273.15 ) - 1 / 298.15 ) ) * C_e )
 }
 
 # combine into dataframe for ggplot. qplot, which accepts vectors,
@@ -525,8 +546,8 @@ sd(C_me* 1e9) * 1.96 # +/- 0.302 nmol N2O
 ```
 
 ## Incorporate measurement uncertainty into source/sink status
-The standard deviation of dissolved gas concentration measurements is `r sd(C_me* 1e9)`nM which compares well to 1.25nM reported by Webb et al.  The 95% confidence interval is calculated as +/-2sd, which in this case is `r sd(C_me* 1e9) * 1.96`nM.  Therefore any dissolved gas concentration that is within `r sd(C_me* 1e9) * 1.96`nM of the equilibrium value cannot be determined as a source or a sink.
 
+The standard deviation of dissolved gas concentration measurements is `r sd(C_me* 1e9)`nM which compares well to 1.25nM reported by Webb et al. The 95% confidence interval is calculated as +/-2sd, which in this case is `r sd(C_me* 1e9) * 1.96`nM. Therefore any dissolved gas concentration that is within `r sd(C_me* 1e9) * 1.96`nM of the equilibrium value cannot be determined as a source or a sink.
 
 ```{r map_table, message=F}
 # two standard deviations = 0.3019449
@@ -610,38 +631,40 @@ ggplot() +
     theme(legend.key.size = unit(0.4, "cm"), # size of boxes in legend
           legend.title = element_text(size = 8))
 ```
+
 # Set up model for simulating true saturation concentration
 
 The full equation for estimating the concentration (nM) of $N_20$ gas dissolved in water that is in equilibrium with the atmosphere is:
 
 $$C_{sat} = 1^{-6}B*C_{air}*(H^{\theta}*exp(2700* \frac{1}{Tc} -  \frac{1}{298.15}))$$
+
 ```{r c_sat}
-C_sat <- C_a * B * 1e-6 * (H  * exp(2700*(1/(T_c + 273.15) - 1/298.15))) 
+C_sat <- C_a_n2o * B * 1e-6 * (H_n2o  * exp(2700*(1/(T_c + 273.15) - 1/298.15))) 
 
 C_sat <- C_sat * 1e9 #convert mol to nmol
 
 
 ```
 
-
 ## Simulate measurement error in GC measurement of N2O in air
-```{r simulate_me_sat_C_a, message=F}
+
+```{r simulate_me_sat_C_a_n2o, message=F}
 C_me_sat <- rep( NA, 1e4 )
 
-C_a_me <- rnorm( 1e4, C_a, n2o_sd ) #m.e. in measured gas in air
+C_a_n2o_me <- rnorm( 1e4, C_a_n2o, n2o_sd_epa ) #m.e. in measured gas in air
 
 
 for( i in 1:length( C_me_sat ) ){
-    C_me_sat[i] <- C_a_me[i] * B * 1e-6 * (H  * exp(2700*(1/(T_c + 273.15) - 1/298.15)))
+    C_me_sat[i] <- C_a_n2o_me[i] * B * 1e-6 * (H_n2o  * exp(2700*(1/(T_c + 273.15) - 1/298.15)))
 }
 
 # combine into dataframe for ggplot. qplot, which accepts vectors,
 # was deprecated in ggplot 3.4.0
-C_sat_df <- tibble(C_me_sat = C_me_sat, C_a_me = C_a_me)
+C_sat_df <- tibble(C_me_sat = C_me_sat, C_a_n2o_me = C_a_n2o_me)
 
-ggplot(C_sat_df, aes(x = C_a_me )) +  
+ggplot(C_sat_df, aes(x = C_a_n2o_me )) +  
   geom_histogram( binwidth = 0.0001 ) + 
-  geom_vline( xintercept = C_a , color = 'red' ) + 
+  geom_vline( xintercept = C_a_n2o , color = 'red' ) + 
   ggtitle( "Simulated measurement error in air gas concentration") +
   xlab( "concentration (ppm)")
 
@@ -656,19 +679,18 @@ ggplot(C_sat_df, aes(x = C_me_sat * 1e9 - C_sat )) +
   geom_vline( xintercept = 0 , color = 'red' ) + 
   ggtitle( "Uncertainty in saturated N2O concentration due to GC measurment error \nof N2O in air") +
   xlab( "absolute error (nMol)")
-```    
-
-
+```
 
 ## Simulate measurement error in water temperature
+
 ```{r simulate_me_sat_T_c, message=F}
 C_me_sat <- rep( NA, 1e4 )
 
 for( i in 1:length( C_me_sat ) ){
-    C_me_sat[i] <- C_a * B * 1e-6 * (H  * exp(2700*(1/(T_c_me[ i ] + 273.15) - 1/298.15)))
+    C_me_sat[i] <- C_a_n2o * B * 1e-6 * (H_n2o  * exp(2700*(1/(T_c_me[ i ] + 273.15) - 1/298.15)))
 }
 
-# combine into dataframe for ggplot. qplot, which acceptes vectors,
+# combine into dataframe for ggplot. qplot, which accepts vectors,
 # was deprecated in ggplot 3.4.0
 C_sat_df <- tibble(C_me_sat = C_me_sat, T_c_me = T_c_me)
 
@@ -692,13 +714,13 @@ ggplot(C_sat_df, aes( x = C_me_sat * 1e9 - C_sat )) +
   xlab( "absolute error (nMol)")
 ```
 
-
 ## Simulate measurement error in barometric pressure
+
 ```{r simulate_me_sat_B, message=F}
 C_me_sat <- rep( NA, 1e4 )
 
 for( i in 1:length( C_me_sat ) ){
-    C_me_sat[i] <- C_a * B_me[ i ] * 1e-6 * (H  * exp(2700*(1/(T_c + 273.15) - 1/298.15)))
+    C_me_sat[i] <- C_a_n2o * B_me[ i ] * 1e-6 * (H_n2o  * exp(2700*(1/(T_c + 273.15) - 1/298.15)))
 }
 
 # combine into dataframe for ggplot. qplot, which accepts vectors,
@@ -725,14 +747,13 @@ ggplot(C_sat_df, aes( x = C_me_sat * 1e9 - C_sat )) +
   xlab( "absolute error (nMol)")
 ```
 
-
-
 ## Simulate measurement error for all observables
+
 ```{r simulate_me_sat_all, message=F}
 C_me_sat <- rep( NA, 1e4 )
 
 for( i in 1:length( C_me_sat ) ){
-    C_me_sat[i] <- C_a_me[ i ] * B_me[ i ] * 1e-6 * (H  * exp(2700*(1/(T_c_me[ i ] + 273.15) - 1/298.15)))
+    C_me_sat[i] <- C_a_n2o_me[ i ] * B_me[ i ] * 1e-6 * (H_n2o  * exp(2700*(1/(T_c_me[ i ] + 273.15) - 1/298.15)))
 }
 
 # combine into dataframe for ggplot. qplot, which accepts vectors,
@@ -760,24 +781,25 @@ sd(C_me_sat * 1e9) * 1.96 # +/- 0.395 nmol N2O
 
 # Set up model for simulating true saturation ratio
 
-
 The full equation for estimating the saturation ratio of $N_20$ gas dissolved in water is:
 
 $$C_ratio = \frac{1^{-6}B \frac{V_{air}(Mr_h - Mr_r)}{(8.3144598 * K * V_{water}) + H^{\theta} \exp( 2700 * ( \frac{1}{K} - \frac{1}{298.15}) * Mr_h}}{1^{-6}B*C_{air}*exp(2700* \frac{1}{Tc} -  \frac{1}{298.15})}$$
 
-``` {r}
+```{r}
 
-C_ratio <- (1e-6 * B * ( V_g * ( C_e - C_a ) / ( 8.3144598 * ( T_c + 273.15 ) * V_w ) + H * exp( 2700 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) * C_e )) /
-  (C_a * B * 1e-6 * (H  * exp(2700*(1/(T_c + 273.15) - 1/298.15)))) 
+C_ratio <- (1e-6 * B * ( V_g * ( C_e - C_a_n2o ) / ( 8.3144598 * ( T_c + 273.15 ) * V_w ) + H_n2o * exp( 2700 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) * C_e )) /
+  (C_a_n2o * B * 1e-6 * (H_n2o  * exp(2700*(1/(T_c + 273.15) - 1/298.15)))) 
 
 ```
-## Simulate measurement error for all observables
+
+## Simulate measurement error for all observables when air is used as headspace gas
+
 ```{r simulate_me_ratio_all, message=F}
 C_me_ratio <- rep( NA, 1e4 )
 
 for( i in 1:length( C_me_ratio ) ){
-C_me_ratio[ i ] <- (1e-6 * B_me[i] * ( V_g_me[i] * ( C_e_me[i] - C_a_me[i] ) / ( 8.3144598 * ( T_c_me[i] + 273.15 ) * V_w_me[i] ) + H * exp( 2700 * ( 1 / ( T_c_me[i] + 273.15 ) - 1 / 298.15 ) ) * C_e_me[i] )) /
-  (C_a_me[i] * B_me[i] * 1e-6 * (H  * exp(2700*(1/(T_c_me[i] + 273.15) - 1/298.15)))) 
+C_me_ratio[ i ] <- (1e-6 * B_me[i] * ( V_g_me[i] * ( C_e_me[i] - C_a_n2o_me[i] ) / ( 8.3144598 * ( T_c_me[i] + 273.15 ) * V_w_me[i] ) + H_n2o * exp( 2700 * ( 1 / ( T_c_me[i] + 273.15 ) - 1 / 298.15 ) ) * C_e_me[i] )) /
+  (C_a_n2o_me[i] * B_me[i] * 1e-6 * (H_n2o  * exp(2700*(1/(T_c_me[i] + 273.15) - 1/298.15)))) 
 }
 
 
@@ -798,12 +820,486 @@ ggplot(C_ratio_df, aes( x = C_me_ratio - C_ratio )) +
   xlab( "absolute error (saturation ratio)")
 
 # standard deviation of a saturation ratio value s:
-sd(C_me_ratio) # 0.0.05479
+sd(C_me_ratio) # 0.026
 
 # the 95% CI is therefore the computed value +/- 2 standard deviations
-sd(C_me_ratio) * 1.96 # +/- 0.1073
+sd(C_me_ratio) * 1.96 # +/- 0.05258214
 
-# so any ratio within 0.1073 of 1.0 cannot be discerned as a source or sink?
+# so any ratio within 0.05 of 1.0 cannot be discerned as a source or sink?
+```
+
+## Map of saturation ratio values with uncertainty when air is used as headspace gas
+
+```{r map_sat_ratio, message=F}
+# two standard deviations = 0.3019449
+# 95% CI is therefore x+/-0.3019449
+
+dg <- dg %>%
+  mutate(n2o.src.snk.with.all.error = case_when(
+    abs(n2o.sat.ratio - 1) < sd(C_me_ratio) ~ "undetermined",
+    TRUE ~ n2o.src.snk)) 
+
+dg %>% 
+  filter(sample.source == "DG", visit.no == 1, sitetype == "PROB") %>%
+  {table(.$n2o.src.snk.with.all.error)} %>%
+  kable(digits = 2, caption = "Number of lakes classified as source/sink")
+
+dg %>% 
+  filter(sample.source == "DG", visit.no == 1, sitetype == "PROB") %>%
+  {prop.table(table(.$n2o.src.snk.with.all.error))} %>%
+  kable(digits = 2, caption = "Proportion of lakes classified as source/sink")
+
+# sf for plotting
+dg.sf <- st_as_sf(dg, coords = c("map.lon.dd", "map.lat.dd"), 
+                  crs = 4269) %>% # standard for lat/lon
+  st_transform(5070) # project to CONUS ALBERS for plotting
+
+
+
+## Map
+ggplot() +
+    geom_sf(data = ecoR, color = NA, aes(fill = WSA9_NAME)) +
+    geom_sf(data = dg.sf %>% 
+              filter(!is.na(n2o.src.snk), sitetype == "PROB", visit.no == 1) %>%
+              arrange(desc(n2o.src.snk.with.all.error)), # grey on top of black
+            aes(size = dissolved.n2o.nmol, color = n2o.src.snk.with.all.error),
+            show.legend = "point") +
+    geom_sf(data = states, fill = NA, color = "cornsilk3", size = 0.1) +
+    # guide argument below removes points from the boxes in the ecoregion legend
+    # https://aosmith.rbind.io/2020/07/09/ggplot2-override-aes/
+    scale_fill_manual("Ecoregion", values = cols,
+                      guide = guide_legend(override.aes = list(shape = NA))) +
+    scale_color_manual(values = c("grey", "black", "orange"), name = "source/sink") +
+    scale_size(name = expression(N[2]*O~(nM)),
+               range = c(0.1, 10), # custom size range
+               breaks = c(1, 10, 25, 50, 100)) + # custom breaks
+    theme(legend.key.size = unit(0.4, "cm"), # size of boxes in legend
+          legend.title = element_text(size = 8))
+```
+
+## Simulate measurement error for all observables when a pure gas (e.g. helium, nitrogen) is used as headspace gas
+
+```{r simulate_me_ratio_pure_gas_all, message=F}
+# set C_e to a lower value to generate a saturation ratio close to that used above
+# C_e will be lower due to dilution with pure headspace gas (e.g. helium, nitrogen)
+C_e <- 0.2
+
+
+# this simulates measurement error on GC.
+# assume TRUE value is C_e and error is simulated with with sd of replicate GC measurements
+C_e_me <- rnorm( 1e4, C_e, n2o_sd_epa ) # me in measured gas in headspace.
+                                   # add random error to measured concentration
+
+# under this scenario we don't need to subtract C_a_n2o (N2O concentration in air) from C_e (N2O concentration in equilibrated headspace)
+C_ratio <- (1e-6 * B * ( V_g * ( C_e - 0 ) / ( 8.3144598 * ( T_c + 273.15 ) * V_w ) + H_n2o * exp( 2700 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) * C_e )) /
+  (C_a_n2o * B * 1e-6 * (H_n2o  * exp(2700*(1/(T_c + 273.15) - 1/298.15))))
+
+
+
+
+
+C_me_ratio <- rep( NA, 1e4 )
+
+for( i in 1:length( C_me_ratio ) ){
+C_me_ratio[ i ] <- (1e-6 * B_me[i] * ( V_g_me[i] * ( C_e_me[i] - 0 ) / ( 8.3144598 * ( T_c_me[i] + 273.15 ) * V_w_me[i] ) + H_n2o * exp( 2700 * ( 1 / ( T_c_me[i] + 273.15 ) - 1 / 298.15 ) ) * C_e_me[i] )) /
+  (C_a_n2o_me[i] * B_me[i] * 1e-6 * (H_n2o  * exp(2700*(1/(T_c_me[i] + 273.15) - 1/298.15)))) 
+}
+
+
+# combine into dataframe for ggplot. qplot, which accepts vectors,
+# was deprecated in ggplot 3.4.0
+C_ratio_df <- tibble(C_me_ratio = C_me_ratio)
+
+ggplot(C_ratio_df, aes( x = C_me_ratio )) +  
+  geom_histogram( binwidth = 0.01 ) + 
+  geom_vline( xintercept = C_ratio , color = 'red' ) + 
+  ggtitle( "Uncertainty in N2O saturation ratio due to cumulative \nmeasurment errors") +
+  xlab( "saturation ratio")
+
+ggplot(C_ratio_df, aes( x = C_me_ratio - C_ratio )) +  
+  geom_histogram( binwidth = 0.001 ) + 
+  geom_vline( xintercept = 0 , color = 'red' ) + 
+  ggtitle( "Uncertainty in N2O saturation ratio due to cumulative \nmeasurment errors") +
+  xlab( "absolute error (saturation ratio)")
+
+# standard deviation of a saturation ratio value s:
+sd(C_me_ratio) # 0.048
+
+# the 95% CI is therefore the computed value +/- 2 standard deviations
+sd(C_me_ratio) * 1.96 # +/- 0.094
+
+# so any ratio within 0.094 of 1.0 cannot be discerned as a source or sink
 ```
 
 
+## Simulate measurement error for all observables when a pure gas (e.g. helium, nitrogen) is used as headspace gas combined with high precision GC
+
+The GC used in the current study is optimized to quantify several analytes across a broad range of concentrations but greater precision can be achieved by optimizing the instrument for a single analyte across a narrower range of concentrations.  For example,  laboratories participating in an international analysis of N2O standards used for atmsopheric monitoring reported a mean standard deviation of `r mean(c(.00033, .00034, .00031, 0.00030, 0.0016, 0.0015))`, which is 10-fold lower than the standard deviation of N2O measurements in this study (`r n2o_sd_epa`).  Utilizing more precise N2O measurements for the equilibrated headspace and/or air will reduce uncertainty in the estimated dissolved N2O concentration, dissolved N2O equilibrium value, and N2O saturation ratio.
+
+```{r simulate_me_ratio_gc_pure_gas_all, message=F}
+# set C_e to a lower value to generate a saturation ratio close to that used above
+# C_e will be lower due to dilution with pure headspace gas (e.g. helium, nitrogen)
+C_e <- 0.2
+
+# two standard deviations reported from each of three labs participating in
+# a laboratory intercomparison study
+n2o_sd_lit <- mean(c(.00033, .00034, .00031, 0.00030, 0.0016, 0.0015)) # from literature
+
+# simulate improved measurement of N2O in equilibrated headspace gas 
+# assume TRUE value is C_e and error is simulated with with sd from literature
+C_e_me <- rnorm( 1e4, C_e, n2o_sd_lit ) 
+
+# under this scenario we don't need to subtract C_a_n2o (N2O concentration in air) from C_e (N2O concentration in equilibrated headspace)
+C_ratio <- (1e-6 * B * ( V_g * ( C_e - 0 ) / ( 8.3144598 * ( T_c + 273.15 ) * V_w ) + H_n2o * exp( 2700 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) * C_e )) /
+  (C_a_n2o * B * 1e-6 * (H_n2o  * exp(2700*(1/(T_c + 273.15) - 1/298.15))))
+
+
+
+
+
+C_me_ratio <- rep( NA, 1e4 )
+
+for( i in 1:length( C_me_ratio ) ){
+C_me_ratio[ i ] <- (1e-6 * B_me[i] * ( V_g_me[i] * ( C_e_me[i] - 0 ) / ( 8.3144598 * ( T_c_me[i] + 273.15 ) * V_w_me[i] ) + H_n2o * exp( 2700 * ( 1 / ( T_c_me[i] + 273.15 ) - 1 / 298.15 ) ) * C_e_me[i] )) /
+  (C_a_n2o_me[i] * B_me[i] * 1e-6 * (H_n2o  * exp(2700*(1/(T_c_me[i] + 273.15) - 1/298.15)))) 
+}
+
+
+# combine into dataframe for ggplot. qplot, which accepts vectors,
+# was deprecated in ggplot 3.4.0
+C_ratio_df <- tibble(C_me_ratio = C_me_ratio)
+
+ggplot(C_ratio_df, aes( x = C_me_ratio )) +  
+  geom_histogram( binwidth = 0.01 ) + 
+  geom_vline( xintercept = C_ratio , color = 'red' ) + 
+  ggtitle( "Uncertainty in N2O saturation ratio due to cumulative \nmeasurment errors") +
+  xlab( "saturation ratio")
+
+ggplot(C_ratio_df, aes( x = C_me_ratio - C_ratio )) +  
+  geom_histogram( binwidth = 0.001 ) + 
+  geom_vline( xintercept = 0 , color = 'red' ) + 
+  ggtitle( "Uncertainty in N2O saturation ratio due to cumulative \nmeasurment errors") +
+  xlab( "absolute error (saturation ratio)")
+
+# standard deviation of a saturation ratio value s:
+sd(C_me_ratio) # 0.029
+
+# the 95% CI is therefore the computed value +/- 2 standard deviations
+sd(C_me_ratio) * 1.96 # +/- 0.0569
+
+# so any ratio within 0.0569 of 1.0 cannot be discerned as a source or sink
+```
+
+# Set up model for MIMS
+
+In Membrane Inlet Mass Spectrometry (MIMS), dissolved gases (typically N2, Ar, O2, N2O) are extracted from a water sample as it passes through a semi-permeable membrane. The abundance of the extracted gases are then measured using a quadrapole mass spectrometer. One advantage of this approach relative to the traditional headspace equilibrium method is that dissolved gases are extracted without contamination and/or dilution from a headspace gas (e.g. air, nitrogen, helium). Dilution by a pure gas isn't much of a concern because N2O detection limits are very low via GC, but correction for the presence of N2O in the headspace gas reduces measurement precision.
+
+Dissolved N2O concentration in a MIMS sample can be calculated from the N2O signal strength and a calibration factor. The calibration factor is determined by analyzing a water sample with known N2O concentration. This is most frequently accomplished by equilibrating laboratory water with air at constant temperature, barometric pressure and N2O partial pressure. The dissolved N2O concentration of the equilibrated water is calculated from solubility laws (see [Set up model for simulating true saturation concentration]) and the calibration factor is:
+
+$$N_2O \text{ calibration factor} =\frac{[N_2O_{\text{dissolved standard}}]}{N_2O_{\text{standard}} \text{ signal strength}}$$ 
+
+The N2O concentration of an unknown sample is then calculated as:
+
+$$C = [N_2O_{sample}] = N_2O_{\text{sample}} \text{ signal strength} * N_2O \text{ calibration factor}$$ 
+
+The equation simply scales the concentration of the N2O standard to the ratio of the MIMS signal strength of the unknown and standard. Via substitution and rearrangement, the equation can be written as: 
+
+$$C =[N_2O_{sample}] = \frac{N_2O_{\text{sample}} \text{ signal strength}}{N_2O_{\text{standard}} \text{ signal strength}} * [N_2O_{\text{dissolved standard}}]$$
+MIMS provides greater precision when measuring gas ratios as compared to measuring a single gas.  High precision gas ratio data can be converted to concentration data with the independent measurement of concentration of one of the component gases.  N2O:Ar ratios are particularly useful for environmental samples because Ar is biologically inert, therefore its concentration can be calculated from solubility, water temperature, barometric pressure, and atmospheric partial pressure (essentially constant across the globe).  As with single gas measurements, N2O:Ar ratios are converted to N2O concentration using a calibration factor derived from measurement of laboratory water equilibrated with air:
+$$N_2O \text{ calibration factor} =\frac{[N_2O:Ar]_{\text{standard}}}{N_2O_{\text{standard}} \text{ signal strength }\text{: }{Ar_{\text{standard}} \text{ signal strength}}}$$ 
+The N2O concentration of an unknown sample is then calculated as: 
+$$C = [N_2O_{sample}] =  [N_2O_\text{sample} \text{ signal strength : }Ar_\text{sample}\text{signal strength}] * N_2O \text{ calibration factor} * [Ar_{\text{dissolved standard}}]$$
+As above, the equation simply scales the N2O:Ar ratio measured in the sample to that of the standard.  Via substitution and rearrangement, the equation can be written as: 
+$$C = [N_2O_{sample}] = \frac{\frac{N_2O_{\text{sample}} \text{ signal strength}}{Ar_{\text{sample}} \text{ signal strength}}}{\frac{N_2O_{\text{standard}} \text{ signal strength}}{Ar_{\text{standard}} \text{ signal strength}}} * [N_2O:Ar]_{\text{standard}} * [Ar]_{\text{standard}}$$
+Concentration of N2O and Ar in the standard is calculated from temperature of the equilibrated water (T_C_standard), laboratory barometric pressure (B), N2O and Ar partial pressure in the atmosphere (C_a_N2O, C_a_Ar, respectively)(see [Set up model for simulating true saturation concentration]).  By substitution, the equation becomes:
+$$C = [N_2O_{sample}] = \frac{\frac{N_2O_{\text{sample}} \text{ signal strength}}{Ar_{\text{sample}} \text{ signal strength}}}{\frac{N_2O_{\text{standard}} \text{ signal strength}}{Ar_{\text{standard}} \text{ signal strength}}} *\frac{ 1^{-6}B*C_{a\text_N2O}*(H_{N2O}*exp(2700* \frac{1}{Tc} -  \frac{1}{298.15}))}{1^{-6}B*C_{a\text_Ar}*(H_{Ar}*exp(1500* \frac{1}{Tc} -  \frac{1}{298.15}))} * 1^{-6}B*C_{a\text_Ar}*(H_{Ar}*exp(1500* \frac{1}{Tc} -  \frac{1}{298.15}))$$
+N2O concentration in laboratory air (Ca_N2O) is derived from direct measurement of N2O via gas chromatography and has a standard deviation of `r n2o_sd_epa` using the method employed in this study [Define GC measurement error], although more precise methods are available (see below).  Ar in the lab atmosphere (Ca_Ar) is 9340ppm and is assumed to be constant and perfectly known (e.g. zero error).  Genther et al (2013) report a standard deviation of 0.022 for the N2O:Ar signal strength ratio but Speir et al (2023) report a CV of 0.05% (sd ~ 0.000096). Here we provisionally use the Speir value pending confirmation.  MIMS uses a very precise thermister  (+/-0.01 C) to control the temperature of the water used as the analytical standard (simulated below). Measurement error in B quantified above.
+
+
+
+## Simulate measurement error for all observables
+
+```{r simulate_me_pure_gas_all_MIMS, message=F}
+
+
+n2o_ar_standard_signal <- 0.27 # Speir et al. 0.27 pers comm. Genther et al. section 3.4 reports 0.192
+n2o_ar_sample_signal <- 0.23 # just a guess
+C_a_ar <- 9340 #ppm.  invariant
+T_c_mims <- T_c # set up for simulation of MIMS temperature bath
+
+
+# this simulates MIMS measurement.
+# assume TRUE value is n2o_ar_standard_signal and error is simulated with CV from Speier et al. 2023
+# Speier et al reports "...our precision was good among all sample and standard replicated (average CV = 0.05%)."
+# Using that CV to model measurement error in the N2O:Ar ratio yields a sd of dissolved N2O that exceeds
+# the sd when measured via GC, which is weird.  Speier reported that the CV is for the N2O:Ar ratio.
+# Genther et al reports a n2o:Ar sd of 0.022, but this also generated a sd for dissolved N2O which exceeds that 
+# measured with GC!  Here we use the Speir data
+n2o_ar_signal_sd <- 0.0005 * n2o_ar_standard_signal # sd = CV * mean.  0.05% = 0.0005
+
+n2o_ar_standard_signal_me <- rnorm( 1e4, n2o_ar_standard_signal, n2o_ar_signal_sd ) # me in N2O:Ar of standard  
+n2o_ar_sample_signal_me <- rnorm( 1e4, n2o_ar_sample_signal, n2o_ar_signal_sd ) # me in N2O:Ar of sample  
+
+
+# High precision water batch used to control temperature of standards
+T_c_mims_me <- rnorm(1e4, T_c_mims, 0.005) # thermostated bath precision is +/-0.01 Celsius
+# hist(T_c_mims_me) # sd of 0.005 gives expected distribution for the specified precision
+
+# True dissolved N2O concentration
+C <- ((n2o_ar_sample_signal / n2o_ar_standard_signal) * # N2O:Ar ratios for sample and standard
+  ( (1e-6 * B * C_a_n2o * (H_n2o * exp( 2700 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) )) / #N2O concentration in standard
+  (1e-6 * B * C_a_ar * (H_ar * exp( 1500 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) )) ) * #Ar concentration in standard
+  (1e-6 * B * C_a_ar*(H_ar  * exp(1500 *(1/(T_c + 273.15) - 1/298.15))))) 
+
+C <- C * 1e9 #convert mol to nmol
+
+# variation in measured N2O concentration
+C_me <- rep(NA, 1e4)
+
+for( i in 1:length( C_me ) ){
+C_me[ i ] <- (n2o_ar_sample_signal_me[ i ] / n2o_ar_standard_signal_me[ i ]) * # N2O:Ar ratios for sample and standard
+  ( (1e-6 * B_me[ i ] * C_a_n2o_me[i] * (H_n2o * exp( 2700 * ( 1 / ( T_c_mims_me[ i ] + 273.15 ) - 1 / 298.15 ) ) )) / #N2O concentration in standard
+  (1e-6 * B_me[ i ] * C_a_ar * (H_ar * exp( 1500 * ( 1 / ( T_c_mims_me[ i ] + 273.15 ) - 1 / 298.15 ) ) )) ) * #Ar concentration in standard
+  (1e-6 * B_me[ i ] * C_a_ar * (H_ar  * exp(1500 *(1/(T_c_mims_me[ i ] + 273.15) - 1/298.15)))) 
+}
+
+
+# combine into dataframe for ggplot.
+C_me_df <- tibble(C_me = C_me * 1e9)
+
+ggplot(C_me_df, aes( x = C_me)) +  
+  geom_histogram( binwidth = 0.01 ) + 
+  geom_vline( xintercept = C , color = 'red' ) + 
+  ggtitle( "Uncertainty in dissolved N2O concentration due to cumulative \nmeasurment errors using MIMS") +
+  xlab( "dissolved N2O (nmol L-1)")
+
+ggplot(C_me_df, aes( x = C_me - C )) +  
+  geom_histogram( binwidth = 0.01 ) + 
+  geom_vline( xintercept = 0 , color = 'red' ) + 
+  ggtitle( "Uncertainty in dissolved N2O concentration due to cumulative \nmeasurment errors using MIMS") +
+  xlab( "absolute error (nmol L-1)")
+
+
+# standard deviation of dissolved N2O via MIMS:
+sd(C_me * 1e9) # 0.169 using Speir CV to calculate N2O:Ar sd.   0.15 with GC and headspace equilibrium!
+# CV of dissolved N2O
+sd(C_me * 1e9) / mean(C_me * 1e9) # 0.025 = 2.5%  12% using Genther sd.
+
+
+
+```
+## Simulate measurement error for all observables with improved GC precision
+
+The GC used in the current study is optimized to quantify several analytes across a broad range of concentrations but greater precision can be achieved by optimizing the instrument for a single analyte across a narrower range of concentrations.  For example,  laboratories participating in an international analysis of N2O standards used for atmsopheric monitoring reported a mean standard deviation of `r n2o_sd_lit`, which is 10-fold lower than the standard deviation of N2O measurements in this study (`r n2o_sd_epa`).  Utilizing more precise N2O measurements for the equilibrated headspace and/or air will reduce uncertainty in the estimated dissolved N2O concentration, dissolved N2O equilibrium value, and N2O saturation ratio.
+
+```{r simulate_me_gc_pure_gas_all_MIMS, message=F}
+# simulate improved measurement precision of GC measurement of N2O in air
+C_a_n2o_lit_me <- rnorm(1e4, C_a_n2o, n2o_sd_lit)
+
+# variation in measured N2O concentration
+C_me <- rep(NA, 1e4)
+
+for( i in 1:length( C_me ) ){
+C_me[ i ] <- (n2o_ar_sample_signal_me[ i ] / n2o_ar_standard_signal_me[ i ]) * # N2O:Ar ratios for sample and standard
+  ( (1e-6 * B_me[ i ] * C_a_n2o_lit_me[i] * (H_n2o * exp( 2700 * ( 1 / ( T_c_mims_me[ i ] + 273.15 ) - 1 / 298.15 ) ) )) / #N2O concentration in standard
+  (1e-6 * B_me[ i ] * C_a_ar * (H_ar * exp( 1500 * ( 1 / ( T_c_mims_me[ i ] + 273.15 ) - 1 / 298.15 ) ) )) ) * #Ar concentration in standard
+  (1e-6 * B_me[ i ] * C_a_ar * (H_ar  * exp(1500 *(1/(T_c_mims_me[ i ] + 273.15) - 1/298.15)))) 
+}
+
+
+# combine into dataframe for ggplot.
+C_me_df <- tibble(C_me = C_me * 1e9)
+
+ggplot(C_me_df, aes( x = C_me)) +  
+  geom_histogram( binwidth = 0.01 ) + 
+  geom_vline( xintercept = C , color = 'red' ) + 
+  ggtitle( "Uncertainty in dissolved N2O concentration due to cumulative \nmeasurment errors using MIMS") +
+  xlab( "dissolved N2O (nmol L-1)")
+
+ggplot(C_me_df, aes( x = C_me - C )) +  
+  geom_histogram( binwidth = 0.01 ) + 
+  geom_vline( xintercept = 0 , color = 'red' ) + 
+  ggtitle( "Uncertainty in dissolved N2O concentration due to cumulative \nmeasurment errors using MIMS") +
+  xlab( "absolute error (nmol L-1)")
+
+
+# standard deviation of dissolved N2O via MIMS:
+sd(C_me * 1e9) # 0.0168 using Speir CV to calculate N2O:Ar sd. 0.15 with GC and headspace equilibrium!
+
+# CV of dissolved N2O
+sd(C_me * 1e9) / mean(C_me * 1e9) # 0.002 = 0.25% CV 
+
+
+
+```
+
+## Simulate ratio with MIMS and standard GC
+```{r simulate_me_ratio_pure_gas_all_MIMS, message=F}
+# True ratio
+C_ratio <- ((n2o_ar_sample_signal / n2o_ar_standard_signal) * # N2O:Ar ratios for sample and standard
+  ( (1e-6 * B * C_a_n2o * (H_n2o * exp( 2700 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) )) / #N2O concentration in standard
+  (1e-6 * B * C_a_ar * (H_ar * exp( 1500 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) )) ) * #Ar concentration in standard
+  (1e-6 * B * C_a_ar*(H_ar  * exp(1500 *(1/(T_c + 273.15) - 1/298.15))))) / # Ar concentration in standard
+  (C_a_n2o * B * 1e-6 * (H_n2o  * exp(2700*(1/(T_c + 273.15) - 1/298.15)))) # N2o saturation value in waterbody 
+
+
+
+C_me_ratio <- rep( NA, 1e4 )
+
+for( i in 1:length( C_me_ratio ) ){
+C_me_ratio[ i ] <- (n2o_ar_sample_signal_me[ i ] / n2o_ar_standard_signal_me[ i ]) * # N2O:Ar ratios for sample and standard
+  ( (1e-6 * B_me[ i ] * C_a_n2o_me[ i ] * (H_n2o * exp( 2700 * ( 1 / ( T_c_mims_me[ i ] + 273.15 ) - 1 / 298.15 ) ) )) / #N2O concentration in standard
+  (1e-6 * B_me[ i ] * C_a_ar * (H_ar * exp( 1500 * ( 1 / ( T_c_mims_me[ i ] + 273.15 ) - 1 / 298.15 ) ) )) ) * #Ar concentration in standard
+  (1e-6 * B_me[ i ] * C_a_ar * (H_ar  * exp(1500 *(1/(T_c_mims_me[ i ] + 273.15) - 1/298.15)))) / # Ar concentration in standard 
+  (C_a_n2o_me[ i ] * B_me[ i ] * 1e-6 * (H_n2o  * exp(2700*(1/(T_c_me[ i ] + 273.15) - 1/298.15)))) # N2o saturation value in waterbody 
+}
+
+
+# combine into dataframe for ggplot.
+C_ratio_df <- tibble(C_me_ratio = C_me_ratio)
+
+ggplot(C_ratio_df, aes( x = C_me_ratio )) +  
+  geom_histogram( binwidth = 0.0001 ) + 
+  geom_vline( xintercept = C_ratio , color = 'red' ) + 
+  ggtitle( "Uncertainty in N2O saturation ratio due to cumulative \nmeasurment errors using MIMS and standard GC analytics") +
+  xlab( "saturation ratio")
+
+ggplot(C_ratio_df, aes( x = C_me_ratio - C_ratio )) +  
+  geom_histogram( binwidth = 0.0001 ) + 
+  geom_vline( xintercept = 0 , color = 'red' ) + 
+  ggtitle( "Uncertainty in N2O saturation ratio due to cumulative \nmeasurment errors using MIMS and standard GC analytics") +
+  xlab( "absolute error (saturation ratio)")
+
+
+
+# standard deviation of a saturation ratio value s:
+sd(C_me_ratio) # 0.0011
+
+# the 95% CI is therefore the computed value +/- 2 standard deviations
+sd(C_me_ratio) * 1.96 # +/- 0.00216
+
+# so any ratio within 0.00216 of 1.0 cannot be discerned as a source or sink
+
+
+
+```
+
+
+
+## Simulate ratio with MIMS and high precision GC
+```{r simulate_me_ratio_gc_pure_gas_all_MIMS, message=F}
+
+C_me_ratio <- rep( NA, 1e4 )
+
+for( i in 1:length( C_me_ratio ) ){
+C_me_ratio[ i ] <- (n2o_ar_sample_signal_me[ i ] / n2o_ar_standard_signal_me[ i ]) * # N2O:Ar ratios for sample and standard
+  ( (1e-6 * B_me[ i ] * C_a_n2o_lit_me[ i ] * (H_n2o * exp( 2700 * ( 1 / ( T_c_mims_me[ i ] + 273.15 ) - 1 / 298.15 ) ) )) / #N2O concentration in standard
+  (1e-6 * B_me[ i ] * C_a_ar * (H_ar * exp( 1500 * ( 1 / ( T_c_mims_me[ i ] + 273.15 ) - 1 / 298.15 ) ) )) ) * #Ar concentration in standard
+  (1e-6 * B_me[ i ] * C_a_ar * (H_ar  * exp(1500 *(1/(T_c_mims_me[ i ] + 273.15) - 1/298.15)))) / # Ar concentration in standard 
+  (C_a_n2o_lit_me[ i ] * B_me[ i ] * 1e-6 * (H_n2o  * exp(2700*(1/(T_c_me[ i ] + 273.15) - 1/298.15)))) # N2o saturation value in waterbody 
+}
+
+
+# combine into dataframe for ggplot.
+C_ratio_df <- tibble(C_me_ratio = C_me_ratio)
+
+ggplot(C_ratio_df, aes( x = C_me_ratio )) +  
+  geom_histogram( binwidth = 0.0001 ) + 
+  geom_vline( xintercept = C_ratio , color = 'red' ) + 
+  ggtitle( "Uncertainty in N2O saturation ratio due to cumulative \nmeasurment errors using MIMS and high precision GC analytics") +
+  xlab( "saturation ratio")
+
+ggplot(C_ratio_df, aes( x = C_me_ratio - C_ratio )) +  
+  geom_histogram( binwidth = 0.0001 ) + 
+  geom_vline( xintercept = 0 , color = 'red' ) + 
+  ggtitle( "Uncertainty in N2O saturation ratio due to cumulative \nmeasurment errors using MIMS and standard GC analytics") +
+  xlab( "absolute error (saturation ratio)")
+
+
+
+# standard deviation of a saturation ratio value s:
+sd(C_me_ratio) # 0.0011
+
+# the 95% CI is therefore the computed value +/- 2 standard deviations
+sd(C_me_ratio) * 1.96 # +/- 0.00216
+
+# so any ratio within 0.00216 of 1.0 cannot be discerned as a source or sink
+
+
+
+```
+
+## Simulate ratio with MIMS, high precision GC, and high precision temperature in field
+
+The thermometers used to measure water temperature in this study have an uncertainty of +/- 0.058C but electronic thermisters are commonly available (e.g. YSI sondes) with an uncertainty of +/-0.01 Celsius.  More precise water temperature measurements will reduce uncertainty in the equilibrium N2O conentration and the saturation ratio.
+```{r simulate_me_ratio_gc_temp_all_MIMS, message=F}
+
+C_me_ratio <- rep( NA, 1e4 )
+
+for( i in 1:length( C_me_ratio ) ){
+C_me_ratio[ i ] <- (n2o_ar_sample_signal_me[ i ] / n2o_ar_standard_signal_me[ i ]) * # N2O:Ar ratios for sample and standard
+  ( (1e-6 * B_me[ i ] * C_a_n2o_lit_me[ i ] * (H_n2o * exp( 2700 * ( 1 / ( T_c_mims_me[ i ] + 273.15 ) - 1 / 298.15 ) ) )) / #N2O concentration in standard
+  (1e-6 * B_me[ i ] * C_a_ar * (H_ar * exp( 1500 * ( 1 / ( T_c_mims_me[ i ] + 273.15 ) - 1 / 298.15 ) ) )) ) * #Ar concentration in standard
+  (1e-6 * B_me[ i ] * C_a_ar * (H_ar  * exp(1500 *(1/(T_c_mims_me[ i ] + 273.15) - 1/298.15)))) / # Ar concentration in standard 
+  (C_a_n2o_lit_me[ i ] * B_me[ i ] * 1e-6 * (H_n2o  * exp(2700*(1/(T_c_mims_me[ i ] + 273.15) - 1/298.15)))) # N2o saturation value in waterbody 
+}
+
+
+# combine into dataframe for ggplot.
+C_ratio_df <- tibble(C_me_ratio = C_me_ratio)
+
+ggplot(C_ratio_df, aes( x = C_me_ratio )) +  
+  geom_histogram( binwidth = 0.0001 ) + 
+  geom_vline( xintercept = C_ratio , color = 'red' ) + 
+  ggtitle( "Uncertainty in N2O saturation ratio due to cumulative \nmeasurment errors using MIMS, high precision GC analytics, and high precision \nin situ temperature measurements") +
+  xlab( "saturation ratio")
+
+ggplot(C_ratio_df, aes( x = C_me_ratio - C_ratio )) +  
+  geom_histogram( binwidth = 0.00001 ) + 
+  geom_vline( xintercept = 0 , color = 'red' ) + 
+  ggtitle( "Uncertainty in N2O saturation ratio due to cumulative \nmeasurment errors using MIMS, high precision GC analytics, and high precision \nin situ temperature measurements") +
+  xlab( "absolute error (saturation ratio)")
+
+
+
+# standard deviation of a saturation ratio value s:
+sd(C_me_ratio) # 0.0006603624
+
+# the 95% CI is therefore the computed value +/- 2 standard deviations
+sd(C_me_ratio) * 1.96 # +/- 0.00129431
+
+# so any ratio within 0.00129 of 1.0 cannot be discerned as a source or sink
+
+
+
+```
+# Summary of results
+
+Precision of the N2O saturation ratio can be improved using high precision GC analytics and N2O-free headspace gas (e.g. helium, nitrogen) but the greatest improvement is seen when dissolved N2O is directly measured using MIMS.
+```{r final_figure, message=FALSE}
+
+results <- tibble(ratio_sd = c(0.055,
+                               0.048,
+                               0.029,
+                               0.001207747,
+                               0.001207747,
+                               0.000690139),
+                  method = c("GC",
+                             "GC + helium",
+                             "High precision GC + helium",
+                             "MIMS",
+                             "MIMS + high precision GC",
+                             "MIMS + high precision GC + \nhigh precision water temp"))
+
+
+results %>%
+  mutate(lower.95 = C_ratio - (1.96 * ratio_sd),
+         upper.95 = C_ratio + (1.96 * ratio_sd),
+         C_ratio = C_ratio) %>%
+  ggplot(aes(C_ratio, method)) +
+  geom_point() +
+  geom_segment(aes(x=lower.95, xend = upper.95, y=method, yend=method)) +
+  xlab("True saturation ratio (black dot) and 95% confidence interval") +
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.9, hjust = 1))
+
+```
