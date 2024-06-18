@@ -14,6 +14,7 @@ editor_options:
 ---
 
 ```{r setup, warning=FALSE, message=FALSE}
+#library(devtools) # needed to install USAboundaries package from
 library(knitr)
 library(rmarkdown)
 library(bayesplot)
@@ -27,6 +28,9 @@ library(gridExtra)
 library(readxl)
 library(janitor)
 library(sf)
+
+# Install USAboundaries package from GitHub
+#devtools::install_github("ropensci/USAboundaries")
 
 # Identify local path for each user
 localPath <- Sys.getenv("USERPROFILE")
@@ -58,13 +62,13 @@ $$C = B^{-6} \cdot \left(\frac{V_g(M_h - M_r)}{(8.3144598 \cdot K \cdot V_w) + (
 
 where:
 
--   $C$ = concentration (nM)
+-   $C$ = concentration (nM) dissolved in water
 -   $B$ = barometric pressure (kPa)
 -   $V_g$ = volume of reference gas in headspace (mL)
--   $M_h$ = gas mixture ratio in the headspace (C_e below)
--   $M_r$ = gas mixture ratio in the reference (C_a_n2o below)
+-   $M_h$ = gas measured in the equilibrated headspace
+-   $M_r$ = gas measured in the reference
 -   $V_w$ = volume of water below the headspace (mL)
--   $K$ = temperature (K) (temp celsius or T_c + 273 below)
+-   $K$ = temperature (K) (T_c + 273 below)
 -   $H^{\theta}$ = Henry's law constant ($H_{N_2O}$ or $H_{Ar}$ below)
 
 and: 
@@ -78,13 +82,14 @@ $$\begin{split}
 where:
 
 -   $V$ = Total volume of the mixing vessel (e.g. 140mL syringe)
+-   $R_M$ = Gas mixing proportion (gas volume / mixing vessel volume)
 -   $V_g$ = Volume of gas (mL) in the mixing vessel 
 -   $V_w$ = Volume of water (mL) in the mixing vessel
--   $R_M$ = Mixing ratio (gas:water)
 
 
-## Simulate $\text{N}_2\text{O}$
-
+## Calculate $\text{N}_2\text{O}$
+Below is a summary of the empirical measurements of N2O (ppm) in the
+equilibrated headspace.
 ```{r summary_empirical, echo=TRUE}
 load(paste0(localPath, "\\Environmental Protection Agency (EPA)",
             "\\ORD NLA17 Dissolved Gas - Documents\\",
@@ -97,8 +102,9 @@ dg %>%
           median_n2o = median(n2o.ppm.gc, na.rm = TRUE)) #mean = 0.36, median = 0.31
 ```
 
-Simulate a single concentration without measurment error to represent the "true" 
-or "known" value for dissolved $\text{N}_2\text{O}$.
+Calculate a single concentration without measurement error to represent a 
+"true" value for dissolved $\text{N}_2\text{O}$. The median of the empirical 
+measurements was used for values of $M_h$ and $M_r$ (M_a_n2o).
 ```{r dg_calc, echo=TRUE}
 # Set volume of syringe/vessel
 V <- 140 # 140mL syringe
@@ -110,45 +116,24 @@ B <- 99 # barometric pressure (kPa)
 V_g <- V * R_M # volume of reference gas in headspace
 V_w <- V * (1 - R_M) # volume of water below headspace
 T_c <- 23 # temperature ( C )
-M_h <- 0.307 # gas mixture ratio in headspace (Mr_h) * Changes as function of R_M at constant C
-M_a_n2o <- 0.310 # gas mixture ratio in reference (Mr_r)
+M_h <- 0.307 # gas measured in headspace; Changes as function of R_M at constant C
+M_a_n2o <- 0.310 # gas measured in reference (air)
 H_n2o <- 0.00024 #mol m-3 Pa, range: 0.00018 - 0.00025; Henry's law constant
 H_ar <- 0.000014 #mol m-3 Pa, range: 0.000013 - 0.000016; Henry's law constant
 
-C <- 1e-6 * B * ( V_g * ( M_h - M_a_n2o ) / ( 8.3144598 * ( T_c + 273.15 ) * V_w ) + H_n2o * exp( 2700 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) * M_h ) 
+C <- 1e-6 * B * (V_g * (M_h - M_a_n2o) / (8.3144598 * (T_c + 273.15) * V_w) + H_n2o * exp(2700 * (1 / (T_c + 273.15) - 1 / 298.15)) * M_h) 
 
 C <- C * 1e9 #convert mol to nmol
 
-round( C, 1 ) 
+round(C, 1) 
+
+#### Re-arrange for Mh
+M_h <- (((C / 1e9) * 8.3144598 * (T_c + 273.15) * V_w) + (1e-6 * B * V_g * M_a_n2o)) / (1e-6 * B * (V_g + 8.3144598 * (T_c + 273.15) * V_w * H_n2o * exp(2700 * (1 / (T_c + 273.15) - 1 / 298.15))))
+
+M_h
 ```
-
-```{r dg_calc_vary_r, echo=TRUE}
-# Set volume of syringe/vessel
-V <- 140 # 140mL syringe
-
-# Set ratio of gas volume to water volume in the mixing vessel
-R_M <- 0.25
-
-B <- 99 # barometric pressure (kPa)
-V_g <- V * R_M # volume of reference gas in headspace
-V_w <- V * (1 - R_M) # volume of water below headspace
-T_c <- 23 # temperature ( C )
-M_h <- 0.307 # gas mixture ratio in headspace (Mr_h)
-M_a_n2o <- 0.310 # gas mixture ratio in reference (Mr_r)
-H_n2o <- 0.00024 #mol m-3 Pa, range: 0.00018 - 0.00025; Henry's law constant
-H_ar <- 0.000014 #mol m-3 Pa, range: 0.000013 - 0.000016; Henry's law constant
-
-C <- 1e-6 * B * ( V_g * ( M_h - M_a_n2o ) / ( 8.3144598 * ( T_c + 273.15 ) * V_w ) + H_n2o * exp( 2700 * ( 1 / ( T_c + 273.15 ) - 1 / 298.15 ) ) * M_h ) 
-
-C <- C * 1e9 #convert mol to nmol
-
-round( C, 1 ) 
-```
-
 
 ## Empricial variation
-Estimate variation due to measurement uncertainty using empirical data from
-laboratory replicates.
 ```{r get_gc_error, echo=FALSE}
 # READ GC DATA----------------
 ##########################################################################
@@ -270,14 +255,13 @@ n2o_sd_epa <- 0.007872511 # from AWBERC GC
 
 ```
 
-Measurement error is defined here as the standard deviation of repeated
-analysis of analytical standards throughout the period of time that the
-NLA2017 samples were analyzed, which was $\sigma$ = `r n2o_sd_epa`.
+Measurement error for this analysis is assumed to be the standard deviation of 
+repeated analyses of the analytical standards throughout the period of time that
+the NLA2017 samples were analyzed, which was $\sigma$ = `r n2o_sd_epa`.
 
 ## Simulate measurment error
-
-Below, potential errors associated with dissolved $\text{N}_2\text{O}$ 
-measurement are simulated and assessed separately for GC observations in:
+Below, potential errors in GC measurements for are simulated and assessed s
+eparately for measurements of $\text{N}_2\text{O}$ in:
 
 -   
 
@@ -291,7 +275,7 @@ measurement are simulated and assessed separately for GC observations in:
 
     (3) the headspace + air
 
-Measurement error is then simulated and assessed separately for:
+Error is then simulated and assessed separately for measurements of:
 
 -   
 
@@ -303,29 +287,28 @@ Measurement error is then simulated and assessed separately for:
 
 -   
 
-    (5) water volume
+    (6) water volume
 
-Finally, all of the sources (1, 2, 4, 5, and 6) are simulated
-simultaneously and assessed as the total variation in dissolved
-$\text{N}_2\text{O}$. This total error is then added to the point estimates for 
-$\text{N}_2\text{O}$ observed in this study, which results in an estimate of
-uncertainty due to measurement error. These error from these simulations was also
-carried through to estimated of the saturation ratio. The source-sink status for
-each site included in this study was then mapped to present a source-sink 
-categorization that reflected these estimated uncertainties. The categorization 
-was made such that any observation with simulated error that was within the 
-central 95th percentile of 
- 
+Finally, all sources of error (1, 2, 4, 5, and 6) were simulated
+simultaneously and assessed as an estimate of the total variation in $\text{N}_2\text{O}$ 
+measurements. The estimated absolute error was added to each of the empirical 
+point measurements recorded in this study, which resulted in an estimate of 
+uncertainty due to measurement error for each empirical observation. The errors 
+were also carried through for estimates of the saturation ratio and a 
+categorical "source" or "sink" status was assigned for each site. This status 
+was assigned such that any observations where the central 95th percentile of the 
+measurement plus simulated error included 1.0 were deemed to be of 
+"undeterminded" status. The source/sink/undetermined status for each site was 
+then mapped. 
 
-Set the number of simulations for error:
-
+Set the number of simulations for estimating error:
 ```{r set_n_sims}
 nsim <- 1e5
 ```
 
 ### Equilibrated headspace
-Simulate measurment error in dissolved $\text{N}_2\text{O}$ due solely to variation in 
-measurements within the equlibrated headspace.
+Simulate measurement error in dissolved $\text{N}_2\text{O}$ due solely to 
+variation in GC measurements of gas in the equlibrated headspace ($M_h$ above).
 ```{r simulate_C_h_me, echo=TRUE, message=FALSE}
 # Create empty vector to fill below with simulated values for N2O observed with 
 # error due to variation in the GC measurments of gas in the equilibrated 
@@ -334,10 +317,10 @@ measurements within the equlibrated headspace.
 C_h_me <- rep(NA, nsim)  
 
 # The true value for the concentration of equilibrated gas in the headspace, 
-# C_e, was set above. This step simulates additive error in this measurement 
+# M_h, was set above. This step simulates additive error in this measurement 
 # that is centered over the true value. The observed concentration of
-# equilibrated gas is simulated as normally distributed variable, with a mean
-# C_e, and a standard deviation specified as the observed sd of replicate GC 
+# equilibrated gas, M_h_me, is simulated as normally distributed variable, with a mean
+# M_h, and a standard deviation specified as the observed sd of replicate GC 
 # measurements in our lab. 
 M_h_me <- rnorm(nsim, M_h, n2o_sd_epa) 
 
@@ -351,9 +334,7 @@ C_h_df <- tibble(C_h_me = C_h_me, M_h_me = M_h_me)
 C_h_me_abs <- (C_h_me * 1e9) - C
 ```
 
-The results of the simulations are summarized with density histograms
-below.
-
+The results of the simulations are summarized using density histograms below.
 ```{r plot_C_h_me, echo=FALSE, fig.align='center', fig.asp=0.35, fig.width=8}
 ggarrange(
 ggplot(C_h_df, aes(x = M_h_me, y = after_stat(density))) +  
@@ -362,7 +343,7 @@ ggplot(C_h_df, aes(x = M_h_me, y = after_stat(density))) +
   geom_vline(xintercept = M_h , color = 'red') + 
   theme(axis.text.y = element_blank(),
         axis.ticks.y = element_blank()) +
-  ggtitle("Simulated variation in \nequilibrated headspace (Mh) \nGC measurements") +
+  ggtitle("Simulated variation in \nequilibrated headspace (Mh) \nGC measurement") +
   xlab("Concentration (nmol L-1)"),
 
 ggplot(C_h_df, aes(x = C_h_me * 1e9, y = after_stat(density))) +  
@@ -382,22 +363,22 @@ ggplot(C_h_df, aes(x = C_h_me_abs, y = after_stat(density))) +
   theme(axis.text.y = element_blank(),
         axis.ticks.y = element_blank(),
         axis.title.y = element_blank()) +
-  ggtitle("Absolute error in dissolved \nN2O estimate (observed - true) \n") +
+  ggtitle("Absolute error in dissolved \nN2O estimate (measured - true) \n") +
   xlab("Error (nMol)"),
 nrow = 1
 )
 ```
 
 ### Ambient air
-Error in the GC measurements of $\text{N}_2\text{O}$ in the ambient air ($M_a$) is simulated 
-below. The result of the simulation is plotted as a histogram to illustrate the
-variation in the measurement. THe resulting effect on the uncertainty of the 
-dissolved N2O measurement is also plotted along with the absolute error in 
-N2O as a result of error in this measurement.
+Error in the GC measurements of $\text{N}_2\text{O}$ in the ambient air 
+($M_r$ above) reference is simulated below. The result of the simulation is
+plotted as a histogram to illustrate the variation in the measurement. The
+resulting effect on the uncertainty in the simulated dissolved N2O observation 
+is plotted along with the absolute error in the simulated measurement.
 ```{r simulate_me_Ca, message=F}
 C_a_me <- rep(NA, nsim)
 
-M_a_n2o_me <- rnorm(nsim, M_a_n2o, n2o_sd_epa) # m.e. in measured gas in air
+M_a_n2o_me <- rnorm(nsim, M_a_n2o, n2o_sd_epa) # m.e. measured gas in air
 
 for(i in 1:nsim){
   C_a_me[i] <- 1e-6 * B * (V_g * (M_h - M_a_n2o_me[i]) / (8.3144598 * (T_c + 273.15) * V_w) + H_n2o * exp(2700 * (1 / (T_c + 273.15) - 1 / 298.15)) * M_h)
@@ -438,13 +419,14 @@ ggplot(C_a_df, aes(x = C_a_me_abs, y = after_stat(density))) +
   theme(axis.text.y = element_blank(),
         axis.ticks.y = element_blank(),
         axis.title.y = element_blank()) +
-  ggtitle( "Absolute error in dissolved \nN2O estimate (observed - true) \n") +
+  ggtitle( "Absolute error in dissolved \nN2O estimate (measured - true) \n") +
   xlab( "Error (nMol)"),
 nrow = 1)
 ```
 
 ### Water temperature
-
+Next, error in water temperature measurements is simulated and its potential
+effect on the final dissolved N2O concentration assessed.
 ```{r simulate_me_T_c, message=F}
 C_tc_me <- rep(NA, nsim)
 
@@ -493,13 +475,14 @@ ggplot(C_tc_df, aes(x = C_tc_me_abs, y = after_stat(density))) +
   theme(axis.text.y = element_blank(),
         axis.ticks.y = element_blank(),
         axis.title.y = element_blank()) + 
-  ggtitle("Absolute error in dissolved \nN2O estimate (observed - true) \n") +
+  ggtitle("Absolute error in dissolved \nN2O estimate (measured - true) \n") +
   xlab("Error (nMol)"),
 nrow = 1)
 ```
 
 ### Barometric pressure
-
+Next, error in barometric pressure measurements is simulated and its potential
+effect on the final dissolved N2O concentration assessed.
 ```{r simulate_me_B, message=F}
 C_b_me <- rep(NA, nsim)
 
@@ -567,13 +550,15 @@ ggplot(C_b_df, aes(x = C_b_me_abs, y = after_stat(density))) +
   theme(axis.text.y = element_blank(),
         axis.ticks.y = element_blank(),
         axis.title.y = element_blank()) + 
-  ggtitle("Absolute error in dissolved \nN2O estimate (observed - true) \n") +
+  ggtitle("Absolute error in dissolved \nN2O estimate (measured - true) \n") +
   xlab("Error (nMol)"),
 nrow = 1)
 ```
 
 ### Water volume
-
+Next, error in the volume of water (relative to volume of gas) in the sample 
+vessel is simulated and its potential effect on the final dissolved N2O 
+concentration assessed.
 ```{r simulate_me_V_w, message=F}
 C_w_me <- rep(NA, nsim)
 
@@ -619,15 +604,499 @@ ggplot(C_w_df, aes(x = C_w_me_abs, y = after_stat(density))) +
   theme(axis.text.y = element_blank(),
         axis.ticks.y = element_blank(),
         axis.title.y = element_blank()) + 
-  ggtitle("Absolute error in dissolved \nN2O estimate (observed - true) \n") +
+  ggtitle("Absolute error in dissolved \nN2O estimate (measured - true) \n") +
   xlab("Error (nMol)"),
 nrow = 1)
 ```
 
+
+### Mixing ratio
+To check the effect of different mixing ratios, we re-arrange the equation to 
+solve for $M_h$, given a known $C$ from above where $C =$ `r round(C, 1)`. For 
+both ambient air and a pure gas (e.g., helium) as the headspace gas, we evaluate 
+three scenarios for the mixing ratio, $R_M$. The $R_M$ value indicates the 
+proportion of gas relative to water in the headspace mixture. In the simulations 
+below, we set $R_M$ to be (1) very low ($R_{M(low)} = 0.1$), (2) at equal mixing 
+proportions ($R_{M(equal)} = 0.5$), and (3) very high ($R_{M(high)} = 0.9$). For 
+reference, in the simulations above, and in the empirical field measurments, 
+$R_M$ was set at `r R_M`. Also note that the total volume of the mixing vessel 
+in the field study was `r V`mL, so the volume of gas in the mixing vessel was 
+intended to be $R_M \cdot V_g =$ `r V_g`mL and the volume of water was 
+$R_M \cdot V_w =$ `r V_w`mL. Finally, note that varying the total volume of the 
+mixing vessel has no consequence for $C$, only the ratio of gas to water.
+
+#### Ambient air
+For the same fixed concentration, $C =$ `r round(C, 1)`, using a low proportion 
+of gas relative to water ($R_{M(low)} = 0.1$) in the equilibrated headspace 
+results in a smaller value of $M_h$ relative to the simulations above with
+$R_M =$ `r R_M`. This simulation assumes ambient air is used as the headspace
+gas.
+```{r dg_calc_vary_rm_low, echo=TRUE}
+# Set volume of syringe/vessel
+V <- 140 # 140mL syringe
+
+# Set ratio of gas volume to water volume in the mixing vessel to something
+# smaller than the scenario above
+R_M_low <- 0.1
+
+C <- C # known N2O concentration in sample from simulation above
+B <- 99 # barometric pressure (kPa)
+V_g_low <- V * R_M_low # volume of reference gas in headspace
+V_w_low <- V * (1 - R_M_low) # volume of water below headspace
+T_c <- 23 # temperature ( C )
+M_a_n2o <- 0.310 # gas measured in reference (air)
+H_n2o <- 0.00024 #mol m-3 Pa, range: 0.00018 - 0.00025; Henry's law constant
+
+#### Re-arranged previous equation to solve for Mh (with low proportion of gas to water)
+M_h_low <- (((C / 1e9) * 8.3144598 * (T_c + 273.15) * V_w_low) + (1e-6 * B * V_g_low * M_a_n2o)) / (1e-6 * B * (V_g_low + 8.3144598 * (T_c + 273.15) * V_w_low * H_n2o * exp(2700 * (1 / (T_c + 273.15) - 1 / 298.15))))
+
+round(M_h_low, 3)
+```
+
+Next, we calculate $M_h$ for equal proportions of gas and water in 
+the headspace, such that $R_{M(equal)} = 0.5$. In this case we get a slightly 
+higher value for $M_h$ relative to the low mixing proportion above.
+```{r dg_calc_vary_rm_equal, echo=TRUE}
+# Set volume of syringe/vessel
+V <- 140 # 140mL syringe
+
+# Set ratio of gas volume to water volume in the mixing vessel to something
+# smaller than the scenario above
+R_M_equal <- 0.5
+
+C <- C # known N2O concentration in sample from simulation above
+B <- 99 # barometric pressure (kPa)
+V_g_equal <- V * R_M_equal # volume of reference gas in headspace
+V_w_equal <- V * (1 - R_M_equal) # volume of water below headspace
+T_c <- 23 # temperature ( C )
+M_a_n2o <- 0.310 # gas measured in reference (air)
+H_n2o <- 0.00024 #mol m-3 Pa, range: 0.00018 - 0.00025; Henry's law constant
+
+#### Re-arranged previous equation to solve for Mh
+M_h_equal <- (((C / 1e9) * 8.3144598 * (T_c + 273.15) * V_w_equal) + (1e-6 * B * V_g_equal * M_a_n2o)) / (1e-6 * B * (V_g_equal + 8.3144598 * (T_c + 273.15) * V_w_equal * H_n2o * exp(2700 * (1 / (T_c + 273.15) - 1 / 298.15))))
+
+round(M_h_equal, 3)
+```
+
+Next, we calculate $M_h$ for a higher proportion of gas relative to water in 
+the headspace, such that $R_{M(high)} = 0.9$. In this case we again get a higher 
+value for $M_h$.
+```{r dg_calc_vary_rm_high, echo=TRUE}
+# Set volume of syringe/vessel
+V <- 140 # 140mL syringe
+
+# Set ratio of gas volume to water volume in the mixing vessel to something
+# smaller than the scenario above
+R_M_high <- 0.9
+
+C <- C # known N2O concentration in sample from simulation above
+B <- 99 # barometric pressure (kPa)
+V_g_high <- V * R_M_high # volume of reference gas in headspace
+V_w_high <- V * (1 - R_M_high) # volume of water below headspace
+T_c <- 23 # temperature ( C )
+M_a_n2o <- 0.310 # gas measured in reference (air)
+H_n2o <- 0.00024 #mol m-3 Pa, range: 0.00018 - 0.00025; Henry's law constant
+
+#### Re-arranged previous equation to solve for Mh
+M_h_high <- (((C / 1e9) * 8.3144598 * (T_c + 273.15) * V_w_high) + (1e-6 * B * V_g_high * M_a_n2o)) / (1e-6 * B * (V_g_high + 8.3144598 * (T_c + 273.15) * V_w_high * H_n2o * exp(2700 * (1 / (T_c + 273.15) - 1 / 298.15))))
+
+round(M_h_high, 3)
+```
+
+Finally, we simulate $C$ again with measurment error on $M_h$, but using the
+values of $M_h$ obtained above using the 3 different values of $R_M$.
+
+##### $R_{M(low)}$
+```{r simulate_C_h_me_low, echo=TRUE, message=FALSE}
+C_h_me_low <- rep(NA, nsim)  
+
+M_h_me_low <- rnorm(nsim, M_h_low, n2o_sd_epa) 
+
+for(i in 1:nsim){
+  C_h_me_low[i] <- 1e-6 * B * (V_g_low * (M_h_me_low[i] - M_a_n2o) / (8.3144598 * (T_c + 273.15) * V_w_low) + H_n2o * exp(2700 * (1 / (T_c + 273.15) - 1 / 298.15)) * M_h_me_low[i])
+}
+
+# combine into dataframe for ggplot. 
+C_h_low_df <- tibble(C_h_me_low = C_h_me_low, M_h_me_low = M_h_me_low)
+# save absolute error for plot
+C_h_me_low_abs <- (C_h_me_low * 1e9) - C
+```
+
+```{r plot_C_h_me_low, echo=FALSE, fig.align='center', fig.asp=0.35, fig.width=8}
+ggarrange(
+ggplot(C_h_low_df, aes(x = M_h_me_low, y = after_stat(density))) +  
+  geom_histogram(binwidth = 0.001) + 
+  geom_density(aes(y = after_stat(density)), color = 'green') +
+  geom_vline(xintercept = M_h_low , color = 'red') + 
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank()) +
+  ggtitle("Simulated variation in \nequilibrated headspace (Mh) \nGC measurement") +
+  xlab("Concentration (nmol L-1)"),
+
+ggplot(C_h_low_df, aes(x = C_h_me_low * 1e9, y = after_stat(density))) +  
+  geom_histogram(binwidth = 0.025) + 
+  geom_density(aes(y = after_stat(density)), color = 'green') +
+  geom_vline(xintercept = C , color = 'red') +  
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.title.y = element_blank()) +
+  ggtitle("Resulting uncertainty in \ndissolved N2O estimate \n") +
+  xlab("Concentration (nMol)"),
+
+ggplot(C_h_low_df, aes(x = C_h_me_low_abs, y = after_stat(density))) +  
+  geom_histogram(binwidth = 0.025) + 
+  geom_density(aes(y = after_stat(density)), color = 'green') +
+  geom_vline(xintercept = 0 , color = 'red') +  
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.title.y = element_blank()) +
+  ggtitle("Absolute error in dissolved \nN2O estimate (measured - true) \n") +
+  xlab("Error (nMol)"),
+nrow = 1
+)
+```
+
+##### $R_{M(equal)}$
+```{r simulate_C_h_me_equal, echo=TRUE, message=FALSE}
+C_h_me_equal <- rep(NA, nsim)  
+
+M_h_me_equal <- rnorm(nsim, M_h_equal, n2o_sd_epa) 
+
+for(i in 1:nsim){
+  C_h_me_equal[i] <- 1e-6 * B * (V_g_equal * (M_h_me_equal[i] - M_a_n2o) / (8.3144598 * (T_c + 273.15) * V_w_equal) + H_n2o * exp(2700 * (1 / (T_c + 273.15) - 1 / 298.15)) * M_h_me_equal[i])
+}
+
+# combine into dataframe for ggplot. 
+C_h_equal_df <- tibble(C_h_me_equal = C_h_me_equal, M_h_me_equal = M_h_me_equal)
+# save absolute error for plot
+C_h_me_equal_abs <- (C_h_me_equal * 1e9) - C
+```
+
+```{r plot_C_h_me_equal, echo=FALSE, fig.align='center', fig.asp=0.35, fig.width=8}
+ggarrange(
+ggplot(C_h_equal_df, aes(x = M_h_me_equal, y = after_stat(density))) +  
+  geom_histogram(binwidth = 0.001) + 
+  geom_density(aes(y = after_stat(density)), color = 'green') +
+  geom_vline(xintercept = M_h_equal , color = 'red') + 
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank()) +
+  ggtitle("Simulated variation in \nequilibrated headspace (Mh) \nGC measurement") +
+  xlab("Concentration (nmol L-1)"),
+
+ggplot(C_h_equal_df, aes(x = C_h_me_equal * 1e9, y = after_stat(density))) +  
+  geom_histogram(binwidth = 0.025) + 
+  geom_density(aes(y = after_stat(density)), color = 'green') +
+  geom_vline(xintercept = C , color = 'red') +  
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.title.y = element_blank()) +
+  ggtitle("Resulting uncertainty in \ndissolved N2O estimate \n") +
+  xlab("Concentration (nMol)"),
+
+ggplot(C_h_equal_df, aes(x = C_h_me_equal_abs, y = after_stat(density))) +  
+  geom_histogram(binwidth = 0.025) + 
+  geom_density(aes(y = after_stat(density)), color = 'green') +
+  geom_vline(xintercept = 0 , color = 'red') +  
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.title.y = element_blank()) +
+  ggtitle("Absolute error in dissolved \nN2O estimate (measured - true) \n") +
+  xlab("Error (nMol)"),
+nrow = 1
+)
+```
+
+##### $R_{M(high)}$
+```{r simulate_C_h_me_high, echo=TRUE, message=FALSE}
+C_h_me_high <- rep(NA, nsim)  
+
+M_h_me_high <- rnorm(nsim, M_h_high, n2o_sd_epa) 
+
+for(i in 1:nsim){
+  C_h_me_high[i] <- 1e-6 * B * (V_g_high * (M_h_me_high[i] - M_a_n2o) / (8.3144598 * (T_c + 273.15) * V_w_high) + H_n2o * exp(2700 * (1 / (T_c + 273.15) - 1 / 298.15)) * M_h_me_high[i])
+}
+
+# combine into dataframe for ggplot. 
+C_h_high_df <- tibble(C_h_me_high = C_h_me_high, M_h_me_high = M_h_me_high)
+# save absolute error for plot
+C_h_me_high_abs <- (C_h_me_high * 1e9) - C
+```
+
+```{r plot_C_h_me_high, echo=FALSE, fig.align='center', fig.asp=0.35, fig.width=8}
+ggarrange(
+ggplot(C_h_high_df, aes(x = M_h_me_high, y = after_stat(density))) +  
+  geom_histogram(binwidth = 0.001) + 
+  geom_density(aes(y = after_stat(density)), color = 'green') +
+  geom_vline(xintercept = M_h_high , color = 'red') + 
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank()) +
+  ggtitle("Simulated variation in \nequilibrated headspace (Mh) \nGC measurement") +
+  xlab("Concentration (nmol L-1)"),
+
+ggplot(C_h_high_df, aes(x = C_h_me_high * 1e9, y = after_stat(density))) +  
+  geom_histogram(binwidth = 0.025) + 
+  geom_density(aes(y = after_stat(density)), color = 'green') +
+  geom_vline(xintercept = C , color = 'red') +  
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.title.y = element_blank()) +
+  ggtitle("Resulting uncertainty in \ndissolved N2O estimate \n") +
+  xlab("Concentration (nMol)"),
+
+ggplot(C_h_high_df, aes(x = C_h_me_high_abs, y = after_stat(density))) +  
+  geom_histogram(binwidth = 0.025) + 
+  geom_density(aes(y = after_stat(density)), color = 'green') +
+  geom_vline(xintercept = 0 , color = 'red') +  
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.title.y = element_blank()) +
+  ggtitle("Absolute error in dissolved \nN2O estimate (measured - true) \n") +
+  xlab("Error (nMol)"),
+nrow = 1
+)
+```
+
+#### Pure gas
+To check the effect of different mixing ratios using a pure gas such as helium 
+as the headspace, we again re-arrange the equation to solve for $M_h$, given 
+known $C$. In this case with a pure gas, we set $M_a = 0$.
+
+For the same fixed concentration, $C$, using a low proportion of pure gas 
+relative to water ($R_{M(low)} = 0.1$) in the equilibrated headspace results in 
+a much smaller value of $M_h$ relative to the original simulations (and field 
+method) where $R_M =$ `r R_M`. This is because the mixing ratio is very low and 
+also because there is no need to account for ambient air in the headspace.
+```{r dg_calc_vary_rm_pg_low, echo=TRUE}
+# Set volume of syringe/vessel
+V <- 140 # 140mL syringe
+
+# Set ratio of gas volume to water volume in the mixing vessel to something
+# smaller than the scenario above
+R_M_low <- 0.1
+
+C <- C # known N2O concentration in sample from simulation above
+B <- 99 # barometric pressure (kPa)
+V_g_low <- V * R_M_low # volume of reference gas in headspace
+V_w_low <- V * (1 - R_M_low) # volume of water below headspace
+T_c <- 23 # temperature ( C )
+H_n2o <- 0.00024 #mol m-3 Pa, range: 0.00018 - 0.00025; Henry's law constant
+
+#### Re-arranged previous equation to solve for Mh
+M_h_pg_low <- (((C / 1e9) * 8.3144598 * (T_c + 273.15) * V_w_low) + (1e-6 * B * V_g_low * 0)) / (1e-6 * B * (V_g_low + 8.3144598 * (T_c + 273.15) * V_w_low * H_n2o * exp(2700 * (1 / (T_c + 273.15) - 1 / 298.15))))
+
+round(M_h_pg_low, 3)
+```
+
+Next, we calculate $M_h$ for equal proportions of pure gas and water in 
+the headspace, such that $R_{M(equal)} = 0.5$. In this case we get a 
+substantially lower value for $M_h$ relative to the low mixing proportion above.
+```{r dg_calc_vary_rm_pg_equal, echo=TRUE}
+# Set volume of syringe/vessel
+V <- 140 # 140mL syringe
+
+# Set ratio of gas volume to water volume in the mixing vessel to something
+# smaller than the scenario above
+R_M_equal <- 0.5
+
+C <- C # known N2O concentration in sample from simulation above
+B <- 99 # barometric pressure (kPa)
+V_g_equal <- V * R_M_equal # volume of reference gas in headspace
+V_w_equal <- V * (1 - R_M_equal) # volume of water below headspace
+T_c <- 23 # temperature ( C )
+H_n2o <- 0.00024 #mol m-3 Pa, range: 0.00018 - 0.00025; Henry's law constant
+
+#### Re-arranged previous equation to solve for Mh
+M_h_pg_equal <- (((C / 1e9) * 8.3144598 * (T_c + 273.15) * V_w_equal) + (1e-6 * B * V_g_equal * 0)) / (1e-6 * B * (V_g_equal + 8.3144598 * (T_c + 273.15) * V_w_equal * H_n2o * exp(2700 * (1 / (T_c + 273.15) - 1 / 298.15))))
+
+round(M_h_pg_equal, 3)
+```
+
+Next, we calculate $M_h$ for a higher proportion of pure gas relative to water 
+in the headspace, such that $R_{M(high)} = 0.9$. In this case we again get a 
+very low value for $M_h$.
+```{r dg_calc_vary_rm_pg_high, echo=TRUE}
+# Set volume of syringe/vessel
+V <- 140 # 140mL syringe
+
+# Set ratio of gas volume to water volume in the mixing vessel to something
+# smaller than the scenario above
+R_M_high <- 0.9
+
+C <- C # known N2O concentration in sample from simulation above
+B <- 99 # barometric pressure (kPa)
+V_g_high <- V * R_M_high # volume of reference gas in headspace
+V_w_high <- V * (1 - R_M_high) # volume of water below headspace
+T_c <- 23 # temperature ( C )
+H_n2o <- 0.00024 #mol m-3 Pa, range: 0.00018 - 0.00025; Henry's law constant
+
+#### Re-arranged previous equation to solve for Mh
+M_h_pg_high <- (((C / 1e9) * 8.3144598 * (T_c + 273.15) * V_w_high) + (1e-6 * B * V_g_high * 0)) / (1e-6 * B * (V_g_high + 8.3144598 * (T_c + 273.15) * V_w_high * H_n2o * exp(2700 * (1 / (T_c + 273.15) - 1 / 298.15))))
+
+round(M_h_pg_high, 3)
+```
+
+Below, we again simulate $C$ with measurment error on $M_h$, using the
+values of $M_h$ obtained above using the 3 different values of $R_M$ with the 
+hypothetical pure gas headspace mixture.
+
+##### $R_{M(low)}$
+```{r simulate_C_h_me_pg_low, echo=TRUE, message=FALSE}
+C_h_pg_me_low <- rep(NA, nsim)  
+
+M_h_pg_me_low <- rnorm(nsim, M_h_pg_low, n2o_sd_epa) 
+
+for(i in 1:nsim){
+  C_h_pg_me_low[i] <- 1e-6 * B * (V_g_low * (M_h_pg_me_low[i] - 0) / (8.3144598 * (T_c + 273.15) * V_w_low) + H_n2o * exp(2700 * (1 / (T_c + 273.15) - 1 / 298.15)) * M_h_pg_me_low[i])
+}
+
+# combine into dataframe for ggplot. 
+C_h_pg_low_df <- tibble(C_h_pg_me_low = C_h_pg_me_low, M_h_pg_me_low = M_h_pg_me_low)
+# save absolute error for plot
+C_h_pg_me_low_abs <- (C_h_pg_me_low * 1e9) - C
+```
+
+```{r plot_C_h_me_pg_low, echo=FALSE, fig.align='center', fig.asp=0.35, fig.width=8}
+ggarrange(
+ggplot(C_h_pg_low_df, aes(x = M_h_pg_me_low, y = after_stat(density))) +  
+  geom_histogram(binwidth = 0.001) + 
+  geom_density(aes(y = after_stat(density)), color = 'green') +
+  geom_vline(xintercept = M_h_pg_low , color = 'red') + 
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank()) +
+  ggtitle("Simulated variation in \nequilibrated headspace (Mh) \nGC measurement") +
+  xlab("Concentration (nmol L-1)"),
+
+ggplot(C_h_pg_low_df, aes(x = C_h_pg_me_low * 1e9, y = after_stat(density))) +  
+  geom_histogram(binwidth = 0.025) + 
+  geom_density(aes(y = after_stat(density)), color = 'green') +
+  geom_vline(xintercept = C , color = 'red') +  
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.title.y = element_blank()) +
+  ggtitle("Resulting uncertainty in \ndissolved N2O estimate \n") +
+  xlab("Concentration (nMol)"),
+
+ggplot(C_h_pg_low_df, aes(x = C_h_pg_me_low_abs, y = after_stat(density))) +  
+  geom_histogram(binwidth = 0.025) + 
+  geom_density(aes(y = after_stat(density)), color = 'green') +
+  geom_vline(xintercept = 0 , color = 'red') +  
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.title.y = element_blank()) +
+  ggtitle("Absolute error in dissolved \nN2O estimate (measured - true) \n") +
+  xlab("Error (nMol)"),
+nrow = 1
+)
+```
+
+##### $R_{M(equal)}$
+```{r simulate_C_h_me_pg_equal, echo=TRUE, message=FALSE}
+C_h_pg_me_equal <- rep(NA, nsim)  
+
+M_h_pg_me_equal <- rnorm(nsim, M_h_pg_equal, n2o_sd_epa) 
+
+for(i in 1:nsim){
+  C_h_pg_me_equal[i] <- 1e-6 * B * (V_g_equal * (M_h_pg_me_equal[i] - 0) / (8.3144598 * (T_c + 273.15) * V_w_equal) + H_n2o * exp(2700 * (1 / (T_c + 273.15) - 1 / 298.15)) * M_h_pg_me_equal[i])
+}
+
+# combine into dataframe for ggplot. 
+C_h_pg_equal_df <- tibble(C_h_pg_me_equal = C_h_pg_me_equal, M_h_pg_me_equal = M_h_pg_me_equal)
+# save absolute error for plot
+C_h_pg_me_equal_abs <- (C_h_pg_me_equal * 1e9) - C
+```
+
+```{r plot_C_h_me_pg_equal, echo=FALSE, fig.align='center', fig.asp=0.35, fig.width=8}
+ggarrange(
+ggplot(C_h_pg_equal_df, aes(x = M_h_pg_me_equal, y = after_stat(density))) +  
+  geom_histogram(binwidth = 0.001) + 
+  geom_density(aes(y = after_stat(density)), color = 'green') +
+  geom_vline(xintercept = M_h_pg_equal , color = 'red') + 
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank()) +
+  ggtitle("Simulated variation in \nequilibrated headspace (Mh) \nGC measurement") +
+  xlab("Concentration (nmol L-1)"),
+
+ggplot(C_h_pg_equal_df, aes(x = C_h_pg_me_equal * 1e9, y = after_stat(density))) +  
+  geom_histogram(binwidth = 0.025) + 
+  geom_density(aes(y = after_stat(density)), color = 'green') +
+  geom_vline(xintercept = C , color = 'red') +  
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.title.y = element_blank()) +
+  ggtitle("Resulting uncertainty in \ndissolved N2O estimate \n") +
+  xlab("Concentration (nMol)"),
+
+ggplot(C_h_pg_equal_df, aes(x = C_h_pg_me_equal_abs, y = after_stat(density))) +  
+  geom_histogram(binwidth = 0.025) + 
+  geom_density(aes(y = after_stat(density)), color = 'green') +
+  geom_vline(xintercept = 0 , color = 'red') +  
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.title.y = element_blank()) +
+  ggtitle("Absolute error in dissolved \nN2O estimate (measured - true) \n") +
+  xlab("Error (nMol)"),
+nrow = 1
+)
+```
+
+##### $R_{M(high)}$
+```{r simulate_C_h_me_pg_high, echo=TRUE, message=FALSE}
+C_h_pg_me_high <- rep(NA, nsim)  
+
+M_h_pg_me_high <- rnorm(nsim, M_h_pg_high, n2o_sd_epa) 
+
+for(i in 1:nsim){
+  C_h_pg_me_high[i] <- 1e-6 * B * (V_g_high * (M_h_pg_me_high[i] - 0) / (8.3144598 * (T_c + 273.15) * V_w_high) + H_n2o * exp(2700 * (1 / (T_c + 273.15) - 1 / 298.15)) * M_h_pg_me_high[i])
+}
+
+# combine into dataframe for ggplot. 
+C_h_pg_high_df <- tibble(C_h_pg_me_high = C_h_pg_me_high, M_h_pg_me_high = M_h_pg_me_high)
+# save absolute error for plot
+C_h_pg_me_high_abs <- (C_h_pg_me_high * 1e9) - C
+```
+
+```{r plot_C_h_me_pg_high, echo=FALSE, fig.align='center', fig.asp=0.35, fig.width=8}
+ggarrange(
+ggplot(C_h_pg_high_df, aes(x = M_h_pg_me_high, y = after_stat(density))) +  
+  geom_histogram(binwidth = 0.001) + 
+  geom_density(aes(y = after_stat(density)), color = 'green') +
+  geom_vline(xintercept = M_h_pg_high , color = 'red') + 
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank()) +
+  ggtitle("Simulated variation in \nequilibrated headspace (Mh) \nGC measurement") +
+  xlab("Concentration (nmol L-1)"),
+
+ggplot(C_h_pg_high_df, aes(x = C_h_pg_me_high * 1e9, y = after_stat(density))) +  
+  geom_histogram(binwidth = 0.025) + 
+  geom_density(aes(y = after_stat(density)), color = 'green') +
+  geom_vline(xintercept = C , color = 'red') +  
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.title.y = element_blank()) +
+  ggtitle("Resulting uncertainty in \ndissolved N2O estimate \n") +
+  xlab("Concentration (nMol)"),
+
+ggplot(C_h_pg_high_df, aes(x = C_h_pg_me_high_abs, y = after_stat(density))) +  
+  geom_histogram(binwidth = 0.025) + 
+  geom_density(aes(y = after_stat(density)), color = 'green') +
+  geom_vline(xintercept = 0 , color = 'red') +  
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.title.y = element_blank()) +
+  ggtitle("Absolute error in dissolved \nN2O estimate (measured - true) \n") +
+  xlab("Error (nMol)"),
+nrow = 1
+)
+```
+
 ### All observables
-Simulate measurement error for all observables (_i.e._, Equilibrated headspace, 
-air, water temperature, and barometric pressure ) and the resulting effects on
-dissolved N2O observations
+In order to get a sense of the total error in a measurement resulting from the
+sources above, we simulate measurement error for all of the observables (_i.e._, 
+GC measure of gas in equilibrated headspace, GC measure of gas in air, water
+temperature, and barometric pressure) and assess the resulting effects on the 
+dissolved N2O concentration measure. In this scenario, it is assumed that, as 
+with the empirical field measurements, air is used as the headspace gas and the 
+mixing ratio is $R_M = $ `r R_M`.
 ```{r simulate_me_all, message=F}
 C_all_me <- rep(NA, nsim)
 
@@ -660,15 +1129,15 @@ ggplot(C_all_df, aes(x = C_all_me_abs, y = after_stat(density))) +
   theme(axis.text.y = element_blank(),
         axis.ticks.y = element_blank(),
         axis.title.y = element_blank()) + 
-  ggtitle( "Absolute error in dissolved \nN2O estimate (observed - true) \n") +
+  ggtitle( "Absolute error in dissolved \nN2O estimate (measured - true) \n") +
   xlab( "Error (nMol)"),
 nrow = 1
 )
 ```
 
-Print the estimated standard deviations of dissolved N2O measurements
-and the resulting 95% credible interval for error in measurements.
-
+The estimated standard deviations of dissolved N2O measurements
+and the resulting 95% credible interval for error in measurements is printed 
+below.
 ```{r calc_sd_me_all}
 # standard deviation of a measurement is:
 sd(C_all_me* 1e9) # 0.20 nmol L-1
@@ -677,6 +1146,7 @@ sd(C_all_me* 1e9) # 0.20 nmol L-1
 sd(C_all_me * 1e9) * 1.96 # +/- 0.395 nmol N2O
 ```
 
+Alternatively, calculate the central 95th percentile of the simulated measures.
 ```{r calc_sd_me_eq_all_2}
 # standard deviation of a measurement is:
 round(sd(C_all_me_abs), 3) # 0.20 nmol L-1
@@ -687,8 +1157,9 @@ round(sd(C_all_me_abs), 3) # 0.20 nmol L-1
 round(quantile((C + C_all_me_abs), probs = c(0.025, 0.975)), 3) # +/- nmol N2O
 ```
 
-## Summary of results
-
+## Summary of contributions to error
+Below, we compare the total error estimated for all observables in the last 
+simulation, to the error estimated from individual sources.
 ```{r final_figure_N2O_diss, message=FALSE, fig.align='center', fig.asp=0.6, fig.width=6}
 results_dissolved_N2O <- tibble(Eh_me= C_h_me_abs,
                                 Air_me = C_a_me_abs,
@@ -716,13 +1187,12 @@ results_dissolved_N2O %>%
                             "B_me" = "Barometric pressure",
                             "W_me" = "Water volume",
                             "All_me" = "All sources")) +
-  xlab("Absolute error in dissolved \nN2O estimate (observed - true) \n") +
+  xlab("Absolute error in dissolved \nN2O estimate (measured - true) \n") +
   ylab("") 
 ```
 
 # Equilibrium concentration
-
-The full equation for estimating the concentration (nM) of ($\text{N}_2\text{O}$) gas
+The equation for estimating the concentration (nM) of ($\text{N}_2\text{O}$) gas
 dissolved in water that is in equilibrium with the atmosphere is:
 
 $$C_{eq} = 1^{-6} \cdot B \cdot C_a \cdot H^{\theta} \cdot e^{2700 \cdot \frac{1}{Tc} -  \frac{1}{298.15}}$$
@@ -732,27 +1202,22 @@ where:
 -   $B$ = barometric pressure (kPa)
 -   $C_a$ = The air concentration in nM
 -   $H^{\theta}$ = Henry's law constant ($H_{N_2O}$ below)
--   $T_c$ = temperature celsius
+-   $T_c$ = temperature (K) = T_c (Celsius) + 273.15
 
 ## Simulate equilibrium $\text{N}_2\text{O}$
-
-A "known" concentration is simulated:
-
+A "known" concentration is calculated:
 ```{r c_sat}
-C_eq <- M_a_n2o * B * 1e-6 * (H_n2o  * exp(2700*(1/(T_c + 273.15) - 1/298.15))) 
+C_eq <- M_a_n2o * B * 1e-6 * (H_n2o  * exp(2700*(1 / (T_c + 273.15) - 1 / 298.15))) 
 
-C_eq <- C_eq * 1e9 #convert mol to nmol
+C_eq <- C_eq * 1e9 # convert mol to nmol
 ```
 
 ## Simulate measurement error
-
 ### Ambient air
-
-Error in the GC measurements of $\text{N}_2\text{O}$ in the ambient air ($M_a$) is simulated 
-below. The resulting effects on the uncertainty of the equilibrium N2O 
-measurement is plotted along with the absolute error in N2O as a result of this
-measurement.
-
+Error in the GC measurements of $\text{N}_2\text{O}$ in the ambient air ($M_a$) 
+is simulated below. The resulting effects on the uncertainty of the equilibrium 
+N2O measurement is plotted along with the absolute error in N2O as a result of 
+this measurement.
 ```{r simulate_me_sat_C_a_n2o, message=F}
 C_a_eq_me <- rep( NA, nsim )
 
@@ -760,7 +1225,7 @@ M_a_n2o_me <- rnorm( nsim, M_a_n2o, n2o_sd_epa ) #m.e. in measured gas in air
 
 
 for(i in 1:nsim){
-    C_a_eq_me[i] <- M_a_n2o_me[i] * B * 1e-6 * (H_n2o  * exp(2700*(1/(T_c + 273.15) - 1/298.15)))
+    C_a_eq_me[i] <- M_a_n2o_me[i] * B * 1e-6 * (H_n2o  * exp(2700*(1 / (T_c + 273.15) - 1 / 298.15)))
 }
 
 C_a_eq_df <- tibble(C_a_eq_me = C_a_eq_me, M_a_n2o_me = M_a_n2o_me)
@@ -798,14 +1263,13 @@ ggplot(C_a_eq_df, aes(x = C_a_eq_me_abs, y = after_stat(density))) +
   theme(axis.text.y = element_blank(),
         axis.ticks.y = element_blank(),
         axis.title.y = element_blank()) +
-  ggtitle("Absolute error in equilibrium \nN2O estimate (observed - true) \n") +
+  ggtitle("Absolute error in equilibrium \nN2O estimate (measured - true) \n") +
   xlab("Error (nMol)"),
 nrow = 1
 )
 ```
 
 ### Water temperature
-
 ```{r simulate_me_sat_T_c, message=F}
 C_tc_eq_me <- rep(NA, nsim)
 
@@ -848,14 +1312,13 @@ ggplot(C_tc_eq_df, aes(x = C_tc_eq_me_abs, y = after_stat(density))) +
   theme(axis.text.y = element_blank(),
         axis.ticks.y = element_blank(),
         axis.title.y = element_blank()) +
-  ggtitle("Absolute error in equilibrium \nN2O estimate (observed - true) \n") +
+  ggtitle("Absolute error in equilibrium \nN2O estimate (measured - true) \n") +
   xlab("Error (nMol)"),
 nrow = 1
 )
 ```
 
 ### Barometric pressure
-
 ```{r simulate_me_sat_B, message=F}
 C_b_eq_me <- rep(NA, nsim)
 
@@ -898,7 +1361,7 @@ ggplot(C_b_eq_df, aes(x = C_b_eq_me_abs, y = after_stat(density))) +
   theme(axis.text.y = element_blank(),
         axis.ticks.y = element_blank(),
         axis.title.y = element_blank()) +
-  ggtitle("Absolute error in equilibrium \nN2O estimate (observed - true) \n") +
+  ggtitle("Absolute error in equilibrium \nN2O estimate (measured - true) \n") +
   xlab("Error (nMol)"),
 nrow = 1
 )
@@ -906,7 +1369,7 @@ nrow = 1
 
 ### All observables
 Simulate measurement error for all observables (_i.e._, air, water temperature,
-and barometric pressure ) and the resulting effects on dissolved N2O 
+and barometric pressure) and the resulting effects on equilibrium N2O 
 observations.
 ```{r simulate_me_sat_all, message=F}
 C_all_eq_me <- rep( NA, nsim )
@@ -940,7 +1403,7 @@ ggplot(C_all_eq_df, aes(x = C_all_eq_me_abs, y = after_stat(density))) +
   theme(axis.text.y = element_blank(),
         axis.ticks.y = element_blank(),
         axis.title.y = element_blank()) + 
-  ggtitle( "Absolute error in equilibrium \nN2O estimate (observed - true) \n") +
+  ggtitle( "Absolute error in equilibrium \nN2O estimate (measured - true) \n") +
   xlab( "Error (nMol)"),
 nrow = 1
 )
@@ -964,8 +1427,7 @@ round(sd(C_all_eq_me_abs), 3) # 0.20 nmol L-1
 round(quantile((C_eq + C_all_eq_me_abs), probs = c(0.025, 0.975)), 3) # +/- nmol N2O
 ```
 
-## Summary of results
-
+## Summary of contributions to error
 ```{r final_figure_N2O_eq, message=FALSE, fig.align='center', fig.asp=0.6, fig.width=6}
 results_equilibrium_N2O <- tibble(Air_me = C_a_eq_me_abs,
                                 Tc_me = C_tc_eq_me_abs,
@@ -987,15 +1449,13 @@ results_equilibrium_N2O %>%
                             "Tc_me" = "Water temperature",
                             "B_me" = "Barometric pressure",
                             "All_me" = "All sources")) +
-  xlab("Absolute error in equilibrium \nN2O estimate (observed - true) \n") +
+  xlab("Absolute error in equilibrium \nN2O estimate (measured - true) \n") +
   ylab("") 
 ```
 
 
 # Saturation ratio
-(Check this equation in text! Particularly the description of variables)
-The full equation for estimating the saturation ratio of ($N_20$) gas
-dissolved in water is:
+The equation for estimating the saturation ratio for ($N_20$) gas in water is:
 
 $$S = \left(\frac{(1^{-6} \cdot B ) \biggl( \frac{V_a (Mr_h - Mr_r)}{(8.3144598 \cdot K \cdot V_w) + H^{\theta} \cdot e^{2700 \cdot ( \frac{1}{K} - \frac{1}{298.15})} \cdot Mr_h} \biggr)}{1^{-6} \cdot B \cdot C_a \cdot e^{2700 \cdot \frac{1}{Tc} -  \frac{1}{298.15}}} \right)$$
 
@@ -1005,8 +1465,8 @@ where:
 -   $B$ = barometric pressure (kPa)
 -   $C_a$ = the air concentration in nM
 -   $V_a$ = volume of reference gas in air
--   $M_h$ = gas mixture ratio in the headspace
--   $M_r$ = gas mixture ratio in the reference (C_a_n2o below)
+-   $M_h$ = gas measured in the headspace
+-   $M_r$ = gas measured in the reference (air)
 -   $V_w$ = volume of water below the headspace
 -   $T_c$ = temperature celsius
 -   $H^{\theta}$ = Henry's law constant ($H_{N_2O}$ below)
@@ -1018,13 +1478,34 @@ S <- (1e-6 * B * (V_g * (M_h - M_a_n2o) / (8.3144598 * (T_c + 273.15) * V_w) + H
 S
 ```
 
+Uncertainty in the saturation ratio, $S$, is simulated below for both a
+standard GC and a high precision GC. The GC used for the current study is 
+optimized to quantify several analytes across a broad range of concentrations 
+but greater precision can be achieved by optimizing the instrument for a single 
+analyte across a narrower range of concentrations. For example, laboratories
+participating in an international analysis of N2O standards used for
+atmsopheric monitoring reported a mean standard deviation of
+`r mean(c(.00033, .00034, .00031, 0.00030, 0.0016, 0.0015))`, which is
+10-fold lower than the standard deviation of N2O measurements in this
+study (`r n2o_sd_epa`). Utilizing more precise N2O measurements for the
+equilibrated headspace and/or air will reduce uncertainty in the
+estimated dissolved N2O concentration, dissolved N2O equilibrium value,
+and N2O saturation ratio.
+
+In addition to the two different GC setups, uncertainty in $S$ is also simulated
+for under additional scenarios using combinations of ambient air vs a pure gas 
+as the headspace gas along with a standard _vs._ high precision thermometer for 
+field temperature (C) measurements.
+
+All of these simulations use the mixing ratio used for the empirical field 
+measurements, where $R_M =$ `r R_M`. 
+
 ## Standard GC
-Simulate uncertainty in the saturation ratio due to measurement error associated
-with the standard GC, using ambient air as the headspace gas, and the standard 
-field thermometer.
-
 ### Ambient air, standard thermometer
-
+Simulate uncertainty in the saturation ratio due to measurement error associated
+with the standard GC, using ambient air as the headspace gas, and a standard 
+field thermometer for temperature. This scenario represents the approach used
+for the empirical observations used in this study.
 ```{r simulate_me_ratio_all_air, message=F}
 S_a_me <- rep( NA, nsim )
 
@@ -1058,7 +1539,7 @@ ggplot(S_a_df, aes(x = S_a_me_abs, y = after_stat(density))) +
   theme(axis.text.y = element_blank(),
         axis.ticks.y = element_blank(),
         axis.title.y = element_blank()) + 
-  ggtitle( "Absolute error in saturation \nratio estimate (observed - true) \n") +
+  ggtitle( "Absolute error in saturation \nratio estimate (measured - true) \n") +
   xlab( "Error (nMol)"),
 nrow = 1
 )
@@ -1088,7 +1569,13 @@ round(quantile((S + S_a_me_abs), probs = c(0.025, 0.975)), 3) # +/- nmol N2O
 ```
 
 #### Map source-sink status
-
+Below, the source-sink status of the empirical measurments used for this study
+are estimated, assuming the measurement errors estimated above. The proportion 
+of observations assumed to be sinks or sources of $N_2O$ is also estimated along
+with the estimate of the proportion of the lakes sampled for which the status 
+was assumed to be "undetermined" due to uncertainty arising from the estimated
+measurement error. A map of each of the sampled lakes' estimated status is also 
+shown.
 ```{r map_ratio_all_air, message=F}
 # two standard deviations = 0.3019449
 # 95% CI is therefore x+/-0.3019449
@@ -1186,7 +1673,6 @@ ggplot() +
 ```
 
 ### Pure gas, standard thermometer
-
 Simulate uncertainty in the saturation ratio due to measurement error associated
 with the standard GC, using a pure gas (helium) as the headspace gas, 
 and the standard field thermometer.
@@ -1237,7 +1723,7 @@ ggplot(S_pg_df, aes(x = S_pg_me_abs, y = after_stat(density))) +
   theme(axis.text.y = element_blank(),
         axis.ticks.y = element_blank(),
         axis.title.y = element_blank()) + 
-  ggtitle( "Absolute error in saturation \nratio estimate (observed - true) \n") +
+  ggtitle( "Absolute error in saturation \nratio estimate (measured - true) \n") +
   xlab( "Error (nMol)"),
 nrow = 1
 )
@@ -1266,8 +1752,7 @@ round(quantile(S_pg_me_abs, probs = c(0.025, 0.975)), 3) # approx +/- 0.11
 round(quantile((S_pg + S_pg_me_abs), probs = c(0.025, 0.975)), 3) # +/- nmol N2O
 ```
 
-#### Map source-sink status
-
+#### Source-sink status
 ```{r map_ratio_pg, message=F}
 # two standard deviations = 0.3019449
 # 95% CI is therefore x+/-0.3019449
@@ -1290,85 +1775,12 @@ dg %>%
   filter(sample.source == "DG", visit.no == 1, sitetype == "PROB") %>%
   {prop.table(table(.$n2o.src.snk.with.all.error))} %>%
   kable(digits = 2, caption = "Proportion of lakes classified as source/sink")
-
-# sf for plotting
-dg.sf <- st_as_sf(dg, coords = c("map.lon.dd", "map.lat.dd"), 
-                  crs = 4269) %>% # standard for lat/lon
-  st_transform(5070) # project to CONUS ALBERS for plotting
-```
-
-```{r plot_map_ratio_pg, echo=FALSE, fig.align='center', fig.width=8, fig.asp=0.6}
-## load ecoregions----
-# read in ecoregion polygons
-ecoR <- st_read(dsn = paste0(localPath, 
-                             "/Environmental Protection Agency (EPA)/",
-                             "ORD NLA17 Dissolved Gas - Documents/inputData"),
-                layer = "aggr_ecoregions_simple",
-                quiet = TRUE)
-
-# Check CRS
-#st_crs(ecoR) # 3857
-ecoR <- st_transform(ecoR, 5070) # convert to CONUS Albers
-#st_crs(ecoR) # 5070
-
-# SET UP CUSTOM COLORS FOR ECOREGIONS
-# Custom color pallette for ecoregion polygons. Attempted to mirror
-# https://www.epa.gov/national-aquatic-resource-surveys/
-# ecoregional-results-national-lakes-assessment-2012
-cols <- c("Coastal Plains" = "orange1",
-          "Northern Appalachians" = "lightpink1",
-          "Northern Plains" = "darksalmon",
-          "Southern Appalachians" = "mediumturquoise",
-          "Southern Plains" = "khaki4",
-          "Temperate Plains" = "forestgreen", 
-          "Upper Midwest" = "deepskyblue4",
-          "Western Mountains" = "saddlebrown",
-          "Xeric" = "lightskyblue4")
-
-
-## Load state boundaries----
-states <- USAboundaries::us_states() %>%
-  dplyr::filter(!state_name %in% c("Alaska", "District of Columbia", "Hawaii", "Puerto Rico")) %>%
-  st_transform(5070) # convert to CONUS Albers
- 
-# To enable spatial analysis of the data, the dataframe will be converted to a 
-# 'simple features' (sf) object.
-# Define coordinates
-coords <- data.frame(longitude = dg$map.lon.dd, latitude = dg$map.lat.dd)
-
-dg.sf <- st_as_sf(dg, coords = c("map.lon.dd", "map.lat.dd"), 
-                  crs = 4269) %>% # standard for lat/lon
-  st_transform(5070) # project to CONUS ALBERS for plotting
-
-
-## Map
-ggplot() +
-    geom_sf(data = ecoR, color = NA, aes(fill = WSA9_NAME), alpha = 0.5) +
-    geom_sf(data = dg.sf %>% 
-              filter(!is.na(n2o.src.snk), sitetype == "PROB", visit.no == 1) %>%
-              arrange(desc(n2o.src.snk.with.all.error)), # grey on top of black
-            aes(size = dissolved.n2o.nmol, color = n2o.src.snk.with.all.error),
-            shape = 1,
-            show.legend = "point") +
-    geom_sf(data = states, fill = NA, color = "cornsilk3", size = 0.1) +
-    # guide argument below removes points from the boxes in the ecoregion legend
-    # https://aosmith.rbind.io/2020/07/09/ggplot2-override-aes/
-    scale_fill_manual("Ecoregion", 
-                      values = cols,
-                      guide = guide_legend(override.aes = list(shape = NA))) +
-    scale_color_manual(values = c("#ca0020", "#0571b0", "#000000"), name = "source/sink") +
-    scale_size(name = expression(N[2]*O~(nM)),
-               range = c(0.5, 8), # custom size range
-               breaks = c(1, 10, 25, 50, 100)) + # custom breaks
-    theme(legend.key.size = unit(0.4, "cm"), # size of boxes in legend
-          legend.title = element_text(size = 8))
 ```
 
 ### Ambient air, high precision thermometer
 Simulate uncertainty in the saturation ratio due to measurement error associated
-with the standard GC, ambient air as the headspace gas, and using a high 
-precision thermometer (e.g., MIMS).
-
+with the standard GC and ambient air used as the headspace gas, and a high 
+precision thermometer (e.g., MIMS) used for temperature measurements.
 ```{r simulate_tc_mims_air_hpt, message=F}
 # High precision water batch used to control temperature of standards
 T_c_mims_me <- rnorm(nsim, T_c, 0.005) # thermo stated bath precision is +/-0.01 Celsius
@@ -1420,7 +1832,7 @@ nrow = 2,
 ncol = 2)
 ```
 
-Simulate uncertainty in the saturation ratio using ambient air in the 
+Simulate uncertainty in the saturation ratio when using ambient air in the 
 headspace and high precision temperature measurements
 ```{r simulate_me_ratio_all_air_hpt, message=F}
 S_a_hpt_me <- rep(NA, nsim)
@@ -1455,7 +1867,7 @@ ggplot(S_a_hpt_df, aes(x = S_a_hpt_me_abs, y = after_stat(density))) +
   theme(axis.text.y = element_blank(),
         axis.ticks.y = element_blank(),
         axis.title.y = element_blank()) + 
-  ggtitle( "Absolute error in saturation \nratio estimate (observed - true) \n") +
+  ggtitle( "Absolute error in saturation \nratio estimate (measured - true) \n") +
   xlab( "Error (nMol)"),
 nrow = 1
 )
@@ -1484,8 +1896,7 @@ round(quantile(S_a_hpt_me_abs, probs = c(0.025, 0.975)), 3) # approx +/- 0.11
 round(quantile((S + S_a_hpt_me_abs), probs = c(0.025, 0.975)), 3) # +/- nmol N2O
 ```
 
-#### Map source-sink status
-
+#### Source-sink status
 ```{r map_mims_air_hpt, message=F}
 # two standard deviations = 0.3019449
 # 95% CI is therefore x+/-0.3019449
@@ -1508,86 +1919,12 @@ dg %>%
   filter(sample.source == "DG", visit.no == 1, sitetype == "PROB") %>%
   {prop.table(table(.$n2o.src.snk.with.all.error))} %>%
   kable(digits = 2, caption = "Proportion of lakes classified as source/sink")
-
-# sf for plotting
-dg.sf <- st_as_sf(dg, coords = c("map.lon.dd", "map.lat.dd"), 
-                  crs = 4269) %>% # standard for lat/lon
-  st_transform(5070) # project to CONUS ALBERS for plotting
 ```
-
-```{r plot_map_mims_air_hpt, echo=FALSE, fig.align='center', fig.width=8, fig.asp=0.6}
-## load ecoregions----
-# read in ecoregion polygons
-ecoR <- st_read(dsn = paste0(localPath, 
-                             "/Environmental Protection Agency (EPA)/",
-                             "ORD NLA17 Dissolved Gas - Documents/inputData"),
-                layer = "aggr_ecoregions_simple",
-                quiet = TRUE)
-
-# Check CRS
-#st_crs(ecoR) # 3857
-ecoR <- st_transform(ecoR, 5070) # convert to CONUS Albers
-#st_crs(ecoR) # 5070
-
-# SET UP CUSTOM COLORS FOR ECOREGIONS
-# Custom color pallette for ecoregion polygons. Attempted to mirror
-# https://www.epa.gov/national-aquatic-resource-surveys/
-# ecoregional-results-national-lakes-assessment-2012
-cols <- c("Coastal Plains" = "orange1",
-          "Northern Appalachians" = "lightpink1",
-          "Northern Plains" = "darksalmon",
-          "Southern Appalachians" = "mediumturquoise",
-          "Southern Plains" = "khaki4",
-          "Temperate Plains" = "forestgreen", 
-          "Upper Midwest" = "deepskyblue4",
-          "Western Mountains" = "saddlebrown",
-          "Xeric" = "lightskyblue4")
-
-
-## Load state boundaries----
-states <- USAboundaries::us_states() %>%
-  dplyr::filter(!state_name %in% c("Alaska", "District of Columbia", "Hawaii", "Puerto Rico")) %>%
-  st_transform(5070) # convert to CONUS Albers
- 
-# To enable spatial analysis of the data, the dataframe will be converted to a 
-# 'simple features' (sf) object.
-# Define coordinates
-coords <- data.frame(longitude = dg$map.lon.dd, latitude = dg$map.lat.dd)
-
-dg.sf <- st_as_sf(dg, coords = c("map.lon.dd", "map.lat.dd"), 
-                  crs = 4269) %>% # standard for lat/lon
-  st_transform(5070) # project to CONUS ALBERS for plotting
-
-
-## Map
-ggplot() +
-    geom_sf(data = ecoR, color = NA, aes(fill = WSA9_NAME), alpha = 0.5) +
-    geom_sf(data = dg.sf %>% 
-              filter(!is.na(n2o.src.snk), sitetype == "PROB", visit.no == 1) %>%
-              arrange(desc(n2o.src.snk.with.all.error)), # grey on top of black
-            aes(size = dissolved.n2o.nmol, color = n2o.src.snk.with.all.error),
-            shape = 1,
-            show.legend = "point") +
-    geom_sf(data = states, fill = NA, color = "cornsilk3", size = 0.1) +
-    # guide argument below removes points from the boxes in the ecoregion legend
-    # https://aosmith.rbind.io/2020/07/09/ggplot2-override-aes/
-    scale_fill_manual("Ecoregion", 
-                      values = cols,
-                      guide = guide_legend(override.aes = list(shape = NA))) +
-    scale_color_manual(values = c("#ca0020", "#0571b0", "#000000"), name = "source/sink") +
-    scale_size(name = expression(N[2]*O~(nM)),
-               range = c(0.5, 8), # custom size range
-               breaks = c(1, 10, 25, 50, 100)) + # custom breaks
-    theme(legend.key.size = unit(0.4, "cm"), # size of boxes in legend
-          legend.title = element_text(size = 8))
-```
-
 
 ### Pure gas, high precision thermometer
 Simulate uncertainty in the saturation ratio due to measurement error associated
 with the standard GC, a pure gas (helium) as the headspace gas, and using a high 
 precision thermometer (e.g., MIMS).
-
 ```{r simulate_me_ratio_all_pg_hpt, message=F}
 S_pg_hpt_me <- rep(NA, nsim)
 
@@ -1621,7 +1958,7 @@ ggplot(S_pg_hpt_df, aes(x = S_pg_hpt_me_abs, y = after_stat(density))) +
   theme(axis.text.y = element_blank(),
         axis.ticks.y = element_blank(),
         axis.title.y = element_blank()) + 
-  ggtitle( "Absolute error in saturation \nratio estimate (observed - true) \n") +
+  ggtitle( "Absolute error in saturation \nratio estimate (measured - true) \n") +
   xlab( "Error (nMol)"),
 nrow = 1
 )
@@ -1650,8 +1987,7 @@ round(quantile(S_pg_hpt_me_abs, probs = c(0.025, 0.975)), 3) # approx +/- 0.11
 round(quantile((S_pg + S_pg_hpt_me_abs), probs = c(0.025, 0.975)), 3) # +/- nmol N2O
 ```
 
-#### Map source-sink status
-
+#### Source-sink status
 ```{r map_sat_ratio_pg_hpt, message=F}
 # two standard deviations = 0.3019449
 # 95% CI is therefore x+/-0.3019449
@@ -1674,82 +2010,9 @@ dg %>%
   filter(sample.source == "DG", visit.no == 1, sitetype == "PROB") %>%
   {prop.table(table(.$n2o.src.snk.with.all.error))} %>%
   kable(digits = 2, caption = "Proportion of lakes classified as source/sink")
-
-# sf for plotting
-dg.sf <- st_as_sf(dg, coords = c("map.lon.dd", "map.lat.dd"), 
-                  crs = 4269) %>% # standard for lat/lon
-  st_transform(5070) # project to CONUS ALBERS for plotting
-```
-
-```{r plot_map_sat_ratio_pg_hpt, echo=FALSE, fig.align='center', fig.width=8, fig.asp=0.6}
-## load ecoregions----
-# read in ecoregion polygons
-ecoR <- st_read(dsn = paste0(localPath, 
-                             "/Environmental Protection Agency (EPA)/",
-                             "ORD NLA17 Dissolved Gas - Documents/inputData"),
-                layer = "aggr_ecoregions_simple",
-                quiet = TRUE)
-
-# Check CRS
-#st_crs(ecoR) # 3857
-ecoR <- st_transform(ecoR, 5070) # convert to CONUS Albers
-#st_crs(ecoR) # 5070
-
-# SET UP CUSTOM COLORS FOR ECOREGIONS
-# Custom color pallette for ecoregion polygons. Attempted to mirror
-# https://www.epa.gov/national-aquatic-resource-surveys/
-# ecoregional-results-national-lakes-assessment-2012
-cols <- c("Coastal Plains" = "orange1",
-          "Northern Appalachians" = "lightpink1",
-          "Northern Plains" = "darksalmon",
-          "Southern Appalachians" = "mediumturquoise",
-          "Southern Plains" = "khaki4",
-          "Temperate Plains" = "forestgreen", 
-          "Upper Midwest" = "deepskyblue4",
-          "Western Mountains" = "saddlebrown",
-          "Xeric" = "lightskyblue4")
-
-
-## Load state boundaries----
-states <- USAboundaries::us_states() %>%
-  dplyr::filter(!state_name %in% c("Alaska", "District of Columbia", "Hawaii", "Puerto Rico")) %>%
-  st_transform(5070) # convert to CONUS Albers
- 
-# To enable spatial analysis of the data, the dataframe will be converted to a 
-# 'simple features' (sf) object.
-# Define coordinates
-coords <- data.frame(longitude = dg$map.lon.dd, latitude = dg$map.lat.dd)
-
-dg.sf <- st_as_sf(dg, coords = c("map.lon.dd", "map.lat.dd"), 
-                  crs = 4269) %>% # standard for lat/lon
-  st_transform(5070) # project to CONUS ALBERS for plotting
-
-
-## Map
-ggplot() +
-    geom_sf(data = ecoR, color = NA, aes(fill = WSA9_NAME), alpha = 0.5) +
-    geom_sf(data = dg.sf %>% 
-              filter(!is.na(n2o.src.snk), sitetype == "PROB", visit.no == 1) %>%
-              arrange(desc(n2o.src.snk.with.all.error)), # grey on top of black
-            aes(size = dissolved.n2o.nmol, color = n2o.src.snk.with.all.error),
-            shape = 1,
-            show.legend = "point") +
-    geom_sf(data = states, fill = NA, color = "cornsilk3", size = 0.1) +
-    # guide argument below removes points from the boxes in the ecoregion legend
-    # https://aosmith.rbind.io/2020/07/09/ggplot2-override-aes/
-    scale_fill_manual("Ecoregion", 
-                      values = cols,
-                      guide = guide_legend(override.aes = list(shape = NA))) +
-    scale_color_manual(values = c("#ca0020", "#0571b0", "#000000"), name = "source/sink") +
-    scale_size(name = expression(N[2]*O~(nM)),
-               range = c(0.5, 8), # custom size range
-               breaks = c(1, 10, 25, 50, 100)) + # custom breaks
-    theme(legend.key.size = unit(0.4, "cm"), # size of boxes in legend
-          legend.title = element_text(size = 8))
 ```
 
 ## High precision GC
-
 The GC used in the current study is optimized to quantify several
 analytes across a broad range of concentrations but greater precision
 can be achieved by optimizing the instrument for a single analyte across
@@ -1761,7 +2024,8 @@ atmsopheric monitoring reported a mean standard deviation of
 study (`r n2o_sd_epa`). Utilizing more precise N2O measurements for the
 equilibrated headspace and/or air will reduce uncertainty in the
 estimated dissolved N2O concentration, dissolved N2O equilibrium value,
-and N2O saturation ratio.
+and N2O saturation ratio. Again, the simulations below assume the mixing 
+ratio used in the empirical field observations, where $R_M =$ `r R_M`.
 
 ### Pure gas, standard thermometer
 ```{r simulate_me_ratio_gc_pure_gas_all, message=F}
@@ -1774,13 +2038,15 @@ M_h_pg_hpgc <- 0.2
 n2o_sd_lit <- mean(c(.00033, .00034, .00031, 0.00030, 0.0016, 0.0015)) # from literature
 
 # simulate improved measurement of N2O in equilibrated headspace gas 
-# assume TRUE value is C_e and error is simulated with with sd from literature
+# assume TRUE value is M_h_pg_hpgc and error is simulated with with sd from literature
 M_h_pg_hpgc_me <- rnorm(nsim, M_h_pg_hpgc, n2o_sd_lit) 
 
-# under this scenario we don't need to subtract C_a_n2o (N2O concentration in air) from C_e (N2O concentration in equilibrated headspace)
+# Set true value
+# under this scenario we don't need to subtract M_a_n2o (N2O concentration in air) from M)h (N2O concentration in equilibrated headspace)
 S_pg_hpgc <- (1e-6 * B * (V_g * (M_h_pg_hpgc - 0) / (8.3144598 * (T_c + 273.15) * V_w) + H_n2o * exp(2700 * (1 / (T_c + 273.15) - 1 / 298.15) ) * M_h_pg_hpgc)) /
   (M_a_n2o * B * 1e-6 * (H_n2o  * exp(2700*(1/(T_c + 273.15) - 1/298.15))))
 
+# Container for simulations
 S_pg_hpgc_me <- rep(NA, 1e4)
 
 for(i in 1:nsim){
@@ -1813,7 +2079,7 @@ ggplot(S_pg_hpgc_df, aes(x = S_pg_hpgc_me_abs, y = after_stat(density))) +
   theme(axis.text.y = element_blank(),
         axis.ticks.y = element_blank(),
         axis.title.y = element_blank()) + 
-  ggtitle( "Absolute error in saturation \nratio estimate (observed - true) \n") +
+  ggtitle( "Absolute error in saturation \nratio estimate (measured - true) \n") +
   xlab( "Error (nMol)"),
 nrow = 1
 )
@@ -1842,8 +2108,7 @@ round(quantile(S_pg_hpgc_me_abs, probs = c(0.025, 0.975)), 3) # approx +/- 0.11
 round(quantile((S_pg_hpgc + S_pg_hpgc_me_abs), probs = c(0.025, 0.975)), 3) # +/- nmol N2O
 ```
 
-#### Map source-sink status
-
+#### Source-sink status
 ```{r map_sat_ratio_gc_pure_gas, message=F}
 # two standard deviations = 0.3019449
 # 95% CI is therefore x+/-0.3019449
@@ -1866,82 +2131,9 @@ dg %>%
   filter(sample.source == "DG", visit.no == 1, sitetype == "PROB") %>%
   {prop.table(table(.$n2o.src.snk.with.all.error))} %>%
   kable(digits = 2, caption = "Proportion of lakes classified as source/sink")
-
-# sf for plotting
-dg.sf <- st_as_sf(dg, coords = c("map.lon.dd", "map.lat.dd"), 
-                  crs = 4269) %>% # standard for lat/lon
-  st_transform(5070) # project to CONUS ALBERS for plotting
-```
-
-```{r plot_map_sat_ratiogc_pure_gas, echo=FALSE, fig.align='center', fig.width=8, fig.asp=0.6}
-## load ecoregions----
-# read in ecoregion polygons
-ecoR <- st_read(dsn = paste0(localPath, 
-                             "/Environmental Protection Agency (EPA)/",
-                             "ORD NLA17 Dissolved Gas - Documents/inputData"),
-                layer = "aggr_ecoregions_simple",
-                quiet = TRUE)
-
-# Check CRS
-#st_crs(ecoR) # 3857
-ecoR <- st_transform(ecoR, 5070) # convert to CONUS Albers
-#st_crs(ecoR) # 5070
-
-# SET UP CUSTOM COLORS FOR ECOREGIONS
-# Custom color pallette for ecoregion polygons. Attempted to mirror
-# https://www.epa.gov/national-aquatic-resource-surveys/
-# ecoregional-results-national-lakes-assessment-2012
-cols <- c("Coastal Plains" = "orange1",
-          "Northern Appalachians" = "lightpink1",
-          "Northern Plains" = "darksalmon",
-          "Southern Appalachians" = "mediumturquoise",
-          "Southern Plains" = "khaki4",
-          "Temperate Plains" = "forestgreen", 
-          "Upper Midwest" = "deepskyblue4",
-          "Western Mountains" = "saddlebrown",
-          "Xeric" = "lightskyblue4")
-
-
-## Load state boundaries----
-states <- USAboundaries::us_states() %>%
-  dplyr::filter(!state_name %in% c("Alaska", "District of Columbia", "Hawaii", "Puerto Rico")) %>%
-  st_transform(5070) # convert to CONUS Albers
- 
-# To enable spatial analysis of the data, the dataframe will be converted to a 
-# 'simple features' (sf) object.
-# Define coordinates
-coords <- data.frame(longitude = dg$map.lon.dd, latitude = dg$map.lat.dd)
-
-dg.sf <- st_as_sf(dg, coords = c("map.lon.dd", "map.lat.dd"), 
-                  crs = 4269) %>% # standard for lat/lon
-  st_transform(5070) # project to CONUS ALBERS for plotting
-
-
-## Map
-ggplot() +
-    geom_sf(data = ecoR, color = NA, aes(fill = WSA9_NAME), alpha = 0.5) +
-    geom_sf(data = dg.sf %>% 
-              filter(!is.na(n2o.src.snk), sitetype == "PROB", visit.no == 1) %>%
-              arrange(desc(n2o.src.snk.with.all.error)), # grey on top of black
-            aes(size = dissolved.n2o.nmol, color = n2o.src.snk.with.all.error),
-            shape = 1,
-            show.legend = "point") +
-    geom_sf(data = states, fill = NA, color = "cornsilk3", size = 0.1) +
-    # guide argument below removes points from the boxes in the ecoregion legend
-    # https://aosmith.rbind.io/2020/07/09/ggplot2-override-aes/
-    scale_fill_manual("Ecoregion", 
-                      values = cols,
-                      guide = guide_legend(override.aes = list(shape = NA))) +
-    scale_color_manual(values = c("#ca0020", "#0571b0", "#000000"), name = "source/sink") +
-    scale_size(name = expression(N[2]*O~(nM)),
-               range = c(0.5, 8), # custom size range
-               breaks = c(1, 10, 25, 50, 100)) + # custom breaks
-    theme(legend.key.size = unit(0.4, "cm"), # size of boxes in legend
-          legend.title = element_text(size = 8))
 ```
 
 ### Pure gas, high precision thermometer
-
 ```{r simulate_me_ratio_hpgc_pg_hpt_all, message=F}
 # set M_h to a lower value to generate a saturation ratio close to that used above
 # M_h will be lower due to dilution with pure headspace gas (e.g. helium, nitrogen)
@@ -1988,7 +2180,7 @@ ggplot(S_pg_hpgc_hpt_df, aes(x = S_pg_hpgc_me_abs, y = after_stat(density))) +
   theme(axis.text.y = element_blank(),
         axis.ticks.y = element_blank(),
         axis.title.y = element_blank()) + 
-  ggtitle( "Absolute error in saturation \nratio estimate (observed - true) \n") +
+  ggtitle( "Absolute error in saturation \nratio estimate (measured - true) \n") +
   xlab( "Error (nMol)"),
 nrow = 1
 )
@@ -2017,8 +2209,7 @@ round(quantile(S_pg_hpgc_hpt_me_abs, probs = c(0.025, 0.975)), 3) # approx +/- 0
 round(quantile((S_pg_hpgc + S_pg_hpgc_hpt_me_abs), probs = c(0.025, 0.975)), 3) # +/- nmol N2O
 ```
 
-#### Map source-sink status
-
+#### Source-sink status
 ```{r map_ratio_hpgc_pg_hpt, message=F}
 # two standard deviations = 0.3019449
 # 95% CI is therefore x+/-0.3019449
@@ -2041,82 +2232,9 @@ dg %>%
   filter(sample.source == "DG", visit.no == 1, sitetype == "PROB") %>%
   {prop.table(table(.$n2o.src.snk.with.all.error))} %>%
   kable(digits = 2, caption = "Proportion of lakes classified as source/sink")
-
-# sf for plotting
-dg.sf <- st_as_sf(dg, coords = c("map.lon.dd", "map.lat.dd"), 
-                  crs = 4269) %>% # standard for lat/lon
-  st_transform(5070) # project to CONUS ALBERS for plotting
-```
-
-```{r plot_map_ratio_hpgc_pg_hpt, echo=FALSE, fig.align='center', fig.width=8, fig.asp=0.6}
-## load ecoregions----
-# read in ecoregion polygons
-ecoR <- st_read(dsn = paste0(localPath, 
-                             "/Environmental Protection Agency (EPA)/",
-                             "ORD NLA17 Dissolved Gas - Documents/inputData"),
-                layer = "aggr_ecoregions_simple",
-                quiet = TRUE)
-
-# Check CRS
-#st_crs(ecoR) # 3857
-ecoR <- st_transform(ecoR, 5070) # convert to CONUS Albers
-#st_crs(ecoR) # 5070
-
-# SET UP CUSTOM COLORS FOR ECOREGIONS
-# Custom color pallette for ecoregion polygons. Attempted to mirror
-# https://www.epa.gov/national-aquatic-resource-surveys/
-# ecoregional-results-national-lakes-assessment-2012
-cols <- c("Coastal Plains" = "orange1",
-          "Northern Appalachians" = "lightpink1",
-          "Northern Plains" = "darksalmon",
-          "Southern Appalachians" = "mediumturquoise",
-          "Southern Plains" = "khaki4",
-          "Temperate Plains" = "forestgreen", 
-          "Upper Midwest" = "deepskyblue4",
-          "Western Mountains" = "saddlebrown",
-          "Xeric" = "lightskyblue4")
-
-
-## Load state boundaries----
-states <- USAboundaries::us_states() %>%
-  dplyr::filter(!state_name %in% c("Alaska", "District of Columbia", "Hawaii", "Puerto Rico")) %>%
-  st_transform(5070) # convert to CONUS Albers
- 
-# To enable spatial analysis of the data, the dataframe will be converted to a 
-# 'simple features' (sf) object.
-# Define coordinates
-coords <- data.frame(longitude = dg$map.lon.dd, latitude = dg$map.lat.dd)
-
-dg.sf <- st_as_sf(dg, coords = c("map.lon.dd", "map.lat.dd"), 
-                  crs = 4269) %>% # standard for lat/lon
-  st_transform(5070) # project to CONUS ALBERS for plotting
-
-
-## Map
-ggplot() +
-    geom_sf(data = ecoR, color = NA, aes(fill = WSA9_NAME), alpha = 0.5) +
-    geom_sf(data = dg.sf %>% 
-              filter(!is.na(n2o.src.snk), sitetype == "PROB", visit.no == 1) %>%
-              arrange(desc(n2o.src.snk.with.all.error)), # grey on top of black
-            aes(size = dissolved.n2o.nmol, color = n2o.src.snk.with.all.error),
-            shape = 1,
-            show.legend = "point") +
-    geom_sf(data = states, fill = NA, color = "cornsilk3", size = 0.1) +
-    # guide argument below removes points from the boxes in the ecoregion legend
-    # https://aosmith.rbind.io/2020/07/09/ggplot2-override-aes/
-    scale_fill_manual("Ecoregion", 
-                      values = cols,
-                      guide = guide_legend(override.aes = list(shape = NA))) +
-    scale_color_manual(values = c("#ca0020", "#0571b0", "#000000"), name = "source/sink") +
-    scale_size(name = expression(N[2]*O~(nM)),
-               range = c(0.5, 8), # custom size range
-               breaks = c(1, 10, 25, 50, 100)) + # custom breaks
-    theme(legend.key.size = unit(0.4, "cm"), # size of boxes in legend
-          legend.title = element_text(size = 8))
 ```
 
 # MIMS
-
 In Membrane Inlet Mass Spectrometry (MIMS), dissolved gases (typically
 N2, Ar, O2, N2O) are extracted from a water sample as it passes through
 a semi-permeable membrane. The abundance of the extracted gases are then
@@ -2238,9 +2356,7 @@ temperature of the water used as the analytical standard (simulated below).
 Measurement error in $B$ was quantified above.
 
 ## Dissolved concentration
-
 ### Standard GC
-
 ```{r simulate_me_hpt_MIMS, message=F}
 #n2o_ar_standard_signal <- 0.27 # Speir et al. 0.27 pers comm. Genther et al. section 3.4 reports 0.192
 #n2o_ar_sample_signal <- 0.23 # just a guess
@@ -2275,7 +2391,7 @@ T_c_mims_me <- rnorm(nsim, T_c, 0.005) # thermo stated bath precision is +/-0.01
 C_mims <- ((R_X_theta / R_X_s) * # N2O:Ar ratios for sample and standard
   ((1e-6 * B * M_a_n2o * (H_n2o * exp( 2700 * (1 / (T_c + 273.15) - 1 / 298.15)))) / #N2O concentration in standard
   (1e-6 * B * C_Ar_a * (H_ar * exp( 1500 * (1 / (T_c + 273.15) - 1 / 298.15))))) * #Ar concentration in standard
-  (1e-6 * B * C_Ar_a*(H_ar  * exp(1500 *(1/(T_c + 273.15) - 1/298.15))))) 
+  (1e-6 * B * C_Ar_a * (H_ar  * exp(1500 *(1/(T_c + 273.15) - 1/298.15))))) 
 
 C_mims <- C_mims * 1e9 #convert mol to nmol
 
@@ -2286,7 +2402,7 @@ for(i in 1:nsim){
 C_mims_hpt_me[i] <- (R_X_theta_me[i] / R_X_s_me[i]) * # N2O:Ar ratios for sample and standard
   ((1e-6 * B_me[i] * M_a_n2o_me[i] * (H_n2o * exp(2700 * (1 / (T_c_mims_me[i] + 273.15) - 1 / 298.15)))) / #N2O concentration in standard
   (1e-6 * B_me[i] * C_Ar_a * (H_ar * exp(1500 * (1 / (T_c_mims_me[i] + 273.15) - 1 / 298.15))))) * #Ar concentration in standard
-  (1e-6 * B_me[i] * C_Ar_a * (H_ar  * exp(1500 * (1 / (T_c_mims_me[i] + 273.15) - 1 / 298.15)))) 
+  (1e-6 * B_me[i] * C_Ar_a * (H_ar * exp(1500 * (1 / (T_c_mims_me[i] + 273.15) - 1 / 298.15)))) 
 }
 
 
@@ -2314,7 +2430,7 @@ ggplot(C_mims_hpt_df, aes(x = C_mims_hpt_me_abs, y = after_stat(density))) +
   theme(axis.text.y = element_blank(),
         axis.ticks.y = element_blank(),
         axis.title.y = element_blank()) + 
-  ggtitle( "Absolute error in dissolved \nN2O estimate (observed - true) \n") +
+  ggtitle( "Absolute error in dissolved \nN2O estimate (measured - true) \n") +
   xlab( "Error (nMol)"),
 nrow = 1
 )
@@ -2345,7 +2461,6 @@ round(quantile((C_mims + C_mims_hpt_me_abs), probs = c(0.025, 0.975)), 3) # +/- 
 ```
 
 ### High precision GC
-
 ```{r hpgc_M_a_MIMS}
 # simulate improved measurement precision of GC measurement of N2O in air
 M_a_n2o_lit_me <- rnorm(nsim, M_a_n2o, n2o_sd_lit) # from intn'l labs = 0.00073 vs epa sd = 0.00787
@@ -2387,7 +2502,7 @@ ggplot(C_mims_hpgc_hpt_df, aes(x = C_mims_hpgc_hpt_me_abs, y = after_stat(densit
   theme(axis.text.y = element_blank(),
         axis.ticks.y = element_blank(),
         axis.title.y = element_blank()) + 
-  ggtitle( "Absolute error in dissolved \nN2O estimate (observed - true) \n") +
+  ggtitle( "Absolute error in dissolved \nN2O estimate (measured - true) \n") +
   xlab( "Error (nMol)"),
 nrow = 1
 )
@@ -2417,7 +2532,6 @@ round(quantile((C_mims + C_mims_hpgc_hpt_me_abs), probs = c(0.025, 0.975)), 3) #
 ```
 
 ## Saturation ratio
-
 Calculate the "true" ratio via MIMS
 ```{r true_ratio_MIMS, message=F}
 # True ratio
@@ -2429,7 +2543,6 @@ S_mims <- ((R_X_theta / R_X_s) * # N2O:Ar ratios for sample and standard
 ```
 
 ### Standard GC 
-
 #### Standard field temperature
 This simulation is for field measurment of temperature for the equilibrium concentration with the standard glass thermometer.
 ```{r simulate_me_ratio_MIMS, message=F}
@@ -2469,7 +2582,7 @@ ggplot(S_mims_df, aes(x = S_mims_me_abs, y = after_stat(density))) +
   theme(axis.text.y = element_blank(),
         axis.ticks.y = element_blank(),
         axis.title.y = element_blank()) + 
-  ggtitle( "Absolute error in saturation \nratio estimate (observed - true) \n") +
+  ggtitle( "Absolute error in saturation \nratio estimate (measured - true) \n") +
   xlab( "Error (nMol)"),
 nrow = 1
 )
@@ -2501,8 +2614,7 @@ round(quantile(S_mims_me_abs, probs = c(0.025, 0.975)), 3) # approx +/- 0.11
 round(quantile((S_mims + S_mims_me_abs), probs = c(0.025, 0.975)), 3) # +/- nmol N2O 
 ```
 
-##### Map source-sink status
-
+##### Source-sink status
 ```{r map_me_ratio_MIMS, message=F}
 # two standard deviations = 0.3019449
 # 95% CI is therefore x+/-0.3019449
@@ -2525,82 +2637,9 @@ dg %>%
   filter(sample.source == "DG", visit.no == 1, sitetype == "PROB") %>%
   {prop.table(table(.$n2o.src.snk.with.all.error))} %>%
   kable(digits = 2, caption = "Proportion of lakes classified as source/sink")
-
-# sf for plotting
-dg.sf <- st_as_sf(dg, coords = c("map.lon.dd", "map.lat.dd"), 
-                  crs = 4269) %>% # standard for lat/lon
-  st_transform(5070) # project to CONUS ALBERS for plotting
-```
-
-```{r plot_map_me_ratio_MIMS, echo=FALSE, fig.align='center', fig.width=8, fig.asp=0.6}
-## load ecoregions----
-# read in ecoregion polygons
-ecoR <- st_read(dsn = paste0(localPath, 
-                             "/Environmental Protection Agency (EPA)/",
-                             "ORD NLA17 Dissolved Gas - Documents/inputData"),
-                layer = "aggr_ecoregions_simple",
-                quiet = TRUE)
-
-# Check CRS
-#st_crs(ecoR) # 3857
-ecoR <- st_transform(ecoR, 5070) # convert to CONUS Albers
-#st_crs(ecoR) # 5070
-
-# SET UP CUSTOM COLORS FOR ECOREGIONS
-# Custom color pallette for ecoregion polygons. Attempted to mirror
-# https://www.epa.gov/national-aquatic-resource-surveys/
-# ecoregional-results-national-lakes-assessment-2012
-cols <- c("Coastal Plains" = "orange1",
-          "Northern Appalachians" = "lightpink1",
-          "Northern Plains" = "darksalmon",
-          "Southern Appalachians" = "mediumturquoise",
-          "Southern Plains" = "khaki4",
-          "Temperate Plains" = "forestgreen", 
-          "Upper Midwest" = "deepskyblue4",
-          "Western Mountains" = "saddlebrown",
-          "Xeric" = "lightskyblue4")
-
-
-## Load state boundaries----
-states <- USAboundaries::us_states() %>%
-  dplyr::filter(!state_name %in% c("Alaska", "District of Columbia", "Hawaii", "Puerto Rico")) %>%
-  st_transform(5070) # convert to CONUS Albers
- 
-# To enable spatial analysis of the data, the dataframe will be converted to a 
-# 'simple features' (sf) object.
-# Define coordinates
-coords <- data.frame(longitude = dg$map.lon.dd, latitude = dg$map.lat.dd)
-
-dg.sf <- st_as_sf(dg, coords = c("map.lon.dd", "map.lat.dd"), 
-                  crs = 4269) %>% # standard for lat/lon
-  st_transform(5070) # project to CONUS ALBERS for plotting
-
-
-## Map
-ggplot() +
-    geom_sf(data = ecoR, color = NA, aes(fill = WSA9_NAME), alpha = 0.5) +
-    geom_sf(data = dg.sf %>% 
-              filter(!is.na(n2o.src.snk), sitetype == "PROB", visit.no == 1) %>%
-              arrange(desc(n2o.src.snk.with.all.error)), # grey on top of black
-            aes(size = dissolved.n2o.nmol, color = n2o.src.snk.with.all.error),
-            shape = 1,
-            show.legend = "point") +
-    geom_sf(data = states, fill = NA, color = "cornsilk3", size = 0.1) +
-    # guide argument below removes points from the boxes in the ecoregion legend
-    # https://aosmith.rbind.io/2020/07/09/ggplot2-override-aes/
-    scale_fill_manual("Ecoregion", 
-                      values = cols,
-                      guide = guide_legend(override.aes = list(shape = NA))) +
-    scale_color_manual(values = c("#ca0020", "#0571b0", "#000000"), name = "source/sink") +
-    scale_size(name = expression(N[2]*O~(nM)),
-               range = c(0.5, 8), # custom size range
-               breaks = c(1, 10, 25, 50, 100)) + # custom breaks
-    theme(legend.key.size = unit(0.4, "cm"), # size of boxes in legend
-          legend.title = element_text(size = 8))
 ```
 
 #### High precision temperature
-
 ```{r simulate_me_ratio_hpt_MIMS, message=F}
 # ratio simulated with measurement error in mims
 S_mims_hpt_me <- rep(NA, nsim)
@@ -2638,7 +2677,7 @@ ggplot(S_mims_hpt_df, aes(x = S_mims_hpt_me_abs, y = after_stat(density))) +
   theme(axis.text.y = element_blank(),
         axis.ticks.y = element_blank(),
         axis.title.y = element_blank()) + 
-  ggtitle( "Absolute error in saturation \nratio estimate (observed - true) \n") +
+  ggtitle( "Absolute error in saturation \nratio estimate (measured - true) \n") +
   xlab( "Error (nMol)"),
 nrow = 1
 )
@@ -2670,8 +2709,7 @@ round(quantile(S_mims_hpt_me_abs, probs = c(0.025, 0.975)), 3) # approx +/- 0.11
 round(quantile((S_mims + S_mims_hpt_me_abs), probs = c(0.025, 0.975)), 3) # +/- nmol N2O 
 ```
 
-##### Map source-sink status
-
+##### Source-sink status
 ```{r map_me_ratio_hpt_MIMS, message=F}
 # two standard deviations = 0.3019449
 # 95% CI is therefore x+/-0.3019449
@@ -2694,85 +2732,10 @@ dg %>%
   filter(sample.source == "DG", visit.no == 1, sitetype == "PROB") %>%
   {prop.table(table(.$n2o.src.snk.with.all.error))} %>%
   kable(digits = 2, caption = "Proportion of lakes classified as source/sink")
-
-# sf for plotting
-dg.sf <- st_as_sf(dg, coords = c("map.lon.dd", "map.lat.dd"), 
-                  crs = 4269) %>% # standard for lat/lon
-  st_transform(5070) # project to CONUS ALBERS for plotting
 ```
-
-```{r plot_map_me_ratio_hpt_MIMS, echo=FALSE, fig.align='center', fig.width=8, fig.asp=0.6}
-## load ecoregions----
-# read in ecoregion polygons
-ecoR <- st_read(dsn = paste0(localPath, 
-                             "/Environmental Protection Agency (EPA)/",
-                             "ORD NLA17 Dissolved Gas - Documents/inputData"),
-                layer = "aggr_ecoregions_simple",
-                quiet = TRUE)
-
-# Check CRS
-#st_crs(ecoR) # 3857
-ecoR <- st_transform(ecoR, 5070) # convert to CONUS Albers
-#st_crs(ecoR) # 5070
-
-# SET UP CUSTOM COLORS FOR ECOREGIONS
-# Custom color pallette for ecoregion polygons. Attempted to mirror
-# https://www.epa.gov/national-aquatic-resource-surveys/
-# ecoregional-results-national-lakes-assessment-2012
-cols <- c("Coastal Plains" = "orange1",
-          "Northern Appalachians" = "lightpink1",
-          "Northern Plains" = "darksalmon",
-          "Southern Appalachians" = "mediumturquoise",
-          "Southern Plains" = "khaki4",
-          "Temperate Plains" = "forestgreen", 
-          "Upper Midwest" = "deepskyblue4",
-          "Western Mountains" = "saddlebrown",
-          "Xeric" = "lightskyblue4")
-
-
-## Load state boundaries----
-states <- USAboundaries::us_states() %>%
-  dplyr::filter(!state_name %in% c("Alaska", "District of Columbia", "Hawaii", "Puerto Rico")) %>%
-  st_transform(5070) # convert to CONUS Albers
- 
-# To enable spatial analysis of the data, the dataframe will be converted to a 
-# 'simple features' (sf) object.
-# Define coordinates
-coords <- data.frame(longitude = dg$map.lon.dd, latitude = dg$map.lat.dd)
-
-dg.sf <- st_as_sf(dg, coords = c("map.lon.dd", "map.lat.dd"), 
-                  crs = 4269) %>% # standard for lat/lon
-  st_transform(5070) # project to CONUS ALBERS for plotting
-
-
-## Map
-ggplot() +
-    geom_sf(data = ecoR, color = NA, aes(fill = WSA9_NAME), alpha = 0.5) +
-    geom_sf(data = dg.sf %>% 
-              filter(!is.na(n2o.src.snk), sitetype == "PROB", visit.no == 1) %>%
-              arrange(desc(n2o.src.snk.with.all.error)), # grey on top of black
-            aes(size = dissolved.n2o.nmol, color = n2o.src.snk.with.all.error),
-            shape = 1,
-            show.legend = "point") +
-    geom_sf(data = states, fill = NA, color = "cornsilk3", size = 0.1) +
-    # guide argument below removes points from the boxes in the ecoregion legend
-    # https://aosmith.rbind.io/2020/07/09/ggplot2-override-aes/
-    scale_fill_manual("Ecoregion", 
-                      values = cols,
-                      guide = guide_legend(override.aes = list(shape = NA))) +
-    scale_color_manual(values = c("#ca0020", "#0571b0", "#000000"), name = "source/sink") +
-    scale_size(name = expression(N[2]*O~(nM)),
-               range = c(0.5, 8), # custom size range
-               breaks = c(1, 10, 25, 50, 100)) + # custom breaks
-    theme(legend.key.size = unit(0.4, "cm"), # size of boxes in legend
-          legend.title = element_text(size = 8))
-```
-
 
 ### High precision GC 
-
 #### Standard temperature
-
 This simulation is for field measurment of temperature for the equilibrium concentration with the standard glass thermometer.
 ```{r simulate_me_ratio_hpgc_MIMS, message=F}
 S_mims_hpgc_me <- rep(NA, nsim)
@@ -2809,7 +2772,7 @@ ggplot(S_mims_hpgc_df, aes(x = S_mims_hpgc_me_abs, y = after_stat(density))) +
   theme(axis.text.y = element_blank(),
         axis.ticks.y = element_blank(),
         axis.title.y = element_blank()) + 
-  ggtitle( "Absolute error in saturation \nratio estimate (observed - true) \n") +
+  ggtitle( "Absolute error in saturation \nratio estimate (measured - true) \n") +
   xlab( "Error (nMol)"),
 nrow = 1
 )
@@ -2828,7 +2791,6 @@ sd(S_mims_hpgc_me) * 1.96 # +/- 0.00216
 sd(S_mims_hpgc_me) / mean(S_mims_hpgc_me) * 100 # 0.07% CV 
 ```
 
-
 ```{r calc_me_ratio_hpgc_MIMS_2}
 # standard deviation of a measurement is:
 round(sd(S_mims_hpgc_me_abs), 3) # 0.20 nmol L-1
@@ -2842,8 +2804,7 @@ round(quantile(S_mims_hpgc_me_abs, probs = c(0.025, 0.975)), 3) # approx +/- 0.1
 round(quantile((S_mims + S_mims_hpgc_me_abs), probs = c(0.025, 0.975)), 3) # +/- nmol N2O
 ```
 
-##### Map source-sink status
-
+##### Source-sink status
 ```{r map_me_ratio_hpgc_MIMS, message=F}
 # two standard deviations = 0.3019449
 # 95% CI is therefore x+/-0.3019449
@@ -2866,82 +2827,9 @@ dg %>%
   filter(sample.source == "DG", visit.no == 1, sitetype == "PROB") %>%
   {prop.table(table(.$n2o.src.snk.with.all.error))} %>%
   kable(digits = 2, caption = "Proportion of lakes classified as source/sink")
-
-# sf for plotting
-dg.sf <- st_as_sf(dg, coords = c("map.lon.dd", "map.lat.dd"), 
-                  crs = 4269) %>% # standard for lat/lon
-  st_transform(5070) # project to CONUS ALBERS for plotting
-```
-
-```{r plot_map_me_ratio_hpgc_MIMS, echo=FALSE, fig.align='center', fig.width=8, fig.asp=0.6}
-## load ecoregions----
-# read in ecoregion polygons
-ecoR <- st_read(dsn = paste0(localPath, 
-                             "/Environmental Protection Agency (EPA)/",
-                             "ORD NLA17 Dissolved Gas - Documents/inputData"),
-                layer = "aggr_ecoregions_simple",
-                quiet = TRUE)
-
-# Check CRS
-#st_crs(ecoR) # 3857
-ecoR <- st_transform(ecoR, 5070) # convert to CONUS Albers
-#st_crs(ecoR) # 5070
-
-# SET UP CUSTOM COLORS FOR ECOREGIONS
-# Custom color pallette for ecoregion polygons. Attempted to mirror
-# https://www.epa.gov/national-aquatic-resource-surveys/
-# ecoregional-results-national-lakes-assessment-2012
-cols <- c("Coastal Plains" = "orange1",
-          "Northern Appalachians" = "lightpink1",
-          "Northern Plains" = "darksalmon",
-          "Southern Appalachians" = "mediumturquoise",
-          "Southern Plains" = "khaki4",
-          "Temperate Plains" = "forestgreen", 
-          "Upper Midwest" = "deepskyblue4",
-          "Western Mountains" = "saddlebrown",
-          "Xeric" = "lightskyblue4")
-
-
-## Load state boundaries----
-states <- USAboundaries::us_states() %>%
-  dplyr::filter(!state_name %in% c("Alaska", "District of Columbia", "Hawaii", "Puerto Rico")) %>%
-  st_transform(5070) # convert to CONUS Albers
- 
-# To enable spatial analysis of the data, the dataframe will be converted to a 
-# 'simple features' (sf) object.
-# Define coordinates
-coords <- data.frame(longitude = dg$map.lon.dd, latitude = dg$map.lat.dd)
-
-dg.sf <- st_as_sf(dg, coords = c("map.lon.dd", "map.lat.dd"), 
-                  crs = 4269) %>% # standard for lat/lon
-  st_transform(5070) # project to CONUS ALBERS for plotting
-
-
-## Map
-ggplot() +
-    geom_sf(data = ecoR, color = NA, aes(fill = WSA9_NAME), alpha = 0.5) +
-    geom_sf(data = dg.sf %>% 
-              filter(!is.na(n2o.src.snk), sitetype == "PROB", visit.no == 1) %>%
-              arrange(desc(n2o.src.snk.with.all.error)), # grey on top of black
-            aes(size = dissolved.n2o.nmol, color = n2o.src.snk.with.all.error),
-            shape = 1,
-            show.legend = "point") +
-    geom_sf(data = states, fill = NA, color = "cornsilk3", size = 0.1) +
-    # guide argument below removes points from the boxes in the ecoregion legend
-    # https://aosmith.rbind.io/2020/07/09/ggplot2-override-aes/
-    scale_fill_manual("Ecoregion", 
-                      values = cols,
-                      guide = guide_legend(override.aes = list(shape = NA))) +
-    scale_color_manual(values = c("#ca0020", "#0571b0", "#000000"), name = "source/sink") +
-    scale_size(name = expression(N[2]*O~(nM)),
-               range = c(0.5, 8), # custom size range
-               breaks = c(1, 10, 25, 50, 100)) + # custom breaks
-    theme(legend.key.size = unit(0.4, "cm"), # size of boxes in legend
-          legend.title = element_text(size = 8))
 ```
 
 #### High precision temperature
-
 The thermometers used to measure water temperature in this study have an
 uncertainty of +/- 0.058C but electronic thermisters are commonly
 available (e.g. YSI sondes) with an uncertainty of +/-0.01 Celsius. More
@@ -2985,7 +2873,7 @@ ggplot(S_mims_hpgc_hpt_df, aes(x = S_mims_hpgc_hpt_me_abs, y = after_stat(densit
   theme(axis.text.y = element_blank(),
         axis.ticks.y = element_blank(),
         axis.title.y = element_blank()) + 
-  ggtitle( "Absolute error in saturation \nratio estimate (observed - true) \n") +
+  ggtitle( "Absolute error in saturation \nratio estimate (measured - true) \n") +
   xlab( "Error (nMol)"),
 nrow = 1
 )
@@ -3014,8 +2902,7 @@ round(quantile(S_mims_hpgc_hpt_me_abs, probs = c(0.025, 0.975)), 3) # approx +/-
 round(quantile((S_mims + S_mims_hpgc_hpt_me_abs), probs = c(0.025, 0.975)), 3) # +/- nmol N2O
 ```
 
-##### Map source-sink status
-
+##### Source-sink status
 ```{r map_me_ratio_hpgc_hpt_MIMS, message=F}
 # two standard deviations = 0.3019449
 # 95% CI is therefore x+/-0.3019449
@@ -3038,87 +2925,13 @@ dg %>%
   filter(sample.source == "DG", visit.no == 1, sitetype == "PROB") %>%
   {prop.table(table(.$n2o.src.snk.with.all.error))} %>%
   kable(digits = 2, caption = "Proportion of lakes classified as source/sink")
-
-# sf for plotting
-dg.sf <- st_as_sf(dg, coords = c("map.lon.dd", "map.lat.dd"), 
-                  crs = 4269) %>% # standard for lat/lon
-  st_transform(5070) # project to CONUS ALBERS for plotting
-```
-
-```{r plot_map_me_ratio_hpgc_hpt_MIMS, echo=FALSE, fig.align='center', fig.width=8, fig.asp=0.6}
-## load ecoregions----
-# read in ecoregion polygons
-ecoR <- st_read(dsn = paste0(localPath, 
-                             "/Environmental Protection Agency (EPA)/",
-                             "ORD NLA17 Dissolved Gas - Documents/inputData"),
-                layer = "aggr_ecoregions_simple",
-                quiet = TRUE)
-
-# Check CRS
-#st_crs(ecoR) # 3857
-ecoR <- st_transform(ecoR, 5070) # convert to CONUS Albers
-#st_crs(ecoR) # 5070
-
-# SET UP CUSTOM COLORS FOR ECOREGIONS
-# Custom color pallette for ecoregion polygons. Attempted to mirror
-# https://www.epa.gov/national-aquatic-resource-surveys/
-# ecoregional-results-national-lakes-assessment-2012
-cols <- c("Coastal Plains" = "orange1",
-          "Northern Appalachians" = "lightpink1",
-          "Northern Plains" = "darksalmon",
-          "Southern Appalachians" = "mediumturquoise",
-          "Southern Plains" = "khaki4",
-          "Temperate Plains" = "forestgreen", 
-          "Upper Midwest" = "deepskyblue4",
-          "Western Mountains" = "saddlebrown",
-          "Xeric" = "lightskyblue4")
-
-
-## Load state boundaries----
-states <- USAboundaries::us_states() %>%
-  dplyr::filter(!state_name %in% c("Alaska", "District of Columbia", "Hawaii", "Puerto Rico")) %>%
-  st_transform(5070) # convert to CONUS Albers
- 
-# To enable spatial analysis of the data, the dataframe will be converted to a 
-# 'simple features' (sf) object.
-# Define coordinates
-coords <- data.frame(longitude = dg$map.lon.dd, latitude = dg$map.lat.dd)
-
-dg.sf <- st_as_sf(dg, coords = c("map.lon.dd", "map.lat.dd"), 
-                  crs = 4269) %>% # standard for lat/lon
-  st_transform(5070) # project to CONUS ALBERS for plotting
-
-
-## Map
-ggplot() +
-    geom_sf(data = ecoR, color = NA, aes(fill = WSA9_NAME), alpha = 0.5) +
-    geom_sf(data = dg.sf %>% 
-              filter(!is.na(n2o.src.snk), sitetype == "PROB", visit.no == 1) %>%
-              arrange(desc(n2o.src.snk.with.all.error)), # grey on top of black
-            aes(size = dissolved.n2o.nmol, color = n2o.src.snk.with.all.error),
-            shape = 1,
-            show.legend = "point") +
-    geom_sf(data = states, fill = NA, color = "cornsilk3", size = 0.1) +
-    # guide argument below removes points from the boxes in the ecoregion legend
-    # https://aosmith.rbind.io/2020/07/09/ggplot2-override-aes/
-    scale_fill_manual("Ecoregion", 
-                      values = cols,
-                      guide = guide_legend(override.aes = list(shape = NA))) +
-    scale_color_manual(values = c("#ca0020", "#0571b0", "#000000"), name = "source/sink") +
-    scale_size(name = expression(N[2]*O~(nM)),
-               range = c(0.5, 8), # custom size range
-               breaks = c(1, 10, 25, 50, 100)) + # custom breaks
-    theme(legend.key.size = unit(0.4, "cm"), # size of boxes in legend
-          legend.title = element_text(size = 8))
 ```
 
 # Summary of ratio results
-
 Precision of the N2O saturation ratio can be improved using high
 precision GC analytics and N2O-free headspace gas (e.g. helium,
 nitrogen) but the greatest improvement is seen when dissolved N2O is
 directly measured using MIMS.
-
 ```{r final_summary, message=FALSE}
 #results <- tibble(ratio_sd = c(0.055,
 #                               0.048,
@@ -3194,7 +3007,6 @@ Precision of the N2O saturation ratio can be improved using high
 precision GC analytics and N2O-free headspace gas (e.g. helium,
 nitrogen) but the greatest improvement is seen when dissolved N2O is
 directly measured using MIMS.
-
 ```{r final_summary_MIMS, message=FALSE}
 results_MIMS <- tibble(MIMS_me = S_mims_me_abs,
                        MIMS_hpt_me = S_mims_hpt_me_abs,
