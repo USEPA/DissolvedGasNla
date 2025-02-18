@@ -46,15 +46,15 @@ library(tidybayes) # prop flux by size figure
 # DATA---------------
 ## load sample data (dg object)----
 if(localPath == "") { # if DMAP, then
-  load("inputData/dg.2021-02-01.RData")
+  load("inputData/dg.2025-02-14.RData")
 } else { # if not DMAP, then...
   load(paste0(localPath,  # object name dg
               "/Environmental Protection Agency (EPA)/",
               "ORD NLA17 Dissolved Gas - Documents/",
-              "inputData/dg.2021-02-01.RData"))
+              "inputData/dg.2025-02-14.RData"))
 }
 
-save(dg, file = "manuscript/manuscript_files/dg.rda")  # save dg fle to ms folder for faster knitting
+save(dg, file = "manuscript/manuscript_files/dg.rda")  # save dg file to ms folder for faster knitting
 
 # To enable spatial analysis of the data, the dataframe will be converted to a 
 # 'simple features' (sf) object.
@@ -320,21 +320,23 @@ if(!("figure1.png" %in% list.files("manuscript/manuscript_figures"))) {
   ggplot() +
     geom_sf(data = ecoR, color = NA, aes(fill = WSA9_NAME)) +
     geom_sf(data = dg.sf %>% 
-              filter(!is.na(n2o.src.snk), sitetype == "PROB", visit.no == 1) %>%
-              arrange(desc(n2o.src.snk)), # grey on top of black
-            aes(size = dissolved.n2o.nmol, color = n2o.src.snk),
+              filter(!is.na(n2o.src.snk.error), sitetype == "PROB", visit.no == 1) %>%
+              arrange(desc(n2o.src.snk.error)), # grey on top of black
+            aes(size = dissolved.n2o.nmol, color = n2o.src.snk.error),
             show.legend = "point") +
     geom_sf(data = states, fill = NA, color = "cornsilk3", size = 0.1) +
     # guide argument below removes points from the boxes in the ecoregion legend
     # https://aosmith.rbind.io/2020/07/09/ggplot2-override-aes/
     scale_fill_manual("Ecoregion", values = cols,
                       guide = guide_legend(override.aes = list(shape = NA))) +
-    scale_color_manual(values = c("grey", "black"), name = "source/sink") +
+    scale_color_manual(values = c("red4", "black", "grey"), name = "source/sink") +
     scale_size(name = expression(N[2]*O~(nM)),
                range = c(0.1, 10), # custom size range
                breaks = c(1, 10, 25, 50, 100)) + # custom breaks
     theme(legend.key.size = unit(0.4, "cm"), # size of boxes in legend
-          legend.title = element_text(size = 8))
+          legend.title = element_text(size = 8),
+          plot.margin = unit(c(0.3, 0, 0.2, 0), 
+                             "inches"))
   ggsave("manuscript/manuscript_figures/figure1.png", width = 8, height = 4, units = "in")
 }
 
@@ -513,7 +515,7 @@ if(!("n2oFluxAndEmissionRateVsContinuousArea.tiff" %in% list.files("manuscript/m
     geom_point(size = 0.1, color = "red") +
     scale_x_log10(labels=scales::comma) +
     scale_y_continuous(trans = ggallin::pseudolog10_trans) +
-    ylab(expression(atop(Emission~rate, "("*mg~N[2]*O~m^-2~day^-1*")"))) +
+    ylab(expression(atop(Areal~Emission~rate, "("*mg~N[2]*O~m^-2~day^-1*")"))) +
     theme_bw()  +
     theme(panel.grid.major = element_blank(), 
           panel.grid.minor = element_blank(),
@@ -541,7 +543,7 @@ if(!("n2oFluxAndEmissionRateVsContinuousArea.tiff" %in% list.files("manuscript/m
     scale_y_continuous(trans = ggallin::pseudolog10_trans, 
                        breaks =c(-1000, -500, -50, -5, 0, 5, 50, 500, 1000)) +
     #xlab("waterbody size (Ha)") +
-    ylab(expression(atop(Flux,"("*metric~tons~N[2]*O~year^-1*")"))) +
+    ylab(expression(atop(Annual~Flux,"("*metric~tons~N[2]*O~year^-1*")"))) +
     theme_bw()  +
     theme(panel.grid.major = element_blank(), 
           panel.grid.minor = element_blank(),
@@ -636,7 +638,7 @@ if(!("n2oFluxAndEmissionRateVsContinuousArea.tiff" %in% list.files("manuscript/m
   #                   nrow=3, labels = "AUTO")
   
   # ggpubr::ggarrange(b2, b1, b3, ncol = 3, nrow=1, labels = "AUTO")
-  ggpubr::ggarrange(b1, b2, b3, ncol = 1, nrow=3, labels = "AUTO", align = "v") #, hjust = -5, vjust = 2
+  ggpubr::ggarrange(b1, b2, b3, ncol = 1, nrow=3, labels = "AUTO", align = "v", hjust = -7, vjust = 2) #, hjust = -5, vjust = 2
   ggsave("manuscript/manuscript_figures/n2oFluxAndEmissionRateVsContinuousArea.tiff", width = 8, height = 5)   
   
 }
@@ -658,7 +660,8 @@ if(!("SIfigure1.tiff" %in% list.files("manuscript/manuscript_figures"))) {
     ylab("density") +
     facet_wrap(~WSA9_NAME, scales = "free_x") +
     theme_bw() +
-    theme(legend.position = "none")
+    theme(legend.position = "none") 
+  
   
   ggsave("manuscript/manuscript_figures/SIfigure1.tiff", width = 8.5, height = 5)
   
