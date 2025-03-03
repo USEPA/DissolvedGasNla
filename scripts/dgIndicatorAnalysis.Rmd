@@ -3,19 +3,21 @@ title: "Analysis of NLA17 Dissolved Gas Indicator"
 authors: "J. Beaulieu, R. Martin, and M. McManus"
 date: "`r Sys.Date()`"
 output:
-  html_document:
-    df_print: paged
-    toc: true
-    toc_float: true
-    fig_caption: yes
-    depth: 2
-    number_sections: true
-    code_folding:  hide
-editor_options: 
-  chunk_output_type: console
+  github_document:
+    number_sections: TRUE
+    df_print: "tibble"
+    math_method: 
+      engine: webtex
+    #  url: https://latex.codecogs.com/svg.image?
+    html_preview: TRUE
+    keep_html: TRUE
+editor_options:
+  chunk_output_type: inline
+  markdown: 
+    wrap: 72
 ---
 
-```{r results='hide', message=FALSE, warning=FALSE}
+```{r setup, results='hide', message=FALSE, warning=FALSE}
 # load libraries
 library(sf) # spatial data
 library(gstat) # lagged scatterplot, variogram
@@ -30,7 +32,7 @@ library(spmodel) # esv function
 
 
 # Identify local path for each user
-localPath <- Sys.getenv("USERPROFILE")
+#localPath <- Sys.getenv("USERPROFILE")
 
 # Define helper functions
 # standardized formatting for column names
@@ -50,13 +52,9 @@ During the 2017 National Lakes Assesment, duplicate dissolved gas samples were c
 The dissolved gas data were currated the 'NLA' dissolved gas project in RStudio.  The code can be found at a private github repository (https://github.com/USEPA/NLA).  After aggregating across duplicate samples, the data were written to nla17gasDataAggregated_2020-02-24.txt.  A copy of this data file is stored in documents library associated with the 'ORD NLA17 Dissolved Gas' Private Group on SharePoint (https://usepa.sharepoint.com/sites/ORD_NLA17_Dissolved_Gas).  This file was futher manipulated in "C://Users//JBEAULIE//OneDrive-Environmental Protection Agency (EPA)//gitRepository//DissolvedGasNla//scripts//dataMunge.Rmd" and written out as an .RData object, which is imported below.
 
 
-```{r}
+```{r load_data}
 # Load data
- load(paste0(localPath,
-            "/Environmental Protection Agency (EPA)/",
-            "ORD NLA17 Dissolved Gas - Documents/",
-            "inputData/dg.2021-02-01.RData"))
-
+load(file = "../inputData/dg.RData")
 ```
 
 ## Analytical uncertainty
@@ -65,7 +63,7 @@ The dissolved gas data were currated the 'NLA' dissolved gas project in RStudio.
 The data file contains `r dg %>% distinct(site.id, visit.no) %>% summarize(n = n()) %>% pull()` unique sampling trips defined by unique combinations of 'site.id' and 'visit.no'.  There were `r dg %>% distinct(site.id) %>% summarize(n = n()) %>% pull()` waterbodies sampled, `r dg %>% filter(visit.no == 2) %>% summarize(n = n()) %>% pull()` of which were sampled twice. The primary response variables are the concentrations of CO~2~, CH~4~, and N~2~O dissolved in the surface water of each waterbody.  Concentration is expressed in both mass based units (umol/L, nmol/L: dissolved.co2, dissolved.ch4, dissolved.n2o) and as a saturation ratio (co2.sat.ratio, ch4.sat.ratio, n2o.sat.ratio).  Saturation ratio is defined as the ratio of the measured concentration to that expected if the waterbody were in equilibrium with the atmosphere.  A value of 1 indicates equilibrium, values < 1 indicate undersaturation and values > 1 indicate supersaturation.  Undersaturated waterbodies function as a sink for the atmospheric gas whereas supersaturated waterbodies function as a source.
 
 
-```{r}
+```{r responses}
 # These are the main response variables.
 dg %>% 
   select(dissolved.co2.umol, dissolved.ch4.umol, dissolved.n2o.nmol, co2.sat.ratio, ch4.sat.ratio, n2o.sat.ratio) %>%
@@ -90,11 +88,7 @@ The survey design allows for population estimates of central tendency and varian
 ```{r, fig.cap= "Fig. caption: Mean +/- 95% CI for the dissolved gas concentration indicator"}
 # Read population estimates calculated with local neighborhood variance estimate.  Code provided by Tom Kincaid 
 # (12/12/2019), then modified to accomdate the gas emission rate and flux variables.  See CDF_Estimates_Jb.Rmd.
-pop <- read.csv(file = paste0(localPath, 
-                              "/Environmental Protection Agency (EPA)/",
-                              "ORD NLA17 Dissolved Gas - Documents/",
-                              "inputData/populationEstimates/",
-                              "NLA_2017_Percentile_Estimates_Local_Mean_JB20201202.csv"),
+pop <- read.csv(file = "../inputData/populationEstimates/NLA_2017_Percentile_Estimates_Local_Mean_JB20201202.csv",
                 as.is = TRUE) %>%
   toEPA()  # enforce formatting convention
 
