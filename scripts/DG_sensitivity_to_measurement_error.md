@@ -1,7 +1,7 @@
 Sensitivity to measurement error in dissolved gas measurements
 ================
 Roy Martin, Jake Beaulieu, Michael McManus
-2024-06-18
+2025-03-03
 
 - [1 Background](#1-background)
 - [2 Dissolved concentration](#2-dissolved-concentration)
@@ -75,9 +75,11 @@ Roy Martin, Jake Beaulieu, Michael McManus
         temperature](#5222-high-precision-temperature)
         - [5.2.2.2.1 Source-sink status](#52221-source-sink-status)
 - [6 Summary of ratio results](#6-summary-of-ratio-results)
+- [7 Update data with uncertainty
+  info](#7-update-data-with-uncertainty-info)
+- [8 Session Info](#8-session-info)
 
 ``` r
-#library(devtools) # needed to install USAboundaries package from
 library(knitr)
 library(rmarkdown)
 library(bayesplot)
@@ -91,9 +93,7 @@ library(gridExtra)
 library(readxl)
 library(janitor)
 library(sf)
-
-# Install USAboundaries package from GitHub
-#devtools::install_github("ropensci/USAboundaries")
+library(usmap)
 
 # Identify local path for each user
 localPath <- Sys.getenv("USERPROFILE")
@@ -155,9 +155,7 @@ Below is a summary of the empirical measurements of N2O (ppm) in the
 equilibrated headspace.
 
 ``` r
-load(paste0(localPath, "\\Environmental Protection Agency (EPA)",
-            "\\ORD NLA17 Dissolved Gas - Documents\\",
-            "inputData\\dg.2021-02-01.RData"))
+load("./../inputData/dg.RData")
 
 # summary of measured N2O ppm in equilibrated headspace gas
 dg %>%
@@ -767,14 +765,14 @@ below.
 sd(C_all_me* 1e9) # 0.20 nmol L-1
 ```
 
-    ## [1] 0.3230882
+    ## [1] 0.3227783
 
 ``` r
 # 2 standard deviations
 sd(C_all_me * 1e9) * 1.96 # +/- 0.395 nmol N2O
 ```
 
-    ## [1] 0.6332529
+    ## [1] 0.6326455
 
 Alternatively, calculate the central 95th percentile of the simulated
 measures.
@@ -794,7 +792,7 @@ round(quantile((C + C_all_me_abs), probs = c(0.025, 0.975)), 3) # +/- nmol N2O
 ```
 
     ##  2.5% 97.5% 
-    ## 7.083 8.345
+    ## 7.083 8.349
 
 ## 2.4 Summary of contributions to error
 
@@ -948,21 +946,21 @@ C_all_eq_me_abs <- (C_all_eq_me * 1e9) - C_eq
 sd(C_all_eq_me* 1e9) # 0.20 nmol L-1
 ```
 
-    ## [1] 0.1981621
+    ## [1] 0.199273
 
 ``` r
 # 2 standard deviations
 sd(C_all_eq_me * 1e9) * 1.96 # +/- 0.395 nmol N2O
 ```
 
-    ## [1] 0.3883978
+    ## [1] 0.3905752
 
 ``` r
 # standard deviation of a measurement is:
 round(sd(C_all_eq_me_abs), 3) # 0.20 nmol L-1
 ```
 
-    ## [1] 0.198
+    ## [1] 0.199
 
 ``` r
 # the 95% CI for an observation with measurement error can be computed 
@@ -972,7 +970,7 @@ round(quantile((C_eq + C_all_eq_me_abs), probs = c(0.025, 0.975)), 3) # +/- nmol
 ```
 
     ##  2.5% 97.5% 
-    ## 7.442 8.215
+    ## 7.441 8.223
 
 ## 3.3 Summary of contributions to error
 
@@ -1086,14 +1084,14 @@ S_a_me_abs <- S_a_me - S
 sd(S_a_me) # 0.026
 ```
 
-    ## [1] 0.05486882
+    ## [1] 0.05487132
 
 ``` r
 # the 95% CI is therefore the computed value +/- 2 standard deviations
 sd(S_a_me) * 1.96 # +/- 0.05258214
 ```
 
-    ## [1] 0.1075429
+    ## [1] 0.1075478
 
 ``` r
 # so any ratio within 0.05 of 1.0 cannot be discerned as a source or sink?
@@ -1112,7 +1110,7 @@ round(quantile(S_a_me_abs, probs = c(0.025, 0.975)), 3) # approx +/- 0.11
 ```
 
     ##   2.5%  97.5% 
-    ## -0.104  0.111
+    ## -0.103  0.112
 
 ``` r
 # the 95% CI for an observation with measurement error can be computed 
@@ -1226,14 +1224,14 @@ S_pg_me_abs <- S_pg_me - S_pg
 sd(S_pg_me) # 0.048
 ```
 
-    ## [1] 0.04801704
+    ## [1] 0.04793482
 
 ``` r
 # the 95% CI is therefore the computed value +/- 2 standard deviations
 sd(S_pg_me) * 1.96 # +/- 0.094
 ```
 
-    ## [1] 0.0941134
+    ## [1] 0.09395225
 
 ``` r
 # so any ratio within 0.094 of 1.0 cannot be discerned as a source or sink
@@ -1262,7 +1260,7 @@ round(quantile((S_pg + S_pg_me_abs), probs = c(0.025, 0.975)), 3) # +/- nmol N2O
 ```
 
     ##  2.5% 97.5% 
-    ## 0.896 1.085
+    ## 0.896 1.084
 
 #### 4.1.2.1 Source-sink status
 
@@ -1287,9 +1285,9 @@ dg %>%
 
 | Var1         | Freq |
 |:-------------|-----:|
-| sink         |  407 |
+| sink         |  408 |
 | source       |  194 |
-| undetermined |  383 |
+| undetermined |  382 |
 
 Number of lakes classified as source/sink
 
@@ -1355,14 +1353,14 @@ S_a_hpt_me_abs <- S_a_hpt_me - S
 sd(S_a_hpt_me) # 0.026
 ```
 
-    ## [1] 0.05486889
+    ## [1] 0.05487129
 
 ``` r
 # the 95% CI is therefore the computed value +/- 2 standard deviations
 sd(S_a_hpt_me) * 1.96 # +/- 0.05258214
 ```
 
-    ## [1] 0.107543
+    ## [1] 0.1075477
 
 ``` r
 # so any ratio within 0.05 of 1.0 cannot be discerned as a source or sink?
@@ -1381,7 +1379,7 @@ round(quantile(S_a_hpt_me_abs, probs = c(0.025, 0.975)), 3) # approx +/- 0.11
 ```
 
     ##   2.5%  97.5% 
-    ## -0.104  0.111
+    ## -0.103  0.112
 
 ``` r
 # the 95% CI for an observation with measurement error can be computed 
@@ -1465,14 +1463,14 @@ S_pg_hpt_me_abs <- S_pg_hpt_me - S_pg
 sd(S_pg_hpt_me) # 0.026
 ```
 
-    ## [1] 0.04801584
+    ## [1] 0.04793385
 
 ``` r
 # the 95% CI is therefore the computed value +/- 2 standard deviations
 sd(S_pg_hpt_me) * 1.96 # +/- 0.05258214
 ```
 
-    ## [1] 0.09411104
+    ## [1] 0.09395034
 
 ``` r
 # so any ratio within 0.05 of 1.0 cannot be discerned as a source or sink?
@@ -1501,7 +1499,7 @@ round(quantile((S_pg + S_pg_hpt_me_abs), probs = c(0.025, 0.975)), 3) # +/- nmol
 ```
 
     ##  2.5% 97.5% 
-    ## 0.896 1.085
+    ## 0.896 1.084
 
 #### 4.1.4.1 Source-sink status
 
@@ -1526,9 +1524,9 @@ dg %>%
 
 | Var1         | Freq |
 |:-------------|-----:|
-| sink         |  407 |
+| sink         |  408 |
 | source       |  194 |
-| undetermined |  383 |
+| undetermined |  382 |
 
 Number of lakes classified as source/sink
 
@@ -1604,14 +1602,14 @@ S_pg_hpgc_me_abs <- S_pg_hpgc_me - S_pg_hpgc
 sd(S_pg_hpgc_me) # 0.029
 ```
 
-    ## [1] 0.02852166
+    ## [1] 0.02858085
 
 ``` r
 # the 95% CI is therefore the computed value +/- 2 standard deviations
 sd(S_pg_hpgc_me) * 1.96 # +/- 0.0569
 ```
 
-    ## [1] 0.05590246
+    ## [1] 0.05601847
 
 ``` r
 # so any ratio within 0.0569 of 1.0 cannot be discerned as a source or sink
@@ -1630,7 +1628,7 @@ round(quantile(S_pg_hpgc_me_abs, probs = c(0.025, 0.975)), 3) # approx +/- 0.11
 ```
 
     ##   2.5%  97.5% 
-    ## -0.053  0.058
+    ## -0.054  0.058
 
 ``` r
 # the 95% CI for an observation with measurement error can be computed 
@@ -1666,8 +1664,8 @@ dg %>%
 | Var1         | Freq |
 |:-------------|-----:|
 | sink         |  521 |
-| source       |  247 |
-| undetermined |  216 |
+| source       |  248 |
+| undetermined |  215 |
 
 Number of lakes classified as source/sink
 
@@ -1723,14 +1721,14 @@ S_pg_hpgc_hpt_me_abs <- S_pg_hpgc_hpt_me - S_pg_hpgc
 sd(S_pg_hpgc_hpt_me) # 0.029
 ```
 
-    ## [1] 0.02850157
+    ## [1] 0.02858561
 
 ``` r
 # the 95% CI is therefore the computed value +/- 2 standard deviations
 sd(S_pg_hpgc_hpt_me) * 1.96 # +/- 0.0569
 ```
 
-    ## [1] 0.05586308
+    ## [1] 0.05602779
 
 ``` r
 # so any ratio within 0.0569 of 1.0 cannot be discerned as a source or sink
@@ -1749,7 +1747,7 @@ round(quantile(S_pg_hpgc_hpt_me_abs, probs = c(0.025, 0.975)), 3) # approx +/- 0
 ```
 
     ##   2.5%  97.5% 
-    ## -0.053  0.059
+    ## -0.054  0.058
 
 ``` r
 # the 95% CI for an observation with measurement error can be computed 
@@ -1996,28 +1994,28 @@ C_mims_hpt_me_abs <- (C_mims_hpt_me * 1e9) - C_mims
 sd(C_mims_hpt_me * 1e9) # 0.169 using Speir CV to calculate N2O:Ar sd.   0.15 with GC and headspace equilibrium!
 ```
 
-    ## [1] 0.1687739
+    ## [1] 0.1696771
 
 ``` r
 # 1.96 x sd
 sd(C_mims_hpt_me * 1e9) * 1.96 
 ```
 
-    ## [1] 0.3307968
+    ## [1] 0.3325672
 
 ``` r
 # CV of dissolved N2O
 (sd(C_mims_hpt_me * 1e9) / mean(C_mims_hpt_me * 1e9)) * 100 # 0.025 = 2.5% vs 12% using Genther sd.
 ```
 
-    ## [1] 2.530256
+    ## [1] 2.543801
 
 ``` r
 # standard deviation of a measurement is:
 round(sd(C_mims_hpt_me_abs), 3) # 0.20 nmol L-1
 ```
 
-    ## [1] 0.169
+    ## [1] 0.17
 
 ``` r
 # central 95th percentile of absolute error
@@ -2025,7 +2023,7 @@ round(quantile(C_mims_hpt_me_abs, probs = c(0.025, 0.975)), 3) # approx +/- 0.11
 ```
 
     ##   2.5%  97.5% 
-    ## -0.331  0.329
+    ## -0.331  0.334
 
 ``` r
 # the 95% CI for an observation with measurement error can be computed 
@@ -2035,7 +2033,7 @@ round(quantile((C_mims + C_mims_hpt_me_abs), probs = c(0.025, 0.975)), 3) # +/- 
 ```
 
     ##  2.5% 97.5% 
-    ## 6.339 6.999
+    ## 6.339 7.005
 
 ### 5.1.2 High precision GC
 
@@ -2069,27 +2067,27 @@ C_mims_hpgc_hpt_me_abs <- (C_mims_hpgc_hpt_me * 1e9) - C_mims
 sd(C_mims_hpgc_hpt_me * 1e9) # 0.0166 using Speir CV to calculate N2O:Ar sd. 0.15 with GC and headspace equilibrium!
 ```
 
-    ## [1] 0.01659314
+    ## [1] 0.01648148
 
 ``` r
 sd(C_mims_hpgc_hpt_me * 1e9) * 1.96 # sd +/- 1.96 (for conf intervals on error)
 ```
 
-    ## [1] 0.03252255
+    ## [1] 0.0323037
 
 ``` r
 # CV of dissolved N2O
 sd(C_mims_hpgc_hpt_me * 1e9) / mean(C_mims_hpgc_hpt_me * 1e9) * 100 # 0.0025 = 0.25% CV 
 ```
 
-    ## [1] 0.2487667
+    ## [1] 0.2470948
 
 ``` r
 # standard deviation of a measurement is:
 round(sd(C_mims_hpgc_hpt_me_abs), 3)
 ```
 
-    ## [1] 0.017
+    ## [1] 0.016
 
 ``` r
 # central 95th percentile of absolute error
@@ -2097,7 +2095,7 @@ round(quantile(C_mims_hpgc_hpt_me_abs, probs = c(0.025, 0.975)), 3)
 ```
 
     ##   2.5%  97.5% 
-    ## -0.032  0.033
+    ## -0.032  0.032
 
 ``` r
 # the 95% CI for an observation with measurement error can be computed 
@@ -2155,14 +2153,14 @@ S_mims_me_abs <- S_mims_me - S_mims
 sd(S_mims_me) # 0.0011
 ```
 
-    ## [1] 0.001069493
+    ## [1] 0.001072047
 
 ``` r
 # the 95% CI is therefore the computed value +/- 2 standard deviations
 sd(S_mims_me) * 1.96 # +/- 0.00216
 ```
 
-    ## [1] 0.002096206
+    ## [1] 0.002101213
 
 ``` r
 # so any ratio within 0.00216 of 1.0 cannot be discerned as a source or sink
@@ -2171,7 +2169,7 @@ sd(S_mims_me) * 1.96 # +/- 0.00216
 sd(S_mims_me) / mean(S_mims_me) * 100 # 0.13% CV 
 ```
 
-    ## [1] 0.1255494
+    ## [1] 0.1258491
 
 ``` r
 # standard deviation of a measurement is:
@@ -2270,14 +2268,14 @@ S_mims_hpt_me_abs <- S_mims_hpt_me - S_mims
 sd(S_mims_hpt_me) # 0.0011
 ```
 
-    ## [1] 0.0006008632
+    ## [1] 0.0006035572
 
 ``` r
 # the 95% CI is therefore the computed value +/- 2 standard deviations
 sd(S_mims_hpt_me) * 1.96 # +/- 0.00216
 ```
 
-    ## [1] 0.001177692
+    ## [1] 0.001182972
 
 ``` r
 # so any ratio within 0.00216 of 1.0 cannot be discerned as a source or sink
@@ -2286,7 +2284,7 @@ sd(S_mims_hpt_me) * 1.96 # +/- 0.00216
 sd(S_mims_hpt_me) / mean(S_mims_hpt_me) * 100 # 0.13% CV 
 ```
 
-    ## [1] 0.07053605
+    ## [1] 0.07085226
 
 ``` r
 # standard deviation of a measurement is:
@@ -2388,14 +2386,14 @@ S_mims_hpgc_me_abs <- S_mims_hpgc_me - S_mims
 sd(S_mims_hpgc_me) # 0.0011
 ```
 
-    ## [1] 0.001069493
+    ## [1] 0.001072047
 
 ``` r
 # the 95% CI is therefore the computed value +/- 2 standard deviations
 sd(S_mims_hpgc_me) * 1.96 # +/- 0.00216
 ```
 
-    ## [1] 0.002096206
+    ## [1] 0.002101213
 
 ``` r
 # so any ratio within 0.00216 of 1.0 cannot be discerned as a source or sink
@@ -2404,7 +2402,7 @@ sd(S_mims_hpgc_me) * 1.96 # +/- 0.00216
 sd(S_mims_hpgc_me) / mean(S_mims_hpgc_me) * 100 # 0.07% CV 
 ```
 
-    ## [1] 0.1255494
+    ## [1] 0.1258491
 
 ``` r
 # standard deviation of a measurement is:
@@ -2509,14 +2507,14 @@ S_mims_hpgc_hpt_me_abs <- S_mims_hpgc_hpt_me - S_mims
 sd(S_mims_hpgc_hpt_me) # 0.0006603624
 ```
 
-    ## [1] 0.0006008632
+    ## [1] 0.0006035572
 
 ``` r
 # the 95% CI is therefore the computed value +/- 2 standard deviations
 sd(S_mims_hpgc_hpt_me) * 1.96 # +/- 0.00129431
 ```
 
-    ## [1] 0.001177692
+    ## [1] 0.001182972
 
 ``` r
 # so any ratio within 0.00129 of 1.0 cannot be discerned as a source or sink
@@ -2702,3 +2700,79 @@ results_MIMS %>%
 ```
 
 ![](DG_sensitivity_to_measurement_error_files/figure-gfm/final_summary_MIMS-1.png)<!-- -->
+
+# 7 Update data with uncertainty info
+
+Finally, we update the dg data frame to include information on estimated
+measurement error
+
+``` r
+dg <- dg %>%
+  mutate(# recompute using error from uncertainty simulations
+         n2o.src.snk.error = case_when(
+           abs(n2o.sat.ratio - 1) < quantile(S_a_me_abs, probs = c(0.975)) ~ "undetermined",
+           TRUE ~ n2o.src.snk))
+
+save(dg, file = "./../inputData/dg.RData")
+```
+
+# 8 Session Info
+
+``` r
+sessionInfo()
+```
+
+    ## R version 4.4.0 (2024-04-24 ucrt)
+    ## Platform: x86_64-w64-mingw32/x64
+    ## Running under: Windows 11 x64 (build 22631)
+    ## 
+    ## Matrix products: default
+    ## 
+    ## 
+    ## locale:
+    ## [1] LC_COLLATE=English_United States.utf8 
+    ## [2] LC_CTYPE=English_United States.utf8   
+    ## [3] LC_MONETARY=English_United States.utf8
+    ## [4] LC_NUMERIC=C                          
+    ## [5] LC_TIME=English_United States.utf8    
+    ## 
+    ## time zone: America/New_York
+    ## tzcode source: internal
+    ## 
+    ## attached base packages:
+    ## [1] stats     graphics  grDevices utils     datasets  methods   base     
+    ## 
+    ## other attached packages:
+    ##  [1] usmap_0.7.1      sf_1.0-19        janitor_2.2.1    readxl_1.4.3    
+    ##  [5] gridExtra_2.3    ggExtra_0.10.1   tidybayes_3.0.6  lubridate_1.9.3 
+    ##  [9] forcats_1.0.0    stringr_1.5.1    dplyr_1.1.4      purrr_1.0.2     
+    ## [13] readr_2.1.5      tidyr_1.3.1      tibble_3.2.1     tidyverse_2.0.0 
+    ## [17] ggpubr_0.6.0     ggplot2_3.5.1    kableExtra_1.4.0 bayesplot_1.11.1
+    ## [21] rmarkdown_2.28   knitr_1.48      
+    ## 
+    ## loaded via a namespace (and not attached):
+    ##  [1] svUnit_1.0.6         tidyselect_1.2.1     viridisLite_0.4.2   
+    ##  [4] farver_2.1.2         fastmap_1.2.0        tensorA_0.36.2.1    
+    ##  [7] promises_1.3.0       digest_0.6.37        timechange_0.3.0    
+    ## [10] mime_0.12            lifecycle_1.0.4      magrittr_2.0.3      
+    ## [13] posterior_1.6.0      compiler_4.4.0       rlang_1.1.4         
+    ## [16] tools_4.4.0          utf8_1.2.4           yaml_2.3.10         
+    ## [19] ggsignif_0.6.4       labeling_0.4.3       classInt_0.4-11     
+    ## [22] xml2_1.3.6           KernSmooth_2.23-22   abind_1.4-5         
+    ## [25] miniUI_0.1.1.1       withr_3.0.2          grid_4.4.0          
+    ## [28] fansi_1.0.6          xtable_1.8-4         e1071_1.7-16        
+    ## [31] colorspace_2.1-1     scales_1.3.0         cli_3.6.3           
+    ## [34] generics_0.1.3       rstudioapi_0.16.0    tzdb_0.4.0          
+    ## [37] proxy_0.4-27         DBI_1.2.3            cellranger_1.1.0    
+    ## [40] vctrs_0.6.5          carData_3.0-5        car_3.1-2           
+    ## [43] hms_1.1.3            arrayhelpers_1.1-0   rstatix_0.7.2       
+    ## [46] systemfonts_1.1.0    ggdist_3.3.2         usmapdata_0.3.0     
+    ## [49] units_0.8-5          glue_1.7.0           cowplot_1.1.3       
+    ## [52] distributional_0.4.0 stringi_1.8.4        gtable_0.3.5        
+    ## [55] later_1.3.2          munsell_0.5.1        pillar_1.9.0        
+    ## [58] htmltools_0.5.8.1    R6_2.5.1             evaluate_1.0.3      
+    ## [61] shiny_1.9.1          lattice_0.22-6       highr_0.11          
+    ## [64] backports_1.5.0      broom_1.0.6          snakecase_0.11.1    
+    ## [67] httpuv_1.6.15        class_7.3-22         Rcpp_1.0.13         
+    ## [70] svglite_2.1.3        coda_0.19-4.1        checkmate_2.3.2     
+    ## [73] xfun_0.47            pkgconfig_2.0.3

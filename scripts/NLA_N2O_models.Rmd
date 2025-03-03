@@ -38,6 +38,7 @@ library(tidybayes)
 library(brms)
 library(tictoc)
 library(arrow)
+library(archive)
 
 options(mc.cores = parallel::detectCores(logical = FALSE))
 options( max.print = 1000 )
@@ -75,11 +76,7 @@ objs <- c("dg",
           "n2o_mod4",
           "n2o_mod5",
           "n2o_mod6",
-          #"all_predictions_b",
-          "n2o_survey_ests",
-          "n2o_survey_ests_size",
-          "sat_survey_ests",
-          "sat_survey_ests_size"
+          "all_predictions_b"
           )
 
 N <- length(objs)
@@ -87,7 +84,7 @@ N <- length(objs)
 # list of file paths for objects saved
 f <- list()
 for(i in 1:N){
-    f[i] <- paste0(Sys.getenv("RENV_PROJECT"), "/modelFiles/",
+    f[i] <- paste0("./../modelFiles/",
     objs[i], ".rda")
     }
 
@@ -265,8 +262,7 @@ Indexing to the observation level, $i$, within each response:
 
 $$\mu_{pijkl} = \alpha_{0(pi)} + \alpha_{1(pij)} + \alpha_{2(pijk)} + \alpha_{3(pijkl)}$$
 
-$$\alpha_1 \sim MVN(0, \Lambda_1)$$ 
-$$\alpha_2 \sim MVN(0, \Lambda_2)$$
+$$\alpha_1 \sim MVN(0, \Lambda_1)$$ $$\alpha_2 \sim MVN(0, \Lambda_2)$$
 $$\alpha_3 \sim MVN(0, \Lambda_3)$$
 
 $$\Lambda_{\alpha = 1,..,3} = \begin{pmatrix} 1 & \tau ^2_{p=1} \\ \tau^2_{p=2} & 1 \end{pmatrix} \chi_{\alpha = 1,..,3} \begin{pmatrix} 1 & \tau^2_{p=1} \\ \tau^2_{p=2} & 1 \end{pmatrix}$$
@@ -629,16 +625,10 @@ munged at:
 
 ## Import
 
-That originally munged gas dataset was imported below.
+That originally munged gas dataset is imported below.
 
 ```{r import_data, eval=FALSE, include=TRUE}
-load( file = paste0( localPath,
-              "/Environmental Protection Agency (EPA)/",
-              "ORD NLA17 Dissolved Gas - Documents/",
-              "inputData/dg.2021-02-01.RData")
-      )
-
-save(dg, file = "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/dg.rda") 
+load("./inputData/dg.RData")
 ```
 
 A new data frame for modeling was constructed from the original file,
@@ -732,7 +722,7 @@ df_model <- dg %>%
          no3_cat
          )
 
-save(df_model, file = "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/df_model.rda") 
+save(df_model, file = "/modelFiles/df_model.rda") 
 ```
 
 A preview of the `r nrow(df_model)` probability samples to be used in
@@ -818,7 +808,7 @@ df_test <- dg %>%
          no3_cat
          )
 
-save(df_test, file = "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/df_test.rda") 
+save(df_test, file = "modelFiles/df_test.rda") 
 ```
 
 A preview of the re-visit data with `r nrow(df_test)` observations:
@@ -835,10 +825,7 @@ only lakes in the assumed POI. The resulting target population included
 a total of 465,897 waterbodies.
 
 ```{r import_sample_frame, eval=FALSE, include=TRUE}
-df_pop <- read.csv(file = paste0(localPath,
-              "/Environmental Protection Agency (EPA)/",
-              "ORD NLA17 Dissolved Gas - Documents/",
-              "inputData/NLA_Sample_Frame.csv"), header = T)
+df_pop <- read.csv(archive::archive_read("inputData/NLA_Sample_Frame.7z")) # This takes a bit
 
 sframe <- df_pop %>%
   filter(nla17_sf != "Exclude2017") %>%
@@ -1580,7 +1567,8 @@ df_model %>%
 
 ## Model 1
 
-The first model for the two N2O responses, conditioned only on the study design factors.
+The first model for the two N2O responses, conditioned only on the study
+design factors.
 
 ```{r n2o_mod_mv_1, eval=FALSE, include=TRUE}
 bf_n2o <- bf(log(n2o) ~ 1 + 
@@ -6828,9 +6816,52 @@ the various levels of the survey factors.
 ### Dissolved N2O
 
 Below, National mean estimates for dissolved N2O from the model and
-design-based approaches were compared. The sample-based estimate was
-also included as a reference. The black, vertical, dashed line indicates
-the mean of the sample.
+design-based approaches were compared. The code and results for the 
+design-based approach are located at: 
+https://github.com/USEPA/DissolvedGasNla/tree/master/scripts
+
+The sample-based estimates were also included as a reference and are
+represented by the black, vertical, dashed lines.
+
+```{r import_design_ests, message=FALSE, cache=TRUE}
+### Dissolved N2O estimates
+
+n2o_survey_ests <- read.csv(file = "./../inputData/populationEstimates/Survey_Ests_N20_dissolved.csv") %>%
+  tibble() %>%
+  rename(estimate = Estimate,
+         LCL = LCB95Pct,
+         UCL = UCB95Pct) %>%
+  select(Type, Subpopulation, estimate, LCL, UCL)
+
+# ests by subpopulations
+n2o_survey_ecoregion <- n2o_survey_ests %>%
+  filter(Type == "AG_ECO9_NM") %>%
+  rename(ecoregion = Subpopulation) %>%
+  select(ecoregion, estimate, LCL, UCL) %>%
+  mutate(ecoregion = recode(ecoregion,
+                            "Coastal Plains" = "CPL",
+                            "Northern Appalachians" = "NAP",
+                            "Northern Plains" = "NPL",
+                            "Southern Appalachians" = "SAP",
+                            "Southern Plains" = "SPL",
+                            "Temperate Plains" = "TPL",
+                            "Upper Midwest" = "UMW",
+                            "Western Mountains" = "WMT",
+                            "Xeric" = "XER"))
+
+n2o_survey_size <- n2o_survey_ests %>%
+  filter(Type == "AREA_CAT6") %>%
+  rename(size_cat = Subpopulation) %>%
+  select(size_cat, estimate, LCL, UCL)
+
+### Saturation ratio estimates
+sat_survey_ests <- read.csv(file = "./../inputData/populationEstimates/Survey_Ests_N20_sat.csv") %>%
+  tibble() %>%
+  rename(estimate = Estimate,
+         LCL = LCB95Pct,
+         UCL = UCB95Pct) %>%
+  select(Type, Subpopulation, estimate, LCL, UCL)
+```
 
 ```{r n2o_means_national, message=FALSE, cache=TRUE}
 all_predictions %>%
@@ -6840,7 +6871,7 @@ all_predictions %>%
     LCL = round(quantile(mean_n2o, probs = 0.025), 2),
     UCL = round(quantile(mean_n2o, probs = 0.975), 2)) %>% 
   mutate(type = "model") %>%
-  bind_rows(cbind(n2o_survey_ests[10, 2:4], type = rep("survey", 1))) %>%
+  bind_rows(cbind(n2o_survey_ests[1, 3:5], type = rep("survey", 1))) %>%
   add_row(estimate = round(mean(df_model$n2o), 2),
           type = "sample") %>%
   print()
@@ -6854,7 +6885,7 @@ all_predictions %>%
     LCL = round(quantile(mean_n2o, probs = 0.025), 2),
     UCL = round(quantile(mean_n2o, probs = 0.975), 2)) %>% 
   mutate(type = "model") %>%
-  bind_rows(cbind(n2o_survey_ests[10, 2:4], type = rep("survey", 1))) %>%
+  bind_rows(cbind(n2o_survey_ests[1, 3:5], type = rep("survey", 1))) %>%
   mutate(cl_width = round(UCL - LCL, 2)) %>%
   ggplot(aes(x = type, y = estimate, color = type)) +
   geom_point(size = 2, position=position_dodge(width=0.5)) +
@@ -6884,7 +6915,8 @@ all_predictions %>%
   mutate(type = "model") %>%
   select(ecoregion, estimate, LCL, UCL, type) %>%
   mutate(ecoregion = forcats::fct_reorder(ecoregion, estimate)) %>%
-  bind_rows(cbind(n2o_survey_ests[-10,], type = rep("survey", 9))) %>%
+  bind_rows(cbind(n2o_survey_ecoregion, type = rep("survey", 9))) %>%
+  #bind_rows(cbind(n2o_survey_ests[-10,], type = rep("survey", 9))) %>%
   arrange(ecoregion) %>%
   print()
 ```
@@ -6902,7 +6934,7 @@ all_predictions %>%
   mutate(type = "model") %>%
   select(ecoregion, estimate, LCL, UCL, type) %>%
   mutate(ecoregion = forcats::fct_reorder(ecoregion, estimate)) %>%
-  bind_rows(cbind(n2o_survey_ests[-10,], type = rep("survey", 9))) %>%
+  bind_rows(cbind(n2o_survey_ecoregion, type = rep("survey", 9))) %>%
   ggplot(aes(x = ecoregion, y = estimate, group = type, color = type)) +
   geom_point(size = 2, position=position_dodge(width=0.5)) +
   geom_linerange(aes(ymin = LCL, ymax = UCL) , position=position_dodge(width=0.5)) +
@@ -6925,7 +6957,7 @@ all_predictions %>%
     UCL = round(quantile(mean_n2o, probs = 0.975), 1),
     .groups = "drop") %>%
   mutate(type = "model") %>%
-  bind_rows(cbind(n2o_survey_ests_size, type = rep("survey", 5))) %>%
+  bind_rows(cbind(n2o_survey_size, type = rep("survey", 5))) %>%
   mutate(size = factor(size_cat)) %>%
   mutate(size = forcats::fct_reorder(size, estimate)) %>%
   mutate(cl_width = UCL - LCL) %>%
@@ -6946,7 +6978,7 @@ all_predictions %>%
   #mutate(size_cat = factor(size_cat)) %>%
   mutate(type = "model") %>%
   select(size_cat, estimate, LCL, UCL, type) %>%
-  bind_rows(cbind(n2o_survey_ests_size, type = rep("survey", 5))) %>%
+  bind_rows(cbind(n2o_survey_size, type = rep("survey", 5))) %>%
   mutate(size_cat = forcats::fct_reorder(size_cat, estimate)) %>%
   ggplot(aes(x = size_cat, y = estimate, group = type, color = type)) +
   geom_point(size = 2, position=position_dodge(width=0.5)) +

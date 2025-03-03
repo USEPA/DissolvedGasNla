@@ -14,7 +14,6 @@ editor_options:
 ---
 
 ```{r setup, warning=FALSE, message=FALSE}
-#library(devtools) # needed to install USAboundaries package from
 library(knitr)
 library(rmarkdown)
 library(bayesplot)
@@ -28,9 +27,7 @@ library(gridExtra)
 library(readxl)
 library(janitor)
 library(sf)
-
-# Install USAboundaries package from GitHub
-#devtools::install_github("ropensci/USAboundaries")
+library(usmap)
 
 # Identify local path for each user
 localPath <- Sys.getenv("USERPROFILE")
@@ -91,9 +88,7 @@ where:
 Below is a summary of the empirical measurements of N2O (ppm) in the
 equilibrated headspace.
 ```{r summary_empirical, echo=TRUE}
-load(paste0(localPath, "\\Environmental Protection Agency (EPA)",
-            "\\ORD NLA17 Dissolved Gas - Documents\\",
-            "inputData\\dg.2021-02-01.RData"))
+load("./../inputData/dg.RData")
 
 # summary of measured N2O ppm in equilibrated headspace gas
 dg %>%
@@ -1635,9 +1630,9 @@ cols <- c("Coastal Plains" = "orange1",
 
 
 ## Load state boundaries----
-states <- USAboundaries::us_states() %>%
-  dplyr::filter(!state_name %in% c("Alaska", "District of Columbia", "Hawaii", "Puerto Rico")) %>%
-  st_transform(5070) # convert to CONUS Albers
+states <- usmap::us_map() %>%
+  dplyr::filter(!full %in% c("Alaska", "District of Columbia", "Hawaii", "Puerto Rico")) %>%
+  sf::st_transform(5070) # convert to CONUS Albers
  
 # To enable spatial analysis of the data, the dataframe will be converted to a 
 # 'simple features' (sf) object.
@@ -3030,5 +3025,25 @@ results_MIMS %>%
                             "MIMS_HPGC_HPT_me" = "MIMS: high precision GC, \nhigh precision temperature")) +
   xlab("Absolute error in saturation ratio") +
   ylab("")
+```
+
+# Update data with uncertainty info
+Finally, we update the dg data frame to include information on estimated measurement error
+
+``` {r update_dg_data}
+dg <- dg %>%
+  mutate(# recompute using error from uncertainty simulations
+         n2o.src.snk.error = case_when(
+           abs(n2o.sat.ratio - 1) < quantile(S_a_me_abs, probs = c(0.975)) ~ "undetermined",
+           TRUE ~ n2o.src.snk))
+
+save(dg, file = "./../inputData/dg.RData")
+```
+
+
+# Session Info
+
+```{r session}
+sessionInfo()
 ```
 

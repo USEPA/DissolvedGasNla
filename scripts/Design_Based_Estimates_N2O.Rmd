@@ -1,0 +1,144 @@
+---
+title: "Design-based estimates for N2O from the NLA 2017 Survey"
+author: "Roy Martin, Jake Beaulieu, Michael McManus"
+date: "`r Sys.Date()`"
+output:
+  github_document:
+    number_sections: TRUE
+    df_print: "tibble"
+    math_method: 
+      engine: webtex
+    #  url: https://latex.codecogs.com/svg.image?
+    html_preview: TRUE
+    keep_html: TRUE
+editor_options:
+  chunk_output_type: inline
+  markdown: 
+    wrap: 72
+---
+
+# Purpose
+Calculate estimates for the NLA 2017 survey with spsurvey and local mean variance estimator for comparison to Bayesian MRP Estimates.
+Tom Kincaid created a .csv file to be used for population estimates, which is loaded and munged below.
+
+# Import and munge survey data
+```{r setup_data, echo=FALSE}
+
+# Attach the Hmisc and spsurvey packages
+library(tidyverse)
+library(Hmisc)
+library(spsurvey)
+
+# Setup file path
+localPath <- Sys.getenv("USERPROFILE")
+```
+
+```{r import_data} 
+# modified file to include N2O emission rates.  See "Users\JBEAULIE\OneDrive - Environmental Protection Agency (EPA)\gitRepository\DissolvedGasNla\scripts\dataMunge.Rmd" for details
+# updated file path
+df_survey <- read.csv(file = "./../inputData/populationEstimates/NLA17_DissolvedGases_forPopEst.csv")
+df_survey <- df_survey %>% 
+  data.frame() %>%
+  filter(!is.na(DISSOLVED_N2O))
+nr <- nrow(df_survey) # 984
+
+# Reorder levels for the lake size class (AREA_CAT6) variable
+levels(df_survey$AREA_CAT6) <- list(
+   "(1,4]" = "(1,4]",
+   "(4,10]" = "(4,10]",
+   "(10,20]" = "(10,20]",
+   "(20,50]" = "(20,50]",
+   ">50" = ">50")
+
+head(df_survey)
+
+tail(df_survey)
+
+# Create data frame for spsurvey estimates
+dframe <- data.frame(
+  siteID = df_survey$SITE_ID,
+  N2O_SAT_RATIO=df_survey$N2O_SAT_RATIO,
+  DISSOLVED_N2O=df_survey$DISSOLVED_N2O,
+  National=rep("National", nr),
+  LAKE_ORGN=df_survey$LAKE_ORGN,
+  AREA_CAT6=df_survey$AREA_CAT6,
+  AG_ECO9_NM=df_survey$AG_ECO9_NM,
+  State = df_survey$STRATUM,
+  wgt = df_survey$WGT_TP,
+  xcoord = df_survey$XCOORD,
+  ycoord = df_survey$YCOORD)
+```
+
+# Survey estimates with spsurvey package
+Estimates made using the local mean variance estimator
+```{r spsurvey_ests, echo=FALSE, results="hide", include=TRUE}
+
+# Calculate the estimates
+#cat("\n\nCalculate CDF estimates using the local mean variance estimator\n")
+if(exists("warn.df")) rm("warn.df")
+time.initial <- Sys.time()
+Design_estimates <- cont_analysis(dframe = dframe, 
+                               vars = c("N2O_SAT_RATIO", "DISSOLVED_N2O"),
+                               subpops = c("National", "LAKE_ORGN", "AREA_CAT6", "AG_ECO9_NM", "State"), 
+                               weight = "wgt", 
+                               xcoord = "xcoord", 
+                               ycoord = "ycoord",
+                               vartype = "Local") # 30 minutes on VM
+Sys.time() - time.initial
+```
+
+
+# Summarize estimates and export
+```{r summarize_mean_estimates_dissolved, echo=FALSE}
+mean_dissolved <- Design_estimates$Mean %>% 
+  tibble() %>%
+  filter(Indicator == "DISSOLVED_N2O") %>%
+  mutate(Estimate = round(Estimate * 1e9, 2),
+         StdError = round(StdError * 1e9, 2),
+         MarginofError = round(MarginofError * 1e9, 2),
+         LCB95Pct = round(LCB95Pct * 1e9, 2),
+         UCB95Pct = round(UCB95Pct * 1e9, 2),
+         Subpopulation = recode(Subpopulation, # simpler naming conventions for the size categories
+                           "(1,4]" = "min_4" ,
+                           "(10,20]" = "10_20",
+                           "(20,50]" = "20_50",
+                           "(4,10]" = "4_10",
+                           ">50" = "50_max")) %>%
+  select(!Indicator)
+
+mean_dissolved %>% print()
+```  
+
+```{r save_to_drive_1, eval=FALSE, include=TRUE}
+write.csv(mean_dissolved, file = "./../inputData/populationEstimates/Survey_Ests_N20_dissolved.csv")
+```
+  
+```{r summarize_mean_estimates_saturation, echo=FALSE}
+mean_sat_ratio <- Design_estimates$Mean %>% 
+  tibble() %>%
+  filter(Indicator == "N2O_SAT_RATIO") %>%
+  mutate(Estimate = round(Estimate, 2),
+         StdError = round(StdError, 2),
+         MarginofError = round(MarginofError, 2),
+         LCB95Pct = round(LCB95Pct, 2),
+         UCB95Pct = round(UCB95Pct, 2),
+         Subpopulation = recode(Subpopulation, # simpler naming conventions for the size categories
+                           "(1,4]" = "min_4" ,
+                           "(10,20]" = "10_20",
+                           "(20,50]" = "20_50",
+                           "(4,10]" = "4_10",
+                           ">50" = "50_max")) %>%
+  select(!Indicator)
+
+mean_sat_ratio %>% print()
+```  
+
+```{r save_to_drive_2, eval=FALSE, include=TRUE}
+write.csv(mean_sat_ratio, file = "./../inputData/populationEstimates/Survey_Ests_N20_sat.csv")
+```
+
+# Session Info
+
+```{r session}
+sessionInfo()
+```

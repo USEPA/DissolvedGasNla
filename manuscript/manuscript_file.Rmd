@@ -30,8 +30,7 @@ objs <- c("dg",
           "national_stats",
           "ecoreg_stats",
           "em_min_max",
-          "FluxBySize",
-          "ipcc.n2o"
+          "FluxBySize"
           )
 
 N <- length(objs)
@@ -39,7 +38,7 @@ N <- length(objs)
 # list of file paths for objects saved
 f <- list()
 for(i in 1:N){
-    f[i] <- paste0(Sys.getenv("RENV_PROJECT"), "/manuscript/manuscript_files/",
+    f[i] <- paste0("/manuscript/manuscript_files/",
     objs[i], ".rda")
     }
 
@@ -81,7 +80,7 @@ N <- length(objs)
 # list of file paths for objects saved
 f <- list()
 for(i in 1:N){
-    f[i] <- paste0(Sys.getenv("RENV_PROJECT"), "/manuscript/manuscript_figures/",
+    f[i] <- paste0("/manuscript/manuscript_figures/",
     objs[i])
     }
 

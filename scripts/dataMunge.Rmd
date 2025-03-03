@@ -3,13 +3,11 @@ title: "Data Munging"
 authors: "J. Beaulieu, R. Martin, and M. McManus"
 date: "`r Sys.Date()`"
 output:
-  html_document:
-    df_print: paged
+  github_document:
     toc: true
-    toc_float: true
-    fig_caption: yes
-    depth: 2
+    toc_depth: 5
     number_sections: true
+    keep_html: true
 editor_options: 
   chunk_output_type: console
 ---
@@ -23,38 +21,31 @@ localPath <- Sys.getenv("USERPROFILE")
 
 
 # Purpose
-The purpose of this .rmd is to prepare the data set for subsequent modeling.  The data will be written as .RData object and stored at the shared documents library associated with this project: https://usepa.sharepoint.com/sites/ORD_NLA17_Dissolved_Gas
+The purpose of this .rmd was to prepare the data set for subsequent modeling. The data were written as .RData object that is stored in the repository associated with this project: https://github.com/USEPA/DissolvedGasNla
 
-The dissolved gas data were curated in the 'NLA' dissolved gas project in RStudio.  The code can be found at a private github repository (https://github.com/USEPA/NLA).  After aggregating across duplicate samples, the data were written to nla17gasDataAggregated_2021-01-13.txt in the documents library associated with the 'ORD NLA17 Dissolved Gas' Private Group on SharePoint (https://usepa.sharepoint.com/sites/ORD_NLA17_Dissolved_Gas).  When synced to a local computer, the documents library can be read directly with R, after identifying the local directory path.
+The dissolved gas data were originally curated in the 'NLA' dissolved gas project in RStudio. The code can be found at a private github repository (https://github.com/USEPA/NLA).  After aggregating across duplicate samples, the data were written to nla17gasDataAggregated_2021-01-13.txt, which is also avaialble in the GitHub repository for this project: https://github.com/USEPA/DissolvedGasNla
 
-Roy Martin modeled the uncertainty in the N2O saturation ratio in DG_sensitivity_to_measurement_error.Rmd (Saturation ratio/Standard GC sections). The absolute error in the simulated values were written to desk and read in below. These error estimates are used to define uncertainty in the N2O saturation ratio.
+The data object ('dg.Rdata') munged in this document was subsequently used to estimate measurement uncertainty in the N2O observations, which is documented in the 'DG_sensitivity_to_measurement_error.Rmd' (Saturation ratio/Standard GC sections) file that is also available in the repository. From there, an updated 'dg.RData' object including this new information on uncertainty was imported into additional RStudio document workflows for (1) making design-based estimates from the survey data (Design_Based_Estimates.Rmd) and (2) generating population estimates using a Bayesian hierarchical model (NLA_N2O_models.Rmd). The object is also imported for the files used to generate the manuscript (manuscript_file.Rmd and manuscript_support.Rmd). All of these files (and more) are included in the GitHub repository for this project in order to ensure the results were reproducible starting from this base file of the observed data.
 
 # Data
 ## Read data
 Below we read in the data files.  
 
-```{r}
+```{r read_data}
 # Read dissolved gas data file
-dg <- read.table(file = paste0(localPath, 
-                               "/Environmental Protection Agency (EPA)/",
-                               "ORD NLA17 Dissolved Gas - Documents/",
-                               "inputData/nla17gasDataAggregated_2021-02-01.txt"),
+dg <- read.table(file = "./../inputData/nla17gasDataAggregated_2021-02-01.txt",
                  header = TRUE, sep = "\t", as.is = TRUE) %>%
   filter(!grepl("AK", site.id)) # omit Alaska sites
 
 # Read simulated saturation ratio values (See DG_sensitivity_to_measurement_error.Rmd, Saturation ratio/Standard GC)
-S_a_me_abs <- readRDS(paste0(localPath, 
-                             "/Environmental Protection Agency (EPA)/",
-                             "ORD NLA17 Dissolved Gas - Documents/",
-                             "inputData/S_a_me_abs.RDS"))
-
+#S_a_me_abs <- readRDS("inputData/S_a_me_abs.RDS")
 ```
 
 
 
 ## Manipulate
 ### Implement unit conversion and create source/sink column:
-``` {r}
+``` {r mutate_data}
 dg <- dg %>%
   # unit conversion
   mutate(dissolved.ch4.umol = dissolved.ch4 * 1000000, # mol/L -> umol/L
@@ -66,11 +57,8 @@ dg <- dg %>%
          # add source/sink column
          co2.src.snk = ifelse(co2.sat.ratio > 1, "source", "sink"),
          ch4.src.snk = ifelse(ch4.sat.ratio > 1, "source", "sink"),
-         n2o.src.snk = ifelse(n2o.sat.ratio > 1, "source", "sink"),
-         # recompute using error from Roy's uncertainty simulations
-         n2o.src.snk.error = case_when(
-           abs(n2o.sat.ratio - 1) < quantile(S_a_me_abs, probs = c(0.975)) ~ "undetermined",
-           TRUE ~ n2o.src.snk)) %>%
+         n2o.src.snk = ifelse(n2o.sat.ratio > 1, "source", "sink")
+         ) %>%
   # remove fields no longer needed
   select(-dissolved.ch4, -dissolved.co2, -dissolved.n2o,
          -sat.ch4, -sat.co2, - sat.n2o)
@@ -99,7 +87,7 @@ where k~600~ is the gas transfer velocity normalized to CO~2~ at 20 ^o^C, U10 is
 k~600~ is a standardized value that must be corrected for the differences in diffusivity among gases and water temperature at the sampling sites.  These corrections will be implemented at a later date and emission rates will be calculated using k~600~ for now.
 
 
-```{r}
+```{r mutate_data_2}
 dg <- dg %>% 
   mutate(
     # e.ch4 umol CH4/m2/d 
@@ -121,69 +109,10 @@ dg <- dg %>%
 
 ```
 
-## Emission rate for population estimate
-Tom Kincaid created a file to be used for population estimates.  Lets add our emission rates estimates to this file.  We can then use Tom's code to construct population estimates of emission rates.
-```{r}
-cdf <- read.csv(paste0(localPath,
-            "/Environmental Protection Agency (EPA)/",
-            "ORD NLA17 Dissolved Gas - Documents/",
-            "inputData/populationEstimates/",
-            "NLA17_DissolvedGases_forPopEst.csv"))
-
-# although data I provided Tom (nla17gasAggregatedForPopEst2019-10-23.txt) included data from both visits,
-# data used for population estimates included only visit one.  I don't know rationale for this, but will
-# do the same with the revised file here.  Also need to strip out air samples.
-unique(cdf$VISIT_NO) # 1
-dg.1 <- dg %>% filter(visit.no == 1, sample.source == "DG")
-
-# even after filtering, dg has 85 more observations than cdf
-dim(cdf) # 1005, 81
-dim(dg.1) # 1090, 306
-
-# which observations in filtered dg, not in cdf?
-# many of these are handpicked (HP) sites.  Others not sure
-# why are excluded
-dg.1 %>% filter(!(dg.1$site.id %in% cdf$SITE_ID)) %>%
-  select(site.id) %>%
-  as_tibble() %>% print(n=Inf)
-
-
-# using left_join to exclude sites from dg.1 that Tom did
-# not include in cdf (see above).  Presumably the excluded sites
-# are not probability sites
-cdf.dg <- left_join(cdf, 
-                    select(dg.1, site.id, visit.no, 
-                           e.ch4.umol.d , e.co2.umol.d, e.n2o.nmol.d, 
-                           f.ch4.km.d, f.co2.km.d, f.n2o.m.d) %>%
-                      # rename for consistency with Tom's data
-                      rename_all(~stringr::str_to_upper(.)) %>% 
-                      rename_all(~stringr::str_replace_all(., '\\.', '_')))
-
-
-dim(cdf.dg) # 1005, 87 same as cdf above, so good
-
-write.csv(cdf.dg, 
-          paste0(localPath,
-            "/Environmental Protection Agency (EPA)/",
-            "ORD NLA17 Dissolved Gas - Documents/",
-            "inputData/populationEstimates/",
-            "NLA17_DissolvedGases_forPopEst.jb.csv"))
-
-                
-
-```
-
-
 ## Write out data
 Write out final .RData object.
-```{r}
-save(dg, file = paste0(localPath,
-                       "/Environmental Protection Agency (EPA)/",
-                       "ORD NLA17 Dissolved Gas - Documents/",
-                       "inputData/dg.", Sys.Date(), ".RData"))
-
-
-
+```{r save_data_munged}
+save(dg, file = "./../inputData/dg.RData")
 ```
 
 

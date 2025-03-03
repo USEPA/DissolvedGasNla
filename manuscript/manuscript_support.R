@@ -5,7 +5,7 @@
 
 # SETUP----------------------
 ## Identify local path for each user
-localPath <- Sys.getenv("USERPROFILE")
+#localPath <- Sys.getenv("USERPROFILE")
 
 ## load libraries
 # DMAP not under renv control.  Should probably specify same
@@ -37,7 +37,8 @@ localPath <- Sys.getenv("USERPROFILE")
 library(sf) # spatial data
 library(tidyverse) # dplyr, ggplot
 library(janitor) # clean names
-library(USAboundaries) # state boundaries
+#library(USAboundaries) # state boundaries (removed from CRAN)
+library(usmap) # state boundaries 
 library(tictoc) # processing time
 library(ggpubr) # multiple plots
 library(ggallin) # psuedlolog transformation for negative values
@@ -45,16 +46,9 @@ library(tidybayes) # prop flux by size figure
 
 # DATA---------------
 ## load sample data (dg object)----
-if(localPath == "") { # if DMAP, then
-  load("inputData/dg.2025-02-14.RData")
-} else { # if not DMAP, then...
-  load(paste0(localPath,  # object name dg
-              "/Environmental Protection Agency (EPA)/",
-              "ORD NLA17 Dissolved Gas - Documents/",
-              "inputData/dg.2025-02-14.RData"))
-}
+load("./inputData/dg.RData")
 
-save(dg, file = "manuscript/manuscript_files/dg.rda")  # save dg file to ms folder for faster knitting
+save(dg, file = "./manuscript/manuscript_files/dg.rda")  # save dg file to ms folder for faster knitting
 
 # To enable spatial analysis of the data, the dataframe will be converted to a 
 # 'simple features' (sf) object.
@@ -67,17 +61,7 @@ dg.sf <- st_as_sf(dg, coords = c("map.lon.dd", "map.lat.dd"),
 
 ## load ecoregions----
 # read in ecoregion polygons
-if(localPath == ""){ # if DMAP, then
-  ecoR <- st_read(dsn = "inputData",
-                  layer = "aggr_ecoregions_simple",
-                  quiet = TRUE)
-} else { # if not DMAP, then...
-  ecoR <- st_read(dsn = paste0(localPath, 
-                               "/Environmental Protection Agency (EPA)/",
-                               "ORD NLA17 Dissolved Gas - Documents/inputData"),
-                  layer = "aggr_ecoregions_simple",
-                  quiet = TRUE)
-}
+ecoR <- st_read("/vsizip/inputData/aggr_ecoregions_simple.zip", quiet = TRUE)
 # Check CRS
 st_crs(ecoR) # 3857
 ecoR <- st_transform(ecoR, 5070) # convert to CONUS Albers
@@ -99,20 +83,19 @@ cols <- c("Coastal Plains" = "orange1",
 
 
 ## Load state boundaries----
-states <- USAboundaries::us_states() %>%
-  dplyr::filter(!state_name %in% c("Alaska", "District of Columbia", "Hawaii", "Puerto Rico")) %>%
-  st_transform(5070) # convert to CONUS Albers
+#states <- USAboundaries::us_states() %>%
+#  dplyr::filter(!state_name %in% c("Alaska", "District of Columbia", "Hawaii", "Puerto Rico")) %>%
+#  st_transform(5070) # convert to CONUS Albers
+
+states <- usmap::us_map() %>%
+  dplyr::filter(!full %in% c("Alaska", "District of Columbia", "Hawaii", "Puerto Rico")) %>%
+  sf::st_transform(5070) # convert to CONUS Albers
 
 
-## load population data----
+## load posterior predictions from modeling----
 #tic() # 7.6min on DMAP.  5 minutes on Dell Precision workstation
-if(localPath == ""){ # if DMAP, then
-  load("../../shared/jbeaulie/all_predictions.rda")
-} else { # if not DMAP
-  load(paste0(localPath, "\\Environmental Protection Agency (EPA)\\",
-              "ORD NLA17 Dissolved Gas - Documents\\",
-              "inputData\\all_predictions.rda"))
-}
+load("./inputData/all_predictions.rda")
+
 #toc()
 
 # remove Great Salt Lake
@@ -142,23 +125,16 @@ rm(all_predictions) # free up RAM
 ### read wind data----
 # Mean index period wind speed was calculated on VM via 
 # nlaSampleFrameWind.R.  The resulting data object was written out and read in below.
-if(localPath == ""){ # if DMAP, then
-  wind <- read.table("inputData/windSampleFrame.txt")
-} else { # if not DMAP, then...
-  wind <- read.table(paste0(Sys.getenv("USERPROFILE"), 
-                            "/Environmental Protection Agency (EPA)/",
-                            "ORD NLA17 Dissolved Gas - Documents/",
-                            "inputData/windSampleFrame.txt"))
-}
+wind <- read.table("./inputData/windSampleFrame.txt")
 
 # print first 6 lines
 wind %>% head()
 
 # print first 6 .row values of all_predictions
-all_predictions_ms %>%
-  filter(.row %in% 1:6) %>% # each row is a unique waterbody
-  group_by(.row) %>%
-  slice(1) # grabs first record
+#all_predictions_ms %>%
+#  filter(.row %in% 1:6) %>% # each row is a unique waterbody
+#  group_by(.row) %>%
+#  slice(1) # grabs first record
 
 # Row order in wind and all_predictions is inherited from sample frame.  Thus row 1
 # of wind corresponds to .row == 1 in all_predictions.  This is a sketchy way to merge
@@ -172,11 +148,11 @@ wind <- wind %>% mutate(.id = row_number())
 # left join needed to exclude great salt lake in wind data.  see line 88-93
 all_predictions_ms <- left_join(all_predictions_ms, wind, by = c(".row" = ".id")) # 40 seconds on laptop
 #toc()
-dim(wind) # 465897
-dim(all_predictions_ms) #931792000, 2000 observations for each lake
-465896*2000 #931792000
+#dim(wind) # 465897
+#dim(all_predictions_ms) #931792000, 2000 observations for each lake
+#465896*2000 #931792000
 
-summary(wind$ws)
+#summary(wind$ws)
 
 ### estimate gas exchange rate for population----
 
@@ -738,7 +714,7 @@ save(em_min_max, file = "manuscript/manuscript_files/em_min_max.rda")
 # should be prescribed to streams/rivers/lakes/reservoirs.
 # ipcc.n2o.surface = round(ipcc.n2o.indirect * (1/3), digits = 0) # 22,767
 
-ipcc.n2o <- tibble(indirect = (15.2+2.9)*(1/265)*(1000/1)*(1000/1)*(1000/1)*(1/1000),
-                   surface = round(ipcc.n2o.indirect * (1/3), digits = 0))
+#ipcc.n2o <- tibble(indirect = (15.2+2.9)*(1/265)*(1000/1)*(1000/1)*(1000/1)*(1/1000),
+#                   surface = round(ipcc.n2o.indirect * (1/3), digits = 0))
 
-save(ipcc.n2o, file = "manuscript/manuscript_files/ipcc.n2o.rda")
+#save(ipcc.n2o, file = "manuscript/manuscript_files/ipcc.n2o.rda")
