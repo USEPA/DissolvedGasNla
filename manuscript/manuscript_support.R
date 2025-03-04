@@ -29,15 +29,12 @@
 #   if(!require("pbkrtest")) install.packages("pbkrtest") 
 #   if(!require("ggpubr")) install.packages("ggpubr")
 #   if(!require("ggallin")) install.packages("ggallin")
-#   if(!require("USAboundaries")) devtools::install_version("USAboundaries", "0.4.0", 
-#                                                 repos = "https://cran.r-project.org/")
 #   if(!require("tidybayes")) install.packages("tidybayes")
 # }
 
 library(sf) # spatial data
 library(tidyverse) # dplyr, ggplot
 library(janitor) # clean names
-#library(USAboundaries) # state boundaries (removed from CRAN)
 library(usmap) # state boundaries 
 library(tictoc) # processing time
 library(ggpubr) # multiple plots
@@ -81,11 +78,6 @@ cols <- c("Coastal Plains" = "orange1",
           "Western Mountains" = "saddlebrown",
           "Xeric" = "lightskyblue4")
 
-
-## Load state boundaries----
-#states <- USAboundaries::us_states() %>%
-#  dplyr::filter(!state_name %in% c("Alaska", "District of Columbia", "Hawaii", "Puerto Rico")) %>%
-#  st_transform(5070) # convert to CONUS Albers
 
 states <- usmap::us_map() %>%
   dplyr::filter(!full %in% c("Alaska", "District of Columbia", "Hawaii", "Puerto Rico")) %>%
