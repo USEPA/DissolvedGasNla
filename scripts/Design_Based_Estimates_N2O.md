@@ -1,7 +1,7 @@
 Design-based estimates for N2O from the NLA 2017 Survey
 ================
 Roy Martin, Jake Beaulieu, Michael McManus
-2025-03-03
+2025-03-05
 
 # 1 Purpose
 
@@ -11,26 +11,6 @@ created a .csv file to be used for population estimates, which is loaded
 and munged below.
 
 # 2 Import and munge survey data
-
-    ## Warning: package 'tidyverse' was built under R version 4.4.1
-
-    ## Warning: package 'ggplot2' was built under R version 4.4.1
-
-    ## Warning: package 'tibble' was built under R version 4.4.1
-
-    ## Warning: package 'tidyr' was built under R version 4.4.1
-
-    ## Warning: package 'readr' was built under R version 4.4.1
-
-    ## Warning: package 'purrr' was built under R version 4.4.1
-
-    ## Warning: package 'dplyr' was built under R version 4.4.1
-
-    ## Warning: package 'stringr' was built under R version 4.4.1
-
-    ## Warning: package 'forcats' was built under R version 4.4.1
-
-    ## Warning: package 'lubridate' was built under R version 4.4.1
 
     ## ── Attaching core tidyverse packages ──────────────────────── tidyverse 2.0.0 ──
     ## ✔ dplyr     1.1.4     ✔ readr     2.1.5
@@ -42,51 +22,54 @@ and munged below.
     ## ✖ dplyr::filter() masks stats::filter()
     ## ✖ dplyr::lag()    masks stats::lag()
     ## ℹ Use the conflicted package (<http://conflicted.r-lib.org/>) to force all conflicts to become errors
-
-    ## Warning: package 'Hmisc' was built under R version 4.4.2
-
     ## 
     ## Attaching package: 'Hmisc'
+    ## 
     ## 
     ## The following objects are masked from 'package:dplyr':
     ## 
     ##     src, summarize
     ## 
+    ## 
     ## The following objects are masked from 'package:base':
     ## 
     ##     format.pval, units
-
-    ## Warning: package 'spsurvey' was built under R version 4.4.2
-
+    ## 
+    ## 
     ## Loading required package: sf
-
-    ## Warning: package 'sf' was built under R version 4.4.2
-
-    ## Linking to GEOS 3.13.0, GDAL 3.10.1, PROJ 9.5.1; sf_use_s2() is TRUE
+    ## 
+    ## Linking to GEOS 3.10.2, GDAL 3.4.1, PROJ 8.2.1; sf_use_s2() is TRUE
+    ## 
     ## Loading required package: survey
-
-    ## Warning: package 'survey' was built under R version 4.4.2
-
+    ## 
     ## Loading required package: grid
+    ## 
     ## Loading required package: Matrix
     ## 
+    ## 
     ## Attaching package: 'Matrix'
+    ## 
     ## 
     ## The following objects are masked from 'package:tidyr':
     ## 
     ##     expand, pack, unpack
     ## 
+    ## 
     ## Loading required package: survival
     ## 
+    ## 
     ## Attaching package: 'survey'
+    ## 
     ## 
     ## The following object is masked from 'package:Hmisc':
     ## 
     ##     deff
     ## 
+    ## 
     ## The following object is masked from 'package:graphics':
     ## 
     ##     dotchart
+    ## 
     ## 
     ## spsurvey version 5.0.0 introduced significant changes to the inputs and outputs of many functions. Please review the updated materials, vignettes, and documentation by visiting 
     ##  https://cran.r-project.org/package=spsurvey
@@ -215,22 +198,24 @@ write.csv(mean_sat_ratio, file = "./../inputData/populationEstimates/Survey_Ests
 sessionInfo()
 ```
 
-    ## R version 4.4.0 (2024-04-24 ucrt)
-    ## Platform: x86_64-w64-mingw32/x64
-    ## Running under: Windows 11 x64 (build 22631)
+    ## R version 4.4.0 (2024-04-24)
+    ## Platform: x86_64-pc-linux-gnu
+    ## Running under: Ubuntu 22.04.4 LTS
     ## 
     ## Matrix products: default
-    ## 
+    ## BLAS:   /usr/lib/x86_64-linux-gnu/openblas-pthread/libblas.so.3 
+    ## LAPACK: /usr/lib/x86_64-linux-gnu/openblas-pthread/libopenblasp-r0.3.20.so;  LAPACK version 3.10.0
     ## 
     ## locale:
-    ## [1] LC_COLLATE=English_United States.utf8 
-    ## [2] LC_CTYPE=English_United States.utf8   
-    ## [3] LC_MONETARY=English_United States.utf8
-    ## [4] LC_NUMERIC=C                          
-    ## [5] LC_TIME=English_United States.utf8    
+    ##  [1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C              
+    ##  [3] LC_TIME=en_US.UTF-8        LC_COLLATE=en_US.UTF-8    
+    ##  [5] LC_MONETARY=en_US.UTF-8    LC_MESSAGES=en_US.UTF-8   
+    ##  [7] LC_PAPER=en_US.UTF-8       LC_NAME=C                 
+    ##  [9] LC_ADDRESS=C               LC_TELEPHONE=C            
+    ## [11] LC_MEASUREMENT=en_US.UTF-8 LC_IDENTIFICATION=C       
     ## 
-    ## time zone: America/New_York
-    ## tzcode source: internal
+    ## time zone: Etc/UTC
+    ## tzcode source: system (glibc)
     ## 
     ## attached base packages:
     ## [1] grid      stats     graphics  grDevices utils     datasets  methods  
@@ -238,25 +223,26 @@ sessionInfo()
     ## 
     ## other attached packages:
     ##  [1] spsurvey_5.5.1  survey_4.4-2    survival_3.5-8  Matrix_1.7-0   
-    ##  [5] sf_1.0-19       Hmisc_5.2-2     lubridate_1.9.3 forcats_1.0.0  
+    ##  [5] sf_1.0-16       Hmisc_5.2-2     lubridate_1.9.3 forcats_1.0.0  
     ##  [9] stringr_1.5.1   dplyr_1.1.4     purrr_1.0.2     readr_2.1.5    
     ## [13] tidyr_1.3.1     tibble_3.2.1    ggplot2_3.5.1   tidyverse_2.0.0
     ## 
     ## loaded via a namespace (and not attached):
-    ##  [1] gtable_0.3.5       xfun_0.47          htmlwidgets_1.6.4  lattice_0.22-6    
-    ##  [5] tzdb_0.4.0         sampling_2.10      vctrs_0.6.5        tools_4.4.0       
-    ##  [9] generics_0.1.3     proxy_0.4-27       fansi_1.0.6        AlgDesign_1.2.1.1 
-    ## [13] cluster_2.1.6      pkgconfig_2.0.3    KernSmooth_2.23-22 data.table_1.15.4 
-    ## [17] checkmate_2.3.2    lifecycle_1.0.4    deldir_2.0-4       compiler_4.4.0    
-    ## [21] munsell_0.5.1      mitools_2.4        htmltools_0.5.8.1  class_7.3-22      
-    ## [25] yaml_2.3.10        htmlTable_2.4.3    Formula_1.2-5      nloptr_2.1.1      
-    ## [29] pillar_1.9.0       MASS_7.3-60.2      classInt_0.4-11    boot_1.3-30       
-    ## [33] rpart_4.1.23       nlme_3.1-164       gtools_3.9.5       tidyselect_1.2.1  
-    ## [37] digest_0.6.37      stringi_1.8.4      splines_4.4.0      fastmap_1.2.0     
-    ## [41] colorspace_2.1-1   cli_3.6.3          magrittr_2.0.3     base64enc_0.1-3   
-    ## [45] utf8_1.2.4         e1071_1.7-16       foreign_0.8-86     withr_3.0.2       
-    ## [49] scales_1.3.0       backports_1.5.0    timechange_0.3.0   rmarkdown_2.28    
-    ## [53] lme4_1.1-35.5      nnet_7.3-19        gridExtra_2.3      hms_1.1.3         
-    ## [57] lpSolve_5.6.23     evaluate_1.0.3     knitr_1.48         crossdes_1.1-2    
-    ## [61] rlang_1.1.4        Rcpp_1.0.13        glue_1.7.0         DBI_1.2.3         
-    ## [65] minqa_1.2.8        rstudioapi_0.16.0  R6_2.5.1           units_0.8-5
+    ##  [1] gtable_0.3.5       xfun_0.43          htmlwidgets_1.6.4  lattice_0.22-6    
+    ##  [5] tzdb_0.4.0         sampling_2.10      Rdpack_2.6.2       vctrs_0.6.5       
+    ##  [9] tools_4.4.0        generics_0.1.3     proxy_0.4-27       fansi_1.0.6       
+    ## [13] AlgDesign_1.2.1.1  cluster_2.1.6      pkgconfig_2.0.3    KernSmooth_2.23-22
+    ## [17] data.table_1.15.4  checkmate_2.3.2    lifecycle_1.0.4    deldir_2.0-4      
+    ## [21] compiler_4.4.0     munsell_0.5.1      mitools_2.4        htmltools_0.5.8.1 
+    ## [25] class_7.3-22       yaml_2.3.8         htmlTable_2.4.3    Formula_1.2-5     
+    ## [29] nloptr_2.1.1       pillar_1.9.0       MASS_7.3-60.2      classInt_0.4-10   
+    ## [33] reformulas_0.4.0   boot_1.3-30        rpart_4.1.23       nlme_3.1-164      
+    ## [37] gtools_3.9.5       tidyselect_1.2.1   digest_0.6.35      stringi_1.8.3     
+    ## [41] splines_4.4.0      fastmap_1.1.1      colorspace_2.1-0   cli_3.6.2         
+    ## [45] magrittr_2.0.3     base64enc_0.1-3    utf8_1.2.4         e1071_1.7-14      
+    ## [49] foreign_0.8-86     withr_3.0.0        scales_1.3.0       backports_1.4.1   
+    ## [53] timechange_0.3.0   rmarkdown_2.26     lme4_1.1-36        nnet_7.3-19       
+    ## [57] gridExtra_2.3      hms_1.1.3          lpSolve_5.6.23     evaluate_0.23     
+    ## [61] knitr_1.46         rbibutils_2.3      crossdes_1.1-2     rlang_1.1.3       
+    ## [65] Rcpp_1.0.12        glue_1.7.0         DBI_1.2.2          minqa_1.2.8       
+    ## [69] rstudioapi_0.16.0  R6_2.5.1           units_0.8-5

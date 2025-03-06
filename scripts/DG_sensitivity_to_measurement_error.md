@@ -1,7 +1,7 @@
 Sensitivity to measurement error in dissolved gas measurements
 ================
 Roy Martin, Jake Beaulieu, Michael McManus
-2025-03-03
+2025-03-05
 
 - [1 Background](#1-background)
 - [2 Dissolved concentration](#2-dissolved-concentration)
@@ -765,14 +765,14 @@ below.
 sd(C_all_me* 1e9) # 0.20 nmol L-1
 ```
 
-    ## [1] 0.3227783
+    ## [1] 0.3230261
 
 ``` r
 # 2 standard deviations
 sd(C_all_me * 1e9) * 1.96 # +/- 0.395 nmol N2O
 ```
 
-    ## [1] 0.6326455
+    ## [1] 0.6331311
 
 Alternatively, calculate the central 95th percentile of the simulated
 measures.
@@ -792,7 +792,7 @@ round(quantile((C + C_all_me_abs), probs = c(0.025, 0.975)), 3) # +/- nmol N2O
 ```
 
     ##  2.5% 97.5% 
-    ## 7.083 8.349
+    ## 7.080 8.347
 
 ## 2.4 Summary of contributions to error
 
@@ -946,14 +946,14 @@ C_all_eq_me_abs <- (C_all_eq_me * 1e9) - C_eq
 sd(C_all_eq_me* 1e9) # 0.20 nmol L-1
 ```
 
-    ## [1] 0.199273
+    ## [1] 0.1986766
 
 ``` r
 # 2 standard deviations
 sd(C_all_eq_me * 1e9) * 1.96 # +/- 0.395 nmol N2O
 ```
 
-    ## [1] 0.3905752
+    ## [1] 0.3894061
 
 ``` r
 # standard deviation of a measurement is:
@@ -970,7 +970,7 @@ round(quantile((C_eq + C_all_eq_me_abs), probs = c(0.025, 0.975)), 3) # +/- nmol
 ```
 
     ##  2.5% 97.5% 
-    ## 7.441 8.223
+    ## 7.443 8.220
 
 ## 3.3 Summary of contributions to error
 
@@ -1084,14 +1084,14 @@ S_a_me_abs <- S_a_me - S
 sd(S_a_me) # 0.026
 ```
 
-    ## [1] 0.05487132
+    ## [1] 0.05481428
 
 ``` r
 # the 95% CI is therefore the computed value +/- 2 standard deviations
 sd(S_a_me) * 1.96 # +/- 0.05258214
 ```
 
-    ## [1] 0.1075478
+    ## [1] 0.107436
 
 ``` r
 # so any ratio within 0.05 of 1.0 cannot be discerned as a source or sink?
@@ -1110,7 +1110,7 @@ round(quantile(S_a_me_abs, probs = c(0.025, 0.975)), 3) # approx +/- 0.11
 ```
 
     ##   2.5%  97.5% 
-    ## -0.103  0.112
+    ## -0.103  0.111
 
 ``` r
 # the 95% CI for an observation with measurement error can be computed 
@@ -1120,7 +1120,7 @@ round(quantile((S + S_a_me_abs), probs = c(0.025, 0.975)), 3) # +/- nmol N2O
 ```
 
     ##  2.5% 97.5% 
-    ## 0.882 1.097
+    ## 0.882 1.096
 
 #### 4.1.1.1 Map source-sink status
 
@@ -1153,9 +1153,9 @@ dg %>%
 
 | Var1         | Freq |
 |:-------------|-----:|
-| sink         |  377 |
-| source       |  183 |
-| undetermined |  424 |
+| sink         |  378 |
+| source       |  184 |
+| undetermined |  422 |
 
 Number of lakes classified as source/sink
 
@@ -1224,14 +1224,14 @@ S_pg_me_abs <- S_pg_me - S_pg
 sd(S_pg_me) # 0.048
 ```
 
-    ## [1] 0.04793482
+    ## [1] 0.04814038
 
 ``` r
 # the 95% CI is therefore the computed value +/- 2 standard deviations
 sd(S_pg_me) * 1.96 # +/- 0.094
 ```
 
-    ## [1] 0.09395225
+    ## [1] 0.09435515
 
 ``` r
 # so any ratio within 0.094 of 1.0 cannot be discerned as a source or sink
@@ -1285,9 +1285,9 @@ dg %>%
 
 | Var1         | Freq |
 |:-------------|-----:|
-| sink         |  408 |
+| sink         |  409 |
 | source       |  194 |
-| undetermined |  382 |
+| undetermined |  381 |
 
 Number of lakes classified as source/sink
 
@@ -1300,7 +1300,7 @@ dg %>%
 
 | Var1         | Freq |
 |:-------------|-----:|
-| sink         | 0.41 |
+| sink         | 0.42 |
 | source       | 0.20 |
 | undetermined | 0.39 |
 
@@ -1353,14 +1353,14 @@ S_a_hpt_me_abs <- S_a_hpt_me - S
 sd(S_a_hpt_me) # 0.026
 ```
 
-    ## [1] 0.05487129
+    ## [1] 0.05481451
 
 ``` r
 # the 95% CI is therefore the computed value +/- 2 standard deviations
 sd(S_a_hpt_me) * 1.96 # +/- 0.05258214
 ```
 
-    ## [1] 0.1075477
+    ## [1] 0.1074364
 
 ``` r
 # so any ratio within 0.05 of 1.0 cannot be discerned as a source or sink?
@@ -1379,7 +1379,7 @@ round(quantile(S_a_hpt_me_abs, probs = c(0.025, 0.975)), 3) # approx +/- 0.11
 ```
 
     ##   2.5%  97.5% 
-    ## -0.103  0.112
+    ## -0.103  0.111
 
 ``` r
 # the 95% CI for an observation with measurement error can be computed 
@@ -1389,7 +1389,7 @@ round(quantile((S + S_a_hpt_me_abs), probs = c(0.025, 0.975)), 3) # +/- nmol N2O
 ```
 
     ##  2.5% 97.5% 
-    ## 0.882 1.097
+    ## 0.882 1.096
 
 #### 4.1.3.1 Source-sink status
 
@@ -1414,9 +1414,9 @@ dg %>%
 
 | Var1         | Freq |
 |:-------------|-----:|
-| sink         |  377 |
-| source       |  183 |
-| undetermined |  424 |
+| sink         |  378 |
+| source       |  184 |
+| undetermined |  422 |
 
 Number of lakes classified as source/sink
 
@@ -1463,14 +1463,14 @@ S_pg_hpt_me_abs <- S_pg_hpt_me - S_pg
 sd(S_pg_hpt_me) # 0.026
 ```
 
-    ## [1] 0.04793385
+    ## [1] 0.04814114
 
 ``` r
 # the 95% CI is therefore the computed value +/- 2 standard deviations
 sd(S_pg_hpt_me) * 1.96 # +/- 0.05258214
 ```
 
-    ## [1] 0.09395034
+    ## [1] 0.09435663
 
 ``` r
 # so any ratio within 0.05 of 1.0 cannot be discerned as a source or sink?
@@ -1602,14 +1602,14 @@ S_pg_hpgc_me_abs <- S_pg_hpgc_me - S_pg_hpgc
 sd(S_pg_hpgc_me) # 0.029
 ```
 
-    ## [1] 0.02858085
+    ## [1] 0.02857339
 
 ``` r
 # the 95% CI is therefore the computed value +/- 2 standard deviations
 sd(S_pg_hpgc_me) * 1.96 # +/- 0.0569
 ```
 
-    ## [1] 0.05601847
+    ## [1] 0.05600384
 
 ``` r
 # so any ratio within 0.0569 of 1.0 cannot be discerned as a source or sink
@@ -1721,14 +1721,14 @@ S_pg_hpgc_hpt_me_abs <- S_pg_hpgc_hpt_me - S_pg_hpgc
 sd(S_pg_hpgc_hpt_me) # 0.029
 ```
 
-    ## [1] 0.02858561
+    ## [1] 0.02857729
 
 ``` r
 # the 95% CI is therefore the computed value +/- 2 standard deviations
 sd(S_pg_hpgc_hpt_me) * 1.96 # +/- 0.0569
 ```
 
-    ## [1] 0.05602779
+    ## [1] 0.05601149
 
 ``` r
 # so any ratio within 0.0569 of 1.0 cannot be discerned as a source or sink
@@ -1783,8 +1783,8 @@ dg %>%
 | Var1         | Freq |
 |:-------------|-----:|
 | sink         |  521 |
-| source       |  247 |
-| undetermined |  216 |
+| source       |  248 |
+| undetermined |  215 |
 
 Number of lakes classified as source/sink
 
@@ -1994,28 +1994,28 @@ C_mims_hpt_me_abs <- (C_mims_hpt_me * 1e9) - C_mims
 sd(C_mims_hpt_me * 1e9) # 0.169 using Speir CV to calculate N2O:Ar sd.   0.15 with GC and headspace equilibrium!
 ```
 
-    ## [1] 0.1696771
+    ## [1] 0.1691907
 
 ``` r
 # 1.96 x sd
 sd(C_mims_hpt_me * 1e9) * 1.96 
 ```
 
-    ## [1] 0.3325672
+    ## [1] 0.3316138
 
 ``` r
 # CV of dissolved N2O
 (sd(C_mims_hpt_me * 1e9) / mean(C_mims_hpt_me * 1e9)) * 100 # 0.025 = 2.5% vs 12% using Genther sd.
 ```
 
-    ## [1] 2.543801
+    ## [1] 2.536562
 
 ``` r
 # standard deviation of a measurement is:
 round(sd(C_mims_hpt_me_abs), 3) # 0.20 nmol L-1
 ```
 
-    ## [1] 0.17
+    ## [1] 0.169
 
 ``` r
 # central 95th percentile of absolute error
@@ -2023,7 +2023,7 @@ round(quantile(C_mims_hpt_me_abs, probs = c(0.025, 0.975)), 3) # approx +/- 0.11
 ```
 
     ##   2.5%  97.5% 
-    ## -0.331  0.334
+    ## -0.330  0.332
 
 ``` r
 # the 95% CI for an observation with measurement error can be computed 
@@ -2033,7 +2033,7 @@ round(quantile((C_mims + C_mims_hpt_me_abs), probs = c(0.025, 0.975)), 3) # +/- 
 ```
 
     ##  2.5% 97.5% 
-    ## 6.339 7.005
+    ## 6.340 7.002
 
 ### 5.1.2 High precision GC
 
@@ -2067,27 +2067,27 @@ C_mims_hpgc_hpt_me_abs <- (C_mims_hpgc_hpt_me * 1e9) - C_mims
 sd(C_mims_hpgc_hpt_me * 1e9) # 0.0166 using Speir CV to calculate N2O:Ar sd. 0.15 with GC and headspace equilibrium!
 ```
 
-    ## [1] 0.01648148
+    ## [1] 0.01659803
 
 ``` r
 sd(C_mims_hpgc_hpt_me * 1e9) * 1.96 # sd +/- 1.96 (for conf intervals on error)
 ```
 
-    ## [1] 0.0323037
+    ## [1] 0.03253213
 
 ``` r
 # CV of dissolved N2O
 sd(C_mims_hpgc_hpt_me * 1e9) / mean(C_mims_hpgc_hpt_me * 1e9) * 100 # 0.0025 = 0.25% CV 
 ```
 
-    ## [1] 0.2470948
+    ## [1] 0.2488408
 
 ``` r
 # standard deviation of a measurement is:
 round(sd(C_mims_hpgc_hpt_me_abs), 3)
 ```
 
-    ## [1] 0.016
+    ## [1] 0.017
 
 ``` r
 # central 95th percentile of absolute error
@@ -2095,7 +2095,7 @@ round(quantile(C_mims_hpgc_hpt_me_abs, probs = c(0.025, 0.975)), 3)
 ```
 
     ##   2.5%  97.5% 
-    ## -0.032  0.032
+    ## -0.033  0.033
 
 ``` r
 # the 95% CI for an observation with measurement error can be computed 
@@ -2105,7 +2105,7 @@ round(quantile((C_mims + C_mims_hpgc_hpt_me_abs), probs = c(0.025, 0.975)), 3) #
 ```
 
     ##  2.5% 97.5% 
-    ## 6.638 6.703
+    ## 6.637 6.703
 
 ## 5.2 Saturation ratio
 
@@ -2153,14 +2153,14 @@ S_mims_me_abs <- S_mims_me - S_mims
 sd(S_mims_me) # 0.0011
 ```
 
-    ## [1] 0.001072047
+    ## [1] 0.001071651
 
 ``` r
 # the 95% CI is therefore the computed value +/- 2 standard deviations
 sd(S_mims_me) * 1.96 # +/- 0.00216
 ```
 
-    ## [1] 0.002101213
+    ## [1] 0.002100436
 
 ``` r
 # so any ratio within 0.00216 of 1.0 cannot be discerned as a source or sink
@@ -2169,7 +2169,7 @@ sd(S_mims_me) * 1.96 # +/- 0.00216
 sd(S_mims_me) / mean(S_mims_me) * 100 # 0.13% CV 
 ```
 
-    ## [1] 0.1258491
+    ## [1] 0.1258031
 
 ``` r
 # standard deviation of a measurement is:
@@ -2268,14 +2268,14 @@ S_mims_hpt_me_abs <- S_mims_hpt_me - S_mims
 sd(S_mims_hpt_me) # 0.0011
 ```
 
-    ## [1] 0.0006035572
+    ## [1] 0.0006046325
 
 ``` r
 # the 95% CI is therefore the computed value +/- 2 standard deviations
 sd(S_mims_hpt_me) * 1.96 # +/- 0.00216
 ```
 
-    ## [1] 0.001182972
+    ## [1] 0.00118508
 
 ``` r
 # so any ratio within 0.00216 of 1.0 cannot be discerned as a source or sink
@@ -2284,7 +2284,7 @@ sd(S_mims_hpt_me) * 1.96 # +/- 0.00216
 sd(S_mims_hpt_me) / mean(S_mims_hpt_me) * 100 # 0.13% CV 
 ```
 
-    ## [1] 0.07085226
+    ## [1] 0.07097859
 
 ``` r
 # standard deviation of a measurement is:
@@ -2386,14 +2386,14 @@ S_mims_hpgc_me_abs <- S_mims_hpgc_me - S_mims
 sd(S_mims_hpgc_me) # 0.0011
 ```
 
-    ## [1] 0.001072047
+    ## [1] 0.001071651
 
 ``` r
 # the 95% CI is therefore the computed value +/- 2 standard deviations
 sd(S_mims_hpgc_me) * 1.96 # +/- 0.00216
 ```
 
-    ## [1] 0.002101213
+    ## [1] 0.002100436
 
 ``` r
 # so any ratio within 0.00216 of 1.0 cannot be discerned as a source or sink
@@ -2402,7 +2402,7 @@ sd(S_mims_hpgc_me) * 1.96 # +/- 0.00216
 sd(S_mims_hpgc_me) / mean(S_mims_hpgc_me) * 100 # 0.07% CV 
 ```
 
-    ## [1] 0.1258491
+    ## [1] 0.1258031
 
 ``` r
 # standard deviation of a measurement is:
@@ -2507,14 +2507,14 @@ S_mims_hpgc_hpt_me_abs <- S_mims_hpgc_hpt_me - S_mims
 sd(S_mims_hpgc_hpt_me) # 0.0006603624
 ```
 
-    ## [1] 0.0006035572
+    ## [1] 0.0006046325
 
 ``` r
 # the 95% CI is therefore the computed value +/- 2 standard deviations
 sd(S_mims_hpgc_hpt_me) * 1.96 # +/- 0.00129431
 ```
 
-    ## [1] 0.001182972
+    ## [1] 0.00118508
 
 ``` r
 # so any ratio within 0.00129 of 1.0 cannot be discerned as a source or sink
@@ -2722,57 +2722,59 @@ save(dg, file = "./../inputData/dg.RData")
 sessionInfo()
 ```
 
-    ## R version 4.4.0 (2024-04-24 ucrt)
-    ## Platform: x86_64-w64-mingw32/x64
-    ## Running under: Windows 11 x64 (build 22631)
+    ## R version 4.4.0 (2024-04-24)
+    ## Platform: x86_64-pc-linux-gnu
+    ## Running under: Ubuntu 22.04.4 LTS
     ## 
     ## Matrix products: default
-    ## 
+    ## BLAS:   /usr/lib/x86_64-linux-gnu/openblas-pthread/libblas.so.3 
+    ## LAPACK: /usr/lib/x86_64-linux-gnu/openblas-pthread/libopenblasp-r0.3.20.so;  LAPACK version 3.10.0
     ## 
     ## locale:
-    ## [1] LC_COLLATE=English_United States.utf8 
-    ## [2] LC_CTYPE=English_United States.utf8   
-    ## [3] LC_MONETARY=English_United States.utf8
-    ## [4] LC_NUMERIC=C                          
-    ## [5] LC_TIME=English_United States.utf8    
+    ##  [1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C              
+    ##  [3] LC_TIME=en_US.UTF-8        LC_COLLATE=en_US.UTF-8    
+    ##  [5] LC_MONETARY=en_US.UTF-8    LC_MESSAGES=en_US.UTF-8   
+    ##  [7] LC_PAPER=en_US.UTF-8       LC_NAME=C                 
+    ##  [9] LC_ADDRESS=C               LC_TELEPHONE=C            
+    ## [11] LC_MEASUREMENT=en_US.UTF-8 LC_IDENTIFICATION=C       
     ## 
-    ## time zone: America/New_York
-    ## tzcode source: internal
+    ## time zone: Etc/UTC
+    ## tzcode source: system (glibc)
     ## 
     ## attached base packages:
     ## [1] stats     graphics  grDevices utils     datasets  methods   base     
     ## 
     ## other attached packages:
-    ##  [1] usmap_0.7.1      sf_1.0-19        janitor_2.2.1    readxl_1.4.3    
-    ##  [5] gridExtra_2.3    ggExtra_0.10.1   tidybayes_3.0.6  lubridate_1.9.3 
+    ##  [1] usmap_0.7.1      sf_1.0-16        janitor_2.2.1    readxl_1.4.3    
+    ##  [5] gridExtra_2.3    ggExtra_0.10.1   tidybayes_3.0.7  lubridate_1.9.3 
     ##  [9] forcats_1.0.0    stringr_1.5.1    dplyr_1.1.4      purrr_1.0.2     
     ## [13] readr_2.1.5      tidyr_1.3.1      tibble_3.2.1     tidyverse_2.0.0 
     ## [17] ggpubr_0.6.0     ggplot2_3.5.1    kableExtra_1.4.0 bayesplot_1.11.1
-    ## [21] rmarkdown_2.28   knitr_1.48      
+    ## [21] rmarkdown_2.26   knitr_1.46      
     ## 
     ## loaded via a namespace (and not attached):
-    ##  [1] svUnit_1.0.6         tidyselect_1.2.1     viridisLite_0.4.2   
-    ##  [4] farver_2.1.2         fastmap_1.2.0        tensorA_0.36.2.1    
-    ##  [7] promises_1.3.0       digest_0.6.37        timechange_0.3.0    
-    ## [10] mime_0.12            lifecycle_1.0.4      magrittr_2.0.3      
-    ## [13] posterior_1.6.0      compiler_4.4.0       rlang_1.1.4         
-    ## [16] tools_4.4.0          utf8_1.2.4           yaml_2.3.10         
-    ## [19] ggsignif_0.6.4       labeling_0.4.3       classInt_0.4-11     
-    ## [22] xml2_1.3.6           KernSmooth_2.23-22   abind_1.4-5         
-    ## [25] miniUI_0.1.1.1       withr_3.0.2          grid_4.4.0          
-    ## [28] fansi_1.0.6          xtable_1.8-4         e1071_1.7-16        
-    ## [31] colorspace_2.1-1     scales_1.3.0         cli_3.6.3           
-    ## [34] generics_0.1.3       rstudioapi_0.16.0    tzdb_0.4.0          
-    ## [37] proxy_0.4-27         DBI_1.2.3            cellranger_1.1.0    
-    ## [40] vctrs_0.6.5          carData_3.0-5        car_3.1-2           
-    ## [43] hms_1.1.3            arrayhelpers_1.1-0   rstatix_0.7.2       
-    ## [46] systemfonts_1.1.0    ggdist_3.3.2         usmapdata_0.3.0     
-    ## [49] units_0.8-5          glue_1.7.0           cowplot_1.1.3       
-    ## [52] distributional_0.4.0 stringi_1.8.4        gtable_0.3.5        
-    ## [55] later_1.3.2          munsell_0.5.1        pillar_1.9.0        
-    ## [58] htmltools_0.5.8.1    R6_2.5.1             evaluate_1.0.3      
-    ## [61] shiny_1.9.1          lattice_0.22-6       highr_0.11          
-    ## [64] backports_1.5.0      broom_1.0.6          snakecase_0.11.1    
-    ## [67] httpuv_1.6.15        class_7.3-22         Rcpp_1.0.13         
-    ## [70] svglite_2.1.3        coda_0.19-4.1        checkmate_2.3.2     
-    ## [73] xfun_0.47            pkgconfig_2.0.3
+    ##  [1] DBI_1.2.2            rlang_1.1.3          magrittr_2.0.3      
+    ##  [4] snakecase_0.11.1     e1071_1.7-14         compiler_4.4.0      
+    ##  [7] systemfonts_1.2.1    vctrs_0.6.5          pkgconfig_2.0.3     
+    ## [10] arrayhelpers_1.1-0   fastmap_1.1.1        backports_1.4.1     
+    ## [13] labeling_0.4.3       utf8_1.2.4           promises_1.3.0      
+    ## [16] tzdb_0.4.0           xfun_0.43            highr_0.10          
+    ## [19] later_1.3.2          broom_1.0.5          R6_2.5.1            
+    ## [22] stringi_1.8.3        car_3.1-3            cellranger_1.1.0    
+    ## [25] Rcpp_1.0.12          httpuv_1.6.15        timechange_0.3.0    
+    ## [28] tidyselect_1.2.1     rstudioapi_0.16.0    abind_1.4-5         
+    ## [31] yaml_2.3.8           miniUI_0.1.1.1       lattice_0.22-6      
+    ## [34] shiny_1.8.1.1        withr_3.0.0          posterior_1.6.1     
+    ## [37] coda_0.19-4.1        evaluate_0.23        units_0.8-5         
+    ## [40] proxy_0.4-27         ggdist_3.3.2         xml2_1.3.6          
+    ## [43] pillar_1.9.0         carData_3.0-5        tensorA_0.36.2.1    
+    ## [46] KernSmooth_2.23-22   checkmate_2.3.2      distributional_0.5.0
+    ## [49] generics_0.1.3       hms_1.1.3            munsell_0.5.1       
+    ## [52] scales_1.3.0         xtable_1.8-4         class_7.3-22        
+    ## [55] glue_1.7.0           tools_4.4.0          ggsignif_0.6.4      
+    ## [58] usmapdata_0.3.0      cowplot_1.1.3        grid_4.4.0          
+    ## [61] colorspace_2.1-0     Formula_1.2-5        cli_3.6.2           
+    ## [64] fansi_1.0.6          svUnit_1.0.6         viridisLite_0.4.2   
+    ## [67] svglite_2.1.3        gtable_0.3.5         rstatix_0.7.2       
+    ## [70] digest_0.6.35        classInt_0.4-10      farver_2.1.1        
+    ## [73] htmltools_0.5.8.1    lifecycle_1.0.4      mime_0.12

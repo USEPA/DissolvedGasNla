@@ -1603,11 +1603,7 @@ dg.sf <- st_as_sf(dg, coords = c("map.lon.dd", "map.lat.dd"),
 ```{r plot_map_ratio_all_air, echo=FALSE, fig.align='center', fig.width=8, fig.asp=0.6}
 ## load ecoregions----
 # read in ecoregion polygons
-ecoR <- st_read(dsn = paste0(localPath, 
-                             "/Environmental Protection Agency (EPA)/",
-                             "ORD NLA17 Dissolved Gas - Documents/inputData"),
-                layer = "aggr_ecoregions_simple",
-                quiet = TRUE)
+ecoR <- st_read("/vsizip/./../inputData/aggr_ecoregions_simple.zip", quiet = TRUE)
 
 # Check CRS
 #st_crs(ecoR) # 3857

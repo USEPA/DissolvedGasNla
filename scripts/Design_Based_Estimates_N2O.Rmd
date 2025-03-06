@@ -109,7 +109,7 @@ mean_dissolved <- Design_estimates$Mean %>%
 mean_dissolved %>% print()
 ```  
 
-```{r save_to_drive_1, eval=FALSE, include=TRUE}
+```{r save_to_drive_1, eval=TRUE, include=TRUE}
 write.csv(mean_dissolved, file = "./../inputData/populationEstimates/Survey_Ests_N20_dissolved.csv")
 ```
   
@@ -133,7 +133,7 @@ mean_sat_ratio <- Design_estimates$Mean %>%
 mean_sat_ratio %>% print()
 ```  
 
-```{r save_to_drive_2, eval=FALSE, include=TRUE}
+```{r save_to_drive_2, eval=TRUE, include=TRUE}
 write.csv(mean_sat_ratio, file = "./../inputData/populationEstimates/Survey_Ests_N20_sat.csv")
 ```
 
