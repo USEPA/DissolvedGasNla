@@ -41,12 +41,14 @@ library(ggpubr) # multiple plots
 library(ggallin) # psuedlolog transformation for negative values
 library(tidybayes) # prop flux by size figure
 
+
+if(!("figure1.png" %in% list.files("manuscript/manuscript_figures"))) {
+
 # DATA---------------
 ## load sample data (dg object)----
 load("./inputData/dg.RData")
-
 save(dg, file = "./manuscript/manuscript_files/dg.rda")  # save dg file to ms folder for faster knitting
-
+  
 # To enable spatial analysis of the data, the dataframe will be converted to a 
 # 'simple features' (sf) object.
 # Define coordinates
@@ -82,8 +84,17 @@ cols <- c("Coastal Plains" = "orange1",
 states <- usmap::us_map() %>%
   dplyr::filter(!full %in% c("Alaska", "District of Columbia", "Hawaii", "Puerto Rico")) %>%
   sf::st_transform(5070) # convert to CONUS Albers
+} # fig 1
 
-
+if(!("ecoreg_stats.rda" %in% list.files("manuscript/manuscript_files"))) {
+  if(!("national_stats.rda" %in% list.files("manuscript/manuscript_files"))) {
+    if(!("figure2.tiff" %in% list.files("manuscript/manuscript_figures"))) {
+      if(!("n2oFluxAndEmissionRateVsContinuousArea.tiff" %in% list.files("manuscript/manuscript_figures"))) {
+        if(!("n2oStarBySize.tiff" %in% list.files("manuscript/manuscript_figures"))) {
+          if(!("SIfigure1.tiff" %in% list.files("manuscript/manuscript_figures"))) {
+            if(!("FluxBySize.rda" %in% list.files("manuscript/manuscript_files"))) {
+              if(!("em_min_max.rda" %in% list.files("manuscript/manuscript_files"))) {
+      
 ## load posterior predictions from modeling----
 #tic() # 7.6min on DMAP.  5 minutes on Dell Precision workstation
 load("./inputData/all_predictions.rda")
@@ -189,7 +200,16 @@ all_predictions_ms  <- all_predictions_ms %>%
          n2osat,
          e.n2o.mg.m2.d,
          f.n2o.Mg.y)
+              } # ecoreg_stats
+            } # national_stats
+          } #fig2
+        } # flux
+      } # n2o star
+    } # SI figure
+  } # FluxBySize
+} # emissions min/max
 
+if(!("ecoreg_stats.rda" %in% list.files("manuscript/manuscript_files"))) {
 ## ecoregion and national means----
 ecoreg_stats <- all_predictions_ms %>%
   group_by(WSA9, WSA9_NAME, .draw) %>%
@@ -237,7 +257,9 @@ ecoreg_stats <- all_predictions_ms %>%
   ungroup()
 
 save(ecoreg_stats, file = "manuscript/manuscript_files/ecoreg_stats.rda")
+} # ecoreg_stats
 
+if(!("national_stats.rda" %in% list.files("manuscript/manuscript_files"))) {
 national_stats <- all_predictions_ms %>%
   group_by(.draw) %>%
   summarise( mean_n2o = mean(n2o),
@@ -274,6 +296,8 @@ national_stats <- all_predictions_ms %>%
   mutate(WSA9 = "national", WSA9_NAME = "national")
 
 save(national_stats, file = "manuscript/manuscript_files/national_stats.rda")
+} # national_stats
+
 
 # FIGURES-----------------
 
@@ -306,7 +330,7 @@ if(!("figure1.png" %in% list.files("manuscript/manuscript_figures"))) {
           plot.margin = unit(c(0.3, 0, 0.2, 0), 
                              "inches"))
   ggsave("manuscript/manuscript_figures/figure1.png", width = 8, height = 4, units = "in")
-}
+} # fig 1
 
 
 ## Figure 2: N2O saturation ratio density plot----
@@ -355,7 +379,175 @@ if(!("figure2.tiff" %in% list.files("manuscript/manuscript_figures"))) {
   toc()
   ggsave("manuscript/manuscript_figures/figure2.tiff", width = 8.5, height = 5)
   
-}
+} # fig 2
+
+## fig 3 Conditional effects of NO3 on sat ratio----
+if(!("cond_effect_no3.tiff" %in% list.files("manuscript/manuscript_figures"))) {
+  load("./modelFiles/n2o_mod6.rda")
+  load("./modelFiles/df_model.rda")
+  effect_no3_surftemp <- expand.grid(no3_cat = levels(df_model$no3_cat),
+                                     surftemp = round(quantile(df_model$surftemp, 
+                                                               probs = seq(0.10, 0.90, 0.2)), 0),
+                                     log_area = mean(df_model$log_area),
+                                     log_elev = mean(df_model$log_elev)) %>%
+    add_epred_draws(n2o_mod6, resp = c("n2o", "n2oeq"), re_formula = ~ 1) %>%
+    pivot_wider(names_from = .category, values_from = .epred) %>%
+    mutate(n2o_pred = n2o,
+           n2oeq_pred = n2oeq,
+           sat_pred = n2o / n2oeq,
+           surftemp = factor(surftemp))
+  
+  effect_surftemp_no3 <- expand.grid(no3_cat = levels(df_model$no3_cat),
+                                     surftemp = seq(range(df_model$surftemp)[1],
+                                                    range(df_model$surftemp)[2],
+                                                    length.out = 101),
+                                     log_area = mean(df_model$log_area),
+                                     log_elev = mean(df_model$log_elev)) %>%
+    add_epred_draws(n2o_mod6, resp = c("n2o", "n2oeq"), re_formula = ~ 1) %>%
+    pivot_wider(names_from = .category, values_from = .epred) %>%
+    mutate(n2o_pred = n2o,
+           n2oeq_pred = n2oeq,
+           sat_pred = n2o / n2oeq,
+           surftemp = surftemp)
+  
+  
+  effect_no3_area <- expand.grid(no3_cat = levels(df_model$no3_cat),
+                                 log_area = round(quantile(df_model$log_area, 
+                                                           probs = seq(0.10, 0.90, 0.2)), 0),
+                                 surftemp = mean(df_model$surftemp),
+                                 log_elev = mean(df_model$log_elev)) %>%
+    add_epred_draws(n2o_mod6, resp = c("n2o", "n2oeq"), re_formula = ~ 1) %>%
+    pivot_wider(names_from = .category, values_from = .epred) %>%
+    mutate(n2o_pred = n2o,
+           n2oeq_pred = n2oeq,
+           sat_pred = n2o / n2oeq,
+           log_area = factor(log_area))
+  
+  effect_area_no3 <- expand.grid(no3_cat = levels(df_model$no3_cat),
+                                 log_area = seq(range(df_model$log_area)[1],
+                                                range(df_model$log_area)[2],
+                                                length.out = 101),
+                                 surftemp = mean(df_model$surftemp),
+                                 log_elev = mean(df_model$log_elev)) %>%
+    add_epred_draws(n2o_mod6, resp = c("n2o", "n2oeq"), re_formula = ~ 1) %>%
+    pivot_wider(names_from = .category, values_from = .epred) %>%
+    mutate(n2o_pred = n2o,
+           n2oeq_pred = n2oeq,
+           sat_pred = n2o / n2oeq,
+           log_area = log_area)
+  
+  plt_sat_no3_temp <-
+    effect_no3_surftemp %>%
+    ggplot(aes(x = no3_cat, 
+               y = sat_pred, 
+               group = surftemp,
+               color = surftemp)) +
+    stat_pointinterval(shape = 95,
+                       point_interval = "median_qi",
+                       position = position_dodge(width = 1.4, preserve = "single")) +
+    scale_color_brewer(palette = "PuBu") +
+    xlab(expression(paste("NO"[3], " category"))) +
+    ylab("") +
+    theme_pubr() +
+    scale_y_continuous(expand = c(0, 0), limits = c(0, 7), breaks = seq(0, 7, 1)) +
+    geom_hline(yintercept = 1, linetype = "dashed") +
+    theme(legend.position = c(0.4, 0.6),
+          axis.text.y = element_blank()) +
+    labs(color = "Surface temperature (\u00B0C)")
+  
+  plt_sat_temp_no3 <-
+    effect_surftemp_no3 %>%
+    ggplot() +
+    stat_lineribbon(aes(x = surftemp,
+                        y = sat_pred, 
+                        group = no3_cat,
+                        color = no3_cat),
+                    point_interval = "median_qi",
+                    show.legend = TRUE,
+                    size = 0.7,
+                    .width = 0.95) +
+    scale_color_brewer(palette = "OrRd") +
+    xlab("Surface temperature (\u00B0C)") +
+    ylab("Saturation ratio") +
+    theme_pubr() +
+    scale_y_continuous(expand = c(0, 0), limits = c(0, 7), breaks = seq(0, 7, 1)) +
+    scale_x_continuous(expand = c(0, 0)) +
+    geom_hline(yintercept = 1, linetype = "dashed") +
+    scale_fill_brewer(palette = "Greys", guide = "none") +
+    theme(legend.position = c(0.4, 0.6)) + 
+    labs(color = expression(paste("NO"[3], " category")))
+  
+  plt_sat_no3_area <-
+    effect_no3_area %>%
+    ggplot(aes(x = no3_cat, 
+               y = sat_pred, 
+               group = log_area,
+               color = log_area)) +
+    stat_pointinterval(shape = 95,
+                       point_interval = "median_qi",
+                       position = position_dodge(width = 1.4, preserve = "single")) +
+    scale_color_brewer(palette = "Greys") +
+    xlab(expression(paste("NO"[3], " category"))) +
+    ylab("") +
+    theme_pubr() +
+    scale_y_continuous(expand = c(0, 0), limits = c(0, 7), breaks = seq(0, 7, 1)) +
+    geom_hline(yintercept = 1, linetype = "dashed") +
+    theme(legend.position = c(0.4, 0.6),
+          axis.text.y = element_blank()) +
+    labs(color = "log(surface area (ha))")
+  
+  plt_sat_area_no3 <-
+    effect_area_no3 %>%
+    ggplot() +
+    stat_lineribbon(aes(x = log_area,
+                        y = sat_pred, 
+                        group = no3_cat,
+                        color = no3_cat),
+                    point_interval = "median_qi",
+                    show.legend = TRUE,
+                    size = 0.7,
+                    .width = 0.95) +
+    scale_color_brewer(palette = "OrRd") +
+    xlab("log(surface area (ha))") +
+    ylab("Saturation ratio") +
+    theme_pubr() +
+    scale_y_continuous(expand = c(0, 0), limits = c(0, 7), breaks = seq(0, 7, 1)) +
+    scale_x_continuous(expand = c(0, 0)) +
+    geom_hline(yintercept = 1, linetype = "dashed") +
+    scale_fill_brewer(palette = "Greys", guide = "none") +
+    theme(legend.position = c(0.6, 0.6)) + 
+    labs(color = expression(paste("NO"[3], " category")))
+  
+  plt_temp_area_effects <- ggarrange(plt_sat_temp_no3,
+                                     plt_sat_no3_temp,
+                                     plt_sat_area_no3,
+                                     plt_sat_no3_area,
+                                     ncol = 2,
+                                     nrow = 2,
+                                     widths = c(0.9, 0.9, 0.9, 0.9),
+                                     heights = c(0.9, 0.9, 0.9, 0.9),
+                                     labels = c("A", "B", "C", "D"),
+                                     hjust = -7,
+                                     vjust = 3
+  )
+  
+#  plt_temp_area_effects <- plt_temp_area_effects %>%
+#    annotate_figure(plt_temp_area_effects,
+#                    left = text_grob("Derived posterior mean", 
+#                                     size = 18, 
+#                                     rot = 90)
+#    )
+  
+  # ggsave only works in R console (i.e., copy + paste to save)
+  ggsave(filename = "./manuscript/manuscript_figures/cond_effect_no3.tiff",
+         plot = plt_temp_area_effects,
+         device = "tiff",
+         width = 210 / 25.4,
+         height = 210 / 25.4,
+         units = "in",
+         bg = "white")
+  
+} # fig 3
 
 ## Figure X: delta N2O by waterbody size----
 # See 'N2O saturation ratio: continuous variable' section of dgIndicatorAnalysis.Rmd
@@ -458,7 +650,7 @@ if(!("n2oStarBySize.tiff" %in% list.files("manuscript/manuscript_figures"))) {
   # ggsave("manuscript/manuscript_figures/deltaN2ObySize.tiff", width = 6, height = 5)
   
   
-}
+} # fig 4: n2o star
 
 ## Figure X:  Flux by lake, emission rate by lake, and national flux VS continuous size-------
 if(!("n2oFluxAndEmissionRateVsContinuousArea.tiff" %in% list.files("manuscript/manuscript_figures"))) {
@@ -609,8 +801,7 @@ if(!("n2oFluxAndEmissionRateVsContinuousArea.tiff" %in% list.files("manuscript/m
   ggpubr::ggarrange(b1, b2, b3, ncol = 1, nrow=3, labels = "AUTO", align = "v", hjust = -7, vjust = 2) #, hjust = -5, vjust = 2
   ggsave("manuscript/manuscript_figures/n2oFluxAndEmissionRateVsContinuousArea.tiff", width = 8, height = 5)   
   
-}
-
+} # fig 5: Flux and Flux by size
 
 
 ## SI Figure 1: N2O emission rate distribution----
@@ -633,7 +824,7 @@ if(!("SIfigure1.tiff" %in% list.files("manuscript/manuscript_figures"))) {
   
   ggsave("manuscript/manuscript_figures/SIfigure1.tiff", width = 8.5, height = 5)
   
-}
+} # SI figure
 
 
 # MANUSCRIPT DATA-----
@@ -662,7 +853,8 @@ if(!("SIfigure1.tiff" %in% list.files("manuscript/manuscript_figures"))) {
 #save(propN2OsummaryWSA9, file = "manuscript/manuscript_files/propN2OsummaryWSA9.rda")
 
 ## Lake size distribution----
-
+if(!("FluxBySize.rda" %in% list.files("manuscript/manuscript_files"))) {
+  if(!("em_min_max.rda" %in% list.files("manuscript/manuscript_files"))) {
 # Total flux by lake size class------
 FluxBySize <- all_predictions_ms %>%
   group_by(size_cat, .draw) %>% # group by iteration
@@ -685,7 +877,8 @@ em_min_max <- all_predictions_ms %>%
             max_UCL = round(quantile(max, probs = 0.975), 3))
 
 save(em_min_max, file = "manuscript/manuscript_files/em_min_max.rda")
-
+  } # Flux by size
+} # emissions min/max
 
 
 ## IPCC Indirect N2O Leaching and Runoff----

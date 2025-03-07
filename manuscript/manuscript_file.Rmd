@@ -67,7 +67,7 @@ sframe <- sframe[-258807,]
 # Check for figures. If not available, load and run source script --------
 
 # vector of figure names
-objs <- c("cond_effect_no3.tif",
+objs <- c("cond_effect_no3.tiff",
           "figure1.png",
           "figure2.tiff",
           "n2oFluxAndEmissionRateVsContinuousArea.tiff",
@@ -89,7 +89,8 @@ for(i in 1:N){
   if(file.exists(f[[i]]))
     print("Good! Figure already created")
   else
-    print(paste0("missing figure: ", f[[1]]))
+    print(paste0("missing figure: running manuscript_support.R ", f[[1]]))
+    source("./manuscript/manuscript_support.R", local = knitr::knit_global())
  }
 
 # clean up workspace
@@ -219,7 +220,7 @@ The influence of NO~3~ levels on N~2~O saturation **(Fig. 3)** may reflect a rel
 
 It is also possible that the correlation between N~2~O and NO~3~ reflects the simultaneous production of these solutes via nitrification. Nitrification, an aerobic process which can produce N~2~O as a byproduct, is the microbial oxidation of ammonium (NH~4~^+^) to NO~3~ [@Kuypers_etal_2018]. Nitrification may be more prevalent than denitrification in the predominantly well oxygenated surface waters where the N~2~O samples were collected because denitrification is an anaerobic process. Thus the N~2~O - NO~3~ relationship may be reflective of some combination of N~2~O production/consumption via denitrification and N~2~O production via nitrification.
 
-![Figure 3. Estimated interactive effects of surface water temperature (A and B) and waterbody size (B and D) with NO~3~ levels on the N~2~O saturation ratio.  A) The relationship between N~2~O saturation and surface water temperature, dependent upon nitrate (NO~3~) level.  The five, ordered, categorical levels for NO~3~ correspond to concentration ($\mu$g N L^-1^) ranges in the observed data of 1) below detection, 2) $\geq$ 0.55 and \< 4.09, 3) $\geq$ 4.09 and \< 30.20, 4) $\geq$ 30.20 and \< 223.13, and 5) $\geq$ 223.13. B) The relationship between N~2~O saturation and NO~3~ level conditional on surface water temperature. The NO~3~ effect was estimated at 5 quantiles of the surface temperatures observed (10%, 25%, 50%, 75%, 90%). C) The relationship between N~2~O saturation and waterbody surface area (log-transformed hectares) conditional on NO~3~ level. D) The relationship between N~2~O saturation and NO~3~ level conditional on (log) waterbody surface area (5 quantiles).  Horizontal dashed lines in each panel reflect an N~2~O saturation value of one.](manuscript_figures/cond_effect_no3.tif)
+![Figure 3. Estimated interactive effects of surface water temperature (A and B) and waterbody size (B and D) with NO~3~ levels on the N~2~O saturation ratio.  A) The relationship between N~2~O saturation and surface water temperature, dependent upon nitrate (NO~3~) level.  The five, ordered, categorical levels for NO~3~ correspond to concentration ($\mu$g N L^-1^) ranges in the observed data of 1) below detection, 2) $\geq$ 0.55 and \< 4.09, 3) $\geq$ 4.09 and \< 30.20, 4) $\geq$ 30.20 and \< 223.13, and 5) $\geq$ 223.13. B) The relationship between N~2~O saturation and NO~3~ level conditional on surface water temperature. The NO~3~ effect was estimated at 5 quantiles of the surface temperatures observed (10%, 25%, 50%, 75%, 90%). C) The relationship between N~2~O saturation and waterbody surface area (log-transformed hectares) conditional on NO~3~ level. D) The relationship between N~2~O saturation and NO~3~ level conditional on (log) waterbody surface area (5 quantiles).  Horizontal dashed lines in each panel reflect an N~2~O saturation value of one.](manuscript_figures/cond_effect_no3.tiff)
 
 The estimated pattern of increasing N~2~O saturation with water temperature **(Fig. 3)** is  consistent with nitrogen transformations occurring through temperature sensitive biological processes, but the relationship was dependent on NO~3~ levels. At low NO~3~ levels, temperature was estimated to have a relatively minor effect on N~2~O saturation, possibly because N~2~O production/consumption was limited by substrate rather than temperature. The effect of temperature was more pronounced at greater NO~3~ levels when substrate limitation was less severe. Elevated water temperature may serve to magnify rates of N~2~O production that may be largely dictated by NO~3~ availability.
 
