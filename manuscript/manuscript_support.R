@@ -293,7 +293,7 @@ national_stats <- all_predictions_ms %>%
              UCL_fn2o = round(quantile(fn2o_Mg, probs = 0.975), 3),
              total_sa = round(mean(total_sa), digits = 0),
              n = dplyr::n()) %>%
-  mutate(WSA9 = "national", WSA9_NAME = "national")
+  mutate(WSA9 = "National", WSA9_NAME = "National")
 
 save(national_stats, file = "manuscript/manuscript_files/national_stats.rda")
 } # national_stats
