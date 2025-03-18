@@ -1,7 +1,7 @@
 Modeling workflow: NLA N2O survey data
 ================
 Roy Martin, Jake Beaulieu, Michael McManus
-2024-03-18
+2025-03-17
 
 # 1 Introduction
 
@@ -186,13 +186,13 @@ within each response:
 
 ![\alpha_3 \sim MVN(0, \Lambda_3)](https://latex.codecogs.com/png.image?%5Cdpi%7B110%7D&space;%5Cbg_white&space;%5Calpha_3%20%5Csim%20MVN%280%2C%20%5CLambda_3%29 "\alpha_3 \sim MVN(0, \Lambda_3)")
 
-![\Lambda\_{\alpha = 1,..,3} = \begin{pmatrix} 1 & \tau ^2\_{p=1} \\\\ \tau^2\_{p=2} & 1 \end{pmatrix} \chi\_{\alpha = 1,..,3} \begin{pmatrix} 1 & \tau^2\_{p=1} \\\\ \tau^2\_{p=2} & 1 \end{pmatrix}](https://latex.codecogs.com/png.image?%5Cdpi%7B110%7D&space;%5Cbg_white&space;%5CLambda_%7B%5Calpha%20%3D%201%2C..%2C3%7D%20%3D%20%5Cbegin%7Bpmatrix%7D%201%20%26%20%5Ctau%20%5E2_%7Bp%3D1%7D%20%5C%5C%20%5Ctau%5E2_%7Bp%3D2%7D%20%26%201%20%5Cend%7Bpmatrix%7D%20%5Cchi_%7B%5Calpha%20%3D%201%2C..%2C3%7D%20%5Cbegin%7Bpmatrix%7D%201%20%26%20%5Ctau%5E2_%7Bp%3D1%7D%20%5C%5C%20%5Ctau%5E2_%7Bp%3D2%7D%20%26%201%20%5Cend%7Bpmatrix%7D "\Lambda_{\alpha = 1,..,3} = \begin{pmatrix} 1 & \tau ^2_{p=1} \\ \tau^2_{p=2} & 1 \end{pmatrix} \chi_{\alpha = 1,..,3} \begin{pmatrix} 1 & \tau^2_{p=1} \\ \tau^2_{p=2} & 1 \end{pmatrix}")
+![\Lambda\_{\alpha = 1,..,3} = \begin{pmatrix} 1 & \tau ^2\_{p=1} \\ \tau^2\_{p=2} & 1 \end{pmatrix} \chi\_{\alpha = 1,..,3} \begin{pmatrix} 1 & \tau^2\_{p=1} \\ \tau^2\_{p=2} & 1 \end{pmatrix}](https://latex.codecogs.com/png.image?%5Cdpi%7B110%7D&space;%5Cbg_white&space;%5CLambda_%7B%5Calpha%20%3D%201%2C..%2C3%7D%20%3D%20%5Cbegin%7Bpmatrix%7D%201%20%26%20%5Ctau%20%5E2_%7Bp%3D1%7D%20%5C%5C%20%5Ctau%5E2_%7Bp%3D2%7D%20%26%201%20%5Cend%7Bpmatrix%7D%20%5Cchi_%7B%5Calpha%20%3D%201%2C..%2C3%7D%20%5Cbegin%7Bpmatrix%7D%201%20%26%20%5Ctau%5E2_%7Bp%3D1%7D%20%5C%5C%20%5Ctau%5E2_%7Bp%3D2%7D%20%26%201%20%5Cend%7Bpmatrix%7D "\Lambda_{\alpha = 1,..,3} = \begin{pmatrix} 1 & \tau ^2_{p=1} \\ \tau^2_{p=2} & 1 \end{pmatrix} \chi_{\alpha = 1,..,3} \begin{pmatrix} 1 & \tau^2_{p=1} \\ \tau^2_{p=2} & 1 \end{pmatrix}")
 
-![\chi\_{\alpha = 1,..,3} = \begin{pmatrix} 1 & \varrho\_{p1,p2} \\\\ \varrho\_{p1,p2} & 1 \end{pmatrix}](https://latex.codecogs.com/png.image?%5Cdpi%7B110%7D&space;%5Cbg_white&space;%5Cchi_%7B%5Calpha%20%3D%201%2C..%2C3%7D%20%3D%20%5Cbegin%7Bpmatrix%7D%201%20%26%20%5Cvarrho_%7Bp1%2Cp2%7D%20%5C%5C%20%5Cvarrho_%7Bp1%2Cp2%7D%20%26%201%20%5Cend%7Bpmatrix%7D "\chi_{\alpha = 1,..,3} = \begin{pmatrix} 1 & \varrho_{p1,p2} \\ \varrho_{p1,p2} & 1 \end{pmatrix}")
+![\chi\_{\alpha = 1,..,3} = \begin{pmatrix} 1 & \varrho\_{p1,p2} \\ \varrho\_{p1,p2} & 1 \end{pmatrix}](https://latex.codecogs.com/png.image?%5Cdpi%7B110%7D&space;%5Cbg_white&space;%5Cchi_%7B%5Calpha%20%3D%201%2C..%2C3%7D%20%3D%20%5Cbegin%7Bpmatrix%7D%201%20%26%20%5Cvarrho_%7Bp1%2Cp2%7D%20%5C%5C%20%5Cvarrho_%7Bp1%2Cp2%7D%20%26%201%20%5Cend%7Bpmatrix%7D "\chi_{\alpha = 1,..,3} = \begin{pmatrix} 1 & \varrho_{p1,p2} \\ \varrho_{p1,p2} & 1 \end{pmatrix}")
 
-![\Sigma = \begin{pmatrix} 1 & \sigma^2\_{p=1} \\\\ \sigma^2\_{p=2} & 1 \end{pmatrix} \Omega \begin{pmatrix} 1 & \sigma^2\_{p=1} \\\\ \sigma^2\_{p=2} & 1 \end{pmatrix}](https://latex.codecogs.com/png.image?%5Cdpi%7B110%7D&space;%5Cbg_white&space;%5CSigma%20%3D%20%5Cbegin%7Bpmatrix%7D%201%20%26%20%5Csigma%5E2_%7Bp%3D1%7D%20%5C%5C%20%5Csigma%5E2_%7Bp%3D2%7D%20%26%201%20%5Cend%7Bpmatrix%7D%20%5COmega%20%5Cbegin%7Bpmatrix%7D%201%20%26%20%5Csigma%5E2_%7Bp%3D1%7D%20%5C%5C%20%5Csigma%5E2_%7Bp%3D2%7D%20%26%201%20%5Cend%7Bpmatrix%7D "\Sigma = \begin{pmatrix} 1 & \sigma^2_{p=1} \\ \sigma^2_{p=2} & 1 \end{pmatrix} \Omega \begin{pmatrix} 1 & \sigma^2_{p=1} \\ \sigma^2_{p=2} & 1 \end{pmatrix}")
+![\Sigma = \begin{pmatrix} 1 & \sigma^2\_{p=1} \\ \sigma^2\_{p=2} & 1 \end{pmatrix} \Omega \begin{pmatrix} 1 & \sigma^2\_{p=1} \\ \sigma^2\_{p=2} & 1 \end{pmatrix}](https://latex.codecogs.com/png.image?%5Cdpi%7B110%7D&space;%5Cbg_white&space;%5CSigma%20%3D%20%5Cbegin%7Bpmatrix%7D%201%20%26%20%5Csigma%5E2_%7Bp%3D1%7D%20%5C%5C%20%5Csigma%5E2_%7Bp%3D2%7D%20%26%201%20%5Cend%7Bpmatrix%7D%20%5COmega%20%5Cbegin%7Bpmatrix%7D%201%20%26%20%5Csigma%5E2_%7Bp%3D1%7D%20%5C%5C%20%5Csigma%5E2_%7Bp%3D2%7D%20%26%201%20%5Cend%7Bpmatrix%7D "\Sigma = \begin{pmatrix} 1 & \sigma^2_{p=1} \\ \sigma^2_{p=2} & 1 \end{pmatrix} \Omega \begin{pmatrix} 1 & \sigma^2_{p=1} \\ \sigma^2_{p=2} & 1 \end{pmatrix}")
 
-![\Omega = \begin{pmatrix} 1 & \rho\_{p1,p2} \\\\ \rho\_{p1,p2} & 1 \end{pmatrix}](https://latex.codecogs.com/png.image?%5Cdpi%7B110%7D&space;%5Cbg_white&space;%5COmega%20%3D%20%5Cbegin%7Bpmatrix%7D%201%20%26%20%5Crho_%7Bp1%2Cp2%7D%20%5C%5C%20%5Crho_%7Bp1%2Cp2%7D%20%26%201%20%5Cend%7Bpmatrix%7D "\Omega = \begin{pmatrix} 1 & \rho_{p1,p2} \\ \rho_{p1,p2} & 1 \end{pmatrix}")
+![\Omega = \begin{pmatrix} 1 & \rho\_{p1,p2} \\ \rho\_{p1,p2} & 1 \end{pmatrix}](https://latex.codecogs.com/png.image?%5Cdpi%7B110%7D&space;%5Cbg_white&space;%5COmega%20%3D%20%5Cbegin%7Bpmatrix%7D%201%20%26%20%5Crho_%7Bp1%2Cp2%7D%20%5C%5C%20%5Crho_%7Bp1%2Cp2%7D%20%26%201%20%5Cend%7Bpmatrix%7D "\Omega = \begin{pmatrix} 1 & \rho_{p1,p2} \\ \rho_{p1,p2} & 1 \end{pmatrix}")
 
 Each log-transformed observation,
 ![i \in 1,..,N=984](https://latex.codecogs.com/png.image?%5Cdpi%7B110%7D&space;%5Cbg_white&space;i%20%5Cin%201%2C..%2CN%3D984 "i \in 1,..,N=984"),
@@ -285,7 +285,7 @@ A normal or Gaussian prior,
 ![N(\mu = 2, \sigma = 1)](https://latex.codecogs.com/png.image?%5Cdpi%7B110%7D&space;%5Cbg_white&space;N%28%5Cmu%20%3D%202%2C%20%5Csigma%20%3D%201%29 "N(\mu = 2, \sigma = 1)")
 centered near the (log-scale) data means, was used as the prior for the
 global mean parameter for each response. This prior was considered
-minimally informative as it placed most (\~80%) of the prior mass over
+minimally informative as it placed most (~80%) of the prior mass over
 values between about 2 and 27 ng/L for median N2O and median N2O
 equilibrium concentration; and included support in the tails for values
 approaching 0 ng/L on the lower end and 80 ng/L on the high end. We
@@ -330,7 +330,7 @@ separate linear predictors in a multivariate model to be correlated
 across responses, e.g.,:
 
 ![\begin{aligned} 
-  N_2O\_{diss} \sim 1 + (1\|a\|WSA9) + (1\|b\|WSA9:state) + (1\|c\|WSA9:state:size) \\\\
+  N_2O\_{diss} \sim 1 + (1\|a\|WSA9) + (1\|b\|WSA9:state) + (1\|c\|WSA9:state:size) \\
   N_2O\_{equi} \sim 1 + (1\|a\|WSA9) + (1\|b\|WSA9:state) + (1\|c\|WSA9:state:size) 
 \end{aligned}](https://latex.codecogs.com/png.image?%5Cdpi%7B110%7D&space;%5Cbg_white&space;%5Cbegin%7Baligned%7D%20%0A%20%20N_2O_%7Bdiss%7D%20%5Csim%201%20%2B%20%281%7Ca%7CWSA9%29%20%2B%20%281%7Cb%7CWSA9%3Astate%29%20%2B%20%281%7Cc%7CWSA9%3Astate%3Asize%29%20%5C%5C%0A%20%20N_2O_%7Bequi%7D%20%5Csim%201%20%2B%20%281%7Ca%7CWSA9%29%20%2B%20%281%7Cb%7CWSA9%3Astate%29%20%2B%20%281%7Cc%7CWSA9%3Astate%3Asize%29%20%0A%5Cend%7Baligned%7D "\begin{aligned} 
   N_2O_{diss} \sim 1 + (1|a|WSA9) + (1|b|WSA9:state) + (1|c|WSA9:state:size) \\
@@ -538,9 +538,9 @@ among the fully and partially observed variables in this model could be
 described such that:
 
 ![\begin{aligned} 
-{p( \boldsymbol{N_2O\_{diss}}} &\| Survey, Area, {\boldsymbol{NO_3}}, {\boldsymbol{Temp}}) \\\\ 
-{p( \boldsymbol{N_2O\_{equil}}} &\| Survey, Elev, {\boldsymbol{Temp}})\\\\
-{p( \boldsymbol{NO_3}} &\| Survey, Area, {\boldsymbol{Temp}}) \\\\ 
+{p( \boldsymbol{N_2O\_{diss}}} &\| Survey, Area, {\boldsymbol{NO_3}}, {\boldsymbol{Temp}}) \\ 
+{p( \boldsymbol{N_2O\_{equil}}} &\| Survey, Elev, {\boldsymbol{Temp}})\\
+{p( \boldsymbol{NO_3}} &\| Survey, Area, {\boldsymbol{Temp}}) \\ 
 {p( \boldsymbol{Temp}} &\| Survey, Lat, Elev, Day)
 \end{aligned}](https://latex.codecogs.com/png.image?%5Cdpi%7B110%7D&space;%5Cbg_white&space;%5Cbegin%7Baligned%7D%20%0A%7Bp%28%20%5Cboldsymbol%7BN_2O_%7Bdiss%7D%7D%7D%20%26%7C%20Survey%2C%20Area%2C%20%7B%5Cboldsymbol%7BNO_3%7D%7D%2C%20%7B%5Cboldsymbol%7BTemp%7D%7D%29%20%5C%5C%20%0A%7Bp%28%20%5Cboldsymbol%7BN_2O_%7Bequil%7D%7D%7D%20%26%7C%20Survey%2C%20Elev%2C%20%7B%5Cboldsymbol%7BTemp%7D%7D%29%5C%5C%0A%7Bp%28%20%5Cboldsymbol%7BNO_3%7D%7D%20%26%7C%20Survey%2C%20Area%2C%20%7B%5Cboldsymbol%7BTemp%7D%7D%29%20%5C%5C%20%0A%7Bp%28%20%5Cboldsymbol%7BTemp%7D%7D%20%26%7C%20Survey%2C%20Lat%2C%20Elev%2C%20Day%29%0A%5Cend%7Baligned%7D "\begin{aligned} 
 {p( \boldsymbol{N_2O_{diss}}} &| Survey, Area, {\boldsymbol{NO_3}}, {\boldsymbol{Temp}}) \\ 
@@ -592,7 +592,7 @@ below.
 
 As explained in the data munging document document
 (<https://github.com/USEPA/DissolvedGasNla/blob/master/scripts/dgIndicatorAnalysis.html>),
-duplicate dissolved gas samples were collected at a depth of \~0.1m at
+duplicate dissolved gas samples were collected at a depth of ~0.1m at
 designated index sites distributed across 1091 lakes nationwide, of
 which 95 were sampled twice as repeat visits. This subset of revisit
 sites was used as a test set for assessing model fit and out-of-sample
@@ -625,16 +625,10 @@ munged at:
 
 ## 2.1 Import
 
-That originally munged gas dataset was imported below.
+That originally munged gas dataset is imported below.
 
 ``` r
-load( file = paste0( localPath,
-              "/Environmental Protection Agency (EPA)/",
-              "ORD NLA17 Dissolved Gas - Documents/",
-              "inputData/dg.2021-02-01.RData")
-      )
-
-save(dg, file = "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/dg.rda") 
+load("./inputData/dg.RData")
 ```
 
 A new data frame for modeling was constructed from the original file,
@@ -730,7 +724,7 @@ df_model <- dg %>%
          no3_cat
          )
 
-save(df_model, file = "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/df_model.rda") 
+save(df_model, file = "/modelFiles/df_model.rda") 
 ```
 
 A preview of the 984 probability samples to be used in modeling:
@@ -829,7 +823,7 @@ df_test <- dg %>%
          no3_cat
          )
 
-save(df_test, file = "C:/Users/rmartin/OneDrive - Environmental Protection Agency (EPA)/Documents/AE_Reservoirs/DissolvedGasNla/modelFiles/df_test.rda") 
+save(df_test, file = "modelFiles/df_test.rda") 
 ```
 
 A preview of the re-visit data with 95 observations:
@@ -860,10 +854,7 @@ only lakes in the assumed POI. The resulting target population included
 a total of 465,897 waterbodies.
 
 ``` r
-df_pop <- read.csv(file = paste0(localPath,
-              "/Environmental Protection Agency (EPA)/",
-              "ORD NLA17 Dissolved Gas - Documents/",
-              "inputData/NLA_Sample_Frame.csv"), header = T)
+df_pop <- read.csv(archive::archive_read("inputData/NLA_Sample_Frame.7z")) # This takes a bit
 
 sframe <- df_pop %>%
   filter(nla17_sf != "Exclude2017") %>%
@@ -1430,7 +1421,7 @@ of effective samples for conducting inference.
     ##   Draws: 4 chains, each with iter = 5000; warmup = 2500; thin = 1;
     ##          total post-warmup draws = 10000
     ## 
-    ## Priors: 
+    ## Priors:
     ## Intercept_logn2o ~ normal(2, 1)
     ## Intercept_logn2oeq ~ normal(2, 1)
     ## L ~ lkj_corr_cholesky(2)
@@ -1440,7 +1431,7 @@ of effective samples for conducting inference.
     ## <lower=0> sigma_logn2o ~ exponential(2)
     ## <lower=0> sigma_logn2oeq ~ exponential(2)
     ## 
-    ## Group-Level Effects: 
+    ## Multilevel Hyperparameters:
     ## ~WSA9 (Number of levels: 9) 
     ##                                          Estimate Est.Error l-95% CI u-95% CI
     ## sd(logn2o_Intercept)                         0.04      0.03     0.00     0.13
@@ -1471,12 +1462,12 @@ of effective samples for conducting inference.
     ## sd(logn2oeq_Intercept)                   1.00      928     1365
     ## cor(logn2o_Intercept,logn2oeq_Intercept) 1.00     1661     2807
     ## 
-    ## Population-Level Effects: 
+    ## Regression Coefficients:
     ##                    Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
     ## logn2o_Intercept       2.02      0.04     1.95     2.09 1.00     2641     3963
     ## logn2oeq_Intercept     2.00      0.02     1.96     2.04 1.00     3446     4550
     ## 
-    ## Family Specific Parameters: 
+    ## Further Distributional Parameters:
     ##                Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
     ## sigma_logn2o       0.40      0.01     0.37     0.42 1.00     2749     5523
     ## sigma_logn2oeq     0.08      0.00     0.08     0.09 1.00     4790     6698
@@ -1699,7 +1690,7 @@ diagnostics for the fitted model are printed below.
     ##   Draws: 4 chains, each with iter = 5000; warmup = 2500; thin = 1;
     ##          total post-warmup draws = 10000
     ## 
-    ## Priors: 
+    ## Priors:
     ## Intercept_logn2o ~ normal(2, 1)
     ## Intercept_logn2o_sigma ~ normal(-1, 2)
     ## Intercept_logn2oeq ~ normal(2, 1)
@@ -1711,7 +1702,7 @@ diagnostics for the fitted model are printed below.
     ## <lower=0> sd_logn2oeq ~ exponential(2)
     ## <lower=0> sd_logn2oeq_sigma ~ exponential(2)
     ## 
-    ## Group-Level Effects: 
+    ## Multilevel Hyperparameters:
     ## ~WSA9 (Number of levels: 9) 
     ##                                          Estimate Est.Error l-95% CI u-95% CI
     ## sd(logn2o_Intercept)                         0.06      0.03     0.02     0.12
@@ -1754,7 +1745,7 @@ diagnostics for the fitted model are printed below.
     ## sd(sigma_logn2oeq_Intercept)             1.00     1603     1725
     ## cor(logn2o_Intercept,logn2oeq_Intercept) 1.00      996     2063
     ## 
-    ## Population-Level Effects: 
+    ## Regression Coefficients:
     ##                          Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
     ## logn2o_Intercept             1.93      0.03     1.88     1.99 1.00     3338
     ## sigma_logn2o_Intercept      -1.40      0.12    -1.63    -1.17 1.00     3511
@@ -1929,7 +1920,7 @@ The fitted parameters and MCMC diagnostics are below.
     ##   Draws: 4 chains, each with iter = 5000; warmup = 2500; thin = 1;
     ##          total post-warmup draws = 10000
     ## 
-    ## Priors: 
+    ## Priors:
     ## b_logn2o ~ normal(0, 1)
     ## b_logn2oeq ~ normal(0, 1)
     ## Intercept_logn2o ~ normal(2, 1)
@@ -1944,7 +1935,7 @@ The fitted parameters and MCMC diagnostics are below.
     ## <lower=0> sd_logn2oeq_sigma ~ exponential(2)
     ## simo_logn2o_mono3_cat1 ~ dirichlet(1)
     ## 
-    ## Group-Level Effects: 
+    ## Multilevel Hyperparameters:
     ## ~WSA9 (Number of levels: 9) 
     ##                                          Estimate Est.Error l-95% CI u-95% CI
     ## sd(logn2o_Intercept)                         0.05      0.02     0.02     0.10
@@ -1999,7 +1990,7 @@ The fitted parameters and MCMC diagnostics are below.
     ## sd(sigma_logn2oeq_Intercept)             1.00     1812     3745
     ## cor(logn2o_Intercept,logn2oeq_Intercept) 1.00     4523     5554
     ## 
-    ## Population-Level Effects: 
+    ## Regression Coefficients:
     ##                            Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
     ## logn2o_Intercept               2.40      0.05     2.29     2.50 1.00     5046
     ## sigma_logn2o_Intercept        -1.70      0.08    -1.87    -1.55 1.00     5162
@@ -2021,7 +2012,7 @@ The fitted parameters and MCMC diagnostics are below.
     ## logn2oeq_surftemp:log_elev     8028
     ## logn2o_mono3_cat               4777
     ## 
-    ## Simplex Parameters: 
+    ## Monotonic Simplex Parameters:
     ##                      Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
     ## logn2o_mono3_cat1[1]     0.02      0.01     0.00     0.04 1.00     5535
     ## logn2o_mono3_cat1[2]     0.09      0.02     0.04     0.13 1.00     4281
@@ -2221,7 +2212,7 @@ diagnostics.
     ##   Draws: 4 chains, each with iter = 5000; warmup = 2500; thin = 1;
     ##          total post-warmup draws = 10000
     ## 
-    ## Priors: 
+    ## Priors:
     ## b_logn2o ~ normal(0, 1)
     ## b_logn2o_sigma ~ normal(0, 1)
     ## b_logn2oeq ~ normal(0, 1)
@@ -2239,7 +2230,7 @@ diagnostics.
     ## simo_logn2o_mono3_cat1 ~ dirichlet(1)
     ## simo_logn2o_sigma_mono3_cat1 ~ dirichlet(1)
     ## 
-    ## Group-Level Effects: 
+    ## Multilevel Hyperparameters:
     ## ~WSA9 (Number of levels: 9) 
     ##                                          Estimate Est.Error l-95% CI u-95% CI
     ## sd(logn2o_Intercept)                        0.050     0.020    0.020    0.100
@@ -2294,7 +2285,7 @@ diagnostics.
     ## sd(sigma_logn2oeq_Intercept)             1.001     2372     4366
     ## cor(logn2o_Intercept,logn2oeq_Intercept) 1.001     4231     4956
     ## 
-    ## Population-Level Effects: 
+    ## Regression Coefficients:
     ##                            Estimate Est.Error l-95% CI u-95% CI  Rhat Bulk_ESS
     ## logn2o_Intercept              2.386     0.055    2.278    2.490 1.000     5971
     ## sigma_logn2o_Intercept       -1.855     0.281   -2.389   -1.294 1.000     5965
@@ -2324,7 +2315,7 @@ diagnostics.
     ## logn2o_mono3_cat               5143
     ## sigma_logn2o_mono3_cat         7643
     ## 
-    ## Simplex Parameters: 
+    ## Monotonic Simplex Parameters:
     ##                            Estimate Est.Error l-95% CI u-95% CI  Rhat Bulk_ESS
     ## logn2o_mono3_cat1[1]          0.018     0.012    0.001    0.045 1.000     5709
     ## logn2o_mono3_cat1[2]          0.093     0.027    0.041    0.149 1.000     5034
@@ -2554,7 +2545,7 @@ diagnostics.
     ##   Draws: 4 chains, each with iter = 5000; warmup = 2500; thin = 1;
     ##          total post-warmup draws = 10000
     ## 
-    ## Priors: 
+    ## Priors:
     ## b_logn2o ~ normal(0, 1)
     ## b_logn2o_sigma ~ normal(0, 1)
     ## b_logn2oeq ~ normal(0, 1)
@@ -2574,7 +2565,7 @@ diagnostics.
     ## simo_logn2o_mono3_cat1 ~ dirichlet(1)
     ## simo_logn2o_sigma_mono3_cat1 ~ dirichlet(1)
     ## 
-    ## Group-Level Effects: 
+    ## Multilevel Hyperparameters:
     ## ~WSA9 (Number of levels: 9) 
     ##                                          Estimate Est.Error l-95% CI u-95% CI
     ## sd(logn2o_Intercept)                        0.048     0.019    0.020    0.094
@@ -2629,7 +2620,7 @@ diagnostics.
     ## sd(sigma_logn2oeq_Intercept)             1.001     2326     3796
     ## cor(logn2o_Intercept,logn2oeq_Intercept) 1.002     2950     5425
     ## 
-    ## Population-Level Effects: 
+    ## Regression Coefficients:
     ##                            Estimate Est.Error l-95% CI u-95% CI  Rhat Bulk_ESS
     ## logn2o_Intercept              2.380     0.055    2.273    2.487 1.001     4020
     ## sigma_logn2o_Intercept       -1.596     0.097   -1.789   -1.408 1.002     4961
@@ -2665,7 +2656,7 @@ diagnostics.
     ## logn2o_mono3_cat:surftemp      2416
     ## sigma_logn2o_mono3_cat         6738
     ## 
-    ## Simplex Parameters: 
+    ## Monotonic Simplex Parameters:
     ##                               Estimate Est.Error l-95% CI u-95% CI  Rhat
     ## logn2o_mono3_cat1[1]             0.026     0.024    0.001    0.089 1.001
     ## logn2o_mono3_cat1[2]             0.091     0.066    0.005    0.252 1.001
@@ -2960,7 +2951,7 @@ Below is a summary of the fitted parameters and MCMC diagnostics.
     ##   Draws: 4 chains, each with iter = 5000; warmup = 2500; thin = 1;
     ##          total post-warmup draws = 10000
     ## 
-    ## Priors: 
+    ## Priors:
     ## b_n2o ~ normal(0, 1)
     ## b_n2o_shape ~ normal(0, 1)
     ## b_n2oeq ~ normal(0, 1)
@@ -2988,7 +2979,7 @@ Below is a summary of the fitted parameters and MCMC diagnostics.
     ## simo_n2o_mono3_cat1 ~ dirichlet(1)
     ## simo_n2o_shape_mono3_cat1 ~ dirichlet(1)
     ## 
-    ## Smooth Terms: 
+    ## Smoothing Spline Hyperparameters:
     ##                           Estimate Est.Error l-95% CI u-95% CI  Rhat Bulk_ESS
     ## sds(surftemp_slog_elev_1)    1.161     0.370    0.638    2.079 1.001     2264
     ## sds(surftemp_sjdate_1)       0.571     0.277    0.226    1.273 1.000     2679
@@ -2996,7 +2987,7 @@ Below is a summary of the fitted parameters and MCMC diagnostics.
     ## sds(surftemp_slog_elev_1)     4174
     ## sds(surftemp_sjdate_1)        4853
     ## 
-    ## Group-Level Effects: 
+    ## Multilevel Hyperparameters:
     ## ~WSA9 (Number of levels: 9) 
     ##                                          Estimate Est.Error l-95% CI u-95% CI
     ## sd(n2o_Intercept)                           0.048     0.018    0.020    0.091
@@ -3101,7 +3092,7 @@ Below is a summary of the fitted parameters and MCMC diagnostics.
     ## cor(n2oeq_Intercept,no3cat_Intercept)    1.001     2749     4946
     ## cor(surftemp_Intercept,no3cat_Intercept) 1.001     2607     5750
     ## 
-    ## Population-Level Effects: 
+    ## Regression Coefficients:
     ##                          Estimate Est.Error l-95% CI u-95% CI  Rhat Bulk_ESS
     ## n2o_Intercept               2.392     0.056    2.285    2.500 1.000     3063
     ## shape_n2o_Intercept         3.215     0.189    2.849    3.589 1.001     3997
@@ -3161,7 +3152,7 @@ Below is a summary of the fitted parameters and MCMC diagnostics.
     ## n2o_mono3_cat:surftemp       1621
     ## shape_n2o_mono3_cat          6283
     ## 
-    ## Simplex Parameters: 
+    ## Monotonic Simplex Parameters:
     ##                            Estimate Est.Error l-95% CI u-95% CI  Rhat Bulk_ESS
     ## n2o_mono3_cat1[1]             0.025     0.023    0.001    0.083 1.000     4899
     ## n2o_mono3_cat1[2]             0.183     0.111    0.014    0.425 1.002     1056
@@ -3197,7 +3188,7 @@ Below is a summary of the fitted parameters and MCMC diagnostics.
     ## shape_n2o_mono3_cat1[3]        5848
     ## shape_n2o_mono3_cat1[4]        4561
     ## 
-    ## Family Specific Parameters: 
+    ## Further Distributional Parameters:
     ##             Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
     ## disc_no3cat    1.000     0.000    1.000    1.000   NA       NA       NA
     ## 
@@ -3648,9 +3639,52 @@ the various levels of the survey factors.
 ### 5.3.1 Dissolved N2O
 
 Below, National mean estimates for dissolved N2O from the model and
-design-based approaches were compared. The sample-based estimate was
-also included as a reference. The black, vertical, dashed line indicates
-the mean of the sample.
+design-based approaches were compared. The code and results for the
+design-based approach are located at:
+<https://github.com/USEPA/DissolvedGasNla/tree/master/scripts>
+
+The sample-based estimates were also included as a reference and are
+represented by the black, vertical, dashed lines.
+
+``` r
+### Dissolved N2O estimates
+
+n2o_survey_ests <- read.csv(file = "./../inputData/populationEstimates/Survey_Ests_N20_dissolved.csv") %>%
+  tibble() %>%
+  rename(estimate = Estimate,
+         LCL = LCB95Pct,
+         UCL = UCB95Pct) %>%
+  select(Type, Subpopulation, estimate, LCL, UCL)
+
+# ests by subpopulations
+n2o_survey_ecoregion <- n2o_survey_ests %>%
+  filter(Type == "AG_ECO9_NM") %>%
+  rename(ecoregion = Subpopulation) %>%
+  select(ecoregion, estimate, LCL, UCL) %>%
+  mutate(ecoregion = recode(ecoregion,
+                            "Coastal Plains" = "CPL",
+                            "Northern Appalachians" = "NAP",
+                            "Northern Plains" = "NPL",
+                            "Southern Appalachians" = "SAP",
+                            "Southern Plains" = "SPL",
+                            "Temperate Plains" = "TPL",
+                            "Upper Midwest" = "UMW",
+                            "Western Mountains" = "WMT",
+                            "Xeric" = "XER"))
+
+n2o_survey_size <- n2o_survey_ests %>%
+  filter(Type == "AREA_CAT6") %>%
+  rename(size_cat = Subpopulation) %>%
+  select(size_cat, estimate, LCL, UCL)
+
+### Saturation ratio estimates
+sat_survey_ests <- read.csv(file = "./../inputData/populationEstimates/Survey_Ests_N20_sat.csv") %>%
+  tibble() %>%
+  rename(estimate = Estimate,
+         LCL = LCB95Pct,
+         UCL = UCB95Pct) %>%
+  select(Type, Subpopulation, estimate, LCL, UCL)
+```
 
 ``` r
 all_predictions %>%
@@ -3660,17 +3694,17 @@ all_predictions %>%
     LCL = round(quantile(mean_n2o, probs = 0.025), 2),
     UCL = round(quantile(mean_n2o, probs = 0.975), 2)) %>% 
   mutate(type = "model") %>%
-  bind_rows(cbind(n2o_survey_ests[10, 2:4], type = rep("survey", 1))) %>%
+  bind_rows(cbind(n2o_survey_ests[1, 3:5], type = rep("survey", 1))) %>%
   add_row(estimate = round(mean(df_model$n2o), 2),
           type = "sample") %>%
   print()
 ```
 
-    ## # A tibble: 3 x 4
+    ## # A tibble: 3 × 4
     ##   estimate   LCL   UCL type  
     ##      <dbl> <dbl> <dbl> <chr> 
-    ## 1     7.51  7.36  7.63 model 
-    ## 2     8.1   7     9.1  survey
+    ## 1     7.35  6.59  8.37 model 
+    ## 2     8.05  7.02  9.09 survey
     ## 3     8.72 NA    NA    sample
 
 <img src="NLA_N2O_models_files/figure-gfm/plot_n2o_means_national-1.png" style="display: block; margin: auto;" />
@@ -3690,32 +3724,33 @@ all_predictions %>%
   mutate(type = "model") %>%
   select(ecoregion, estimate, LCL, UCL, type) %>%
   mutate(ecoregion = forcats::fct_reorder(ecoregion, estimate)) %>%
-  bind_rows(cbind(n2o_survey_ests[-10,], type = rep("survey", 9))) %>%
+  bind_rows(cbind(n2o_survey_ecoregion, type = rep("survey", 9))) %>%
+  #bind_rows(cbind(n2o_survey_ests[-10,], type = rep("survey", 9))) %>%
   arrange(ecoregion) %>%
   print()
 ```
 
-    ## # A tibble: 18 x 5
+    ## # A tibble: 18 × 5
     ##    ecoregion estimate   LCL   UCL type  
-    ##    <fct>        <dbl> <dbl> <dbl> <chr> 
-    ##  1 NPL           6.95  6.8   7.1  model 
-    ##  2 NPL           6.9   6.4   7.4  survey
-    ##  3 SPL           7.07  6.84  7.31 model 
-    ##  4 SPL           6.5   4.9   8.1  survey
-    ##  5 NAP           7.33  7.15  7.5  model 
-    ##  6 NAP           7.7   7.2   8.1  survey
-    ##  7 CPL           7.49  7.23  7.7  model 
-    ##  8 CPL           8.4   5.1  11.7  survey
-    ##  9 UMW           7.57  7.43  7.72 model 
-    ## 10 UMW          10.8   6.4  15.2  survey
-    ## 11 SAP           7.62  7.37  7.85 model 
-    ## 12 SAP           7.1   5.9   8.2  survey
-    ## 13 XER           7.65  7.41  7.85 model 
-    ## 14 XER          10.6   7.5  13.7  survey
-    ## 15 WMT           7.8   7.66  7.93 model 
-    ## 16 WMT           7.8   7.1   8.4  survey
-    ## 17 TPL           7.96  7.76  8.18 model 
-    ## 18 TPL           7.8   5.9   9.6  survey
+    ##    <chr>        <dbl> <dbl> <dbl> <chr> 
+    ##  1 CPL           7.87  6.39 10.1  model 
+    ##  2 CPL           8.4   5.13 11.7  survey
+    ##  3 NAP           6.96  6.37  7.78 model 
+    ##  4 NAP           7.65  7.21  8.09 survey
+    ##  5 NPL           7.15  6.58  7.9  model 
+    ##  6 NPL           6.89  6.39  7.4  survey
+    ##  7 SAP           6.51  5.54  8.14 model 
+    ##  8 SAP           7.06  5.93  8.18 survey
+    ##  9 SPL           6.45  5.54  8.23 model 
+    ## 10 SPL           6.51  4.89  8.13 survey
+    ## 11 TPL           7.02  6     8.52 model 
+    ## 12 TPL           7.77  5.94  9.6  survey
+    ## 13 UMW           7.13  6.53  7.88 model 
+    ## 14 UMW          10.8   6.39 15.2  survey
+    ## 15 WMT           8.28  7.49  9.59 model 
+    ## 16 WMT           7.75  7.12  8.38 survey
+    ## 17 XER           7.91  6.98  9.38 model 
+    ## 18 XER          10.6   7.53 13.6  survey
 
 <img src="NLA_N2O_models_files/figure-gfm/plot_mean_n2o_wsa9-1.png" style="display: block; margin: auto;" />
 
@@ -3723,17 +3758,17 @@ Means were compared according to size categories below.
 
     ## # A tibble: 10 × 5
     ##    size   estimate   LCL   UCL type  
-    ##    <ord>     <dbl> <dbl> <dbl> <chr> 
-    ##  1 4_10        7.5   6.8   8.4 model 
-    ##  2 4_10        7.6   6.5   8.8 survey
-    ##  3 10_20       7.5   6.9   8.2 model 
-    ##  4 10_20       7.6   7.1   8.1 survey
-    ##  5 min_4       7.3   6.5   8.4 model 
-    ##  6 min_4       8.2   6.4   9.9 survey
-    ##  7 50_max      7.5   7     8.1 model 
-    ##  8 50_max      8     7.4   8.5 survey
-    ##  9 20_50       7.5   7     8.2 model 
-    ## 10 20_50       8.6   7.7   9.5 survey
+    ##    <fct>     <dbl> <dbl> <dbl> <chr> 
+    ##  1 10_20      7.5   6.9   8.2  model 
+    ##  2 10_20      7.6   7.13  8.08 survey
+    ##  3 4_10       7.5   6.8   8.4  model 
+    ##  4 4_10       7.64  6.51  8.78 survey
+    ##  5 50_max     7.5   7     8.1  model 
+    ##  6 50_max     7.95  7.44  8.47 survey
+    ##  7 min_4      7.3   6.5   8.4  model 
+    ##  8 min_4      8.17  6.41  9.92 survey
+    ##  9 20_50      7.5   7     8.2  model 
+    ## 10 20_50      8.57  7.67  9.47 survey
 
 <img src="NLA_N2O_models_files/figure-gfm/plot_size_mean_n2o-1.png" style="display: block; margin: auto;" />
 
@@ -3789,9 +3824,9 @@ all_predictions %>%
 sessionInfo()
 ```
 
-    ## R version 4.3.0 (2023-04-21 ucrt)
-    ## Platform: x86_64-w64-mingw32/x64 (64-bit)
-    ## Running under: Windows 11 x64 (build 22621)
+    ## R version 4.4.0 (2024-04-24 ucrt)
+    ## Platform: x86_64-w64-mingw32/x64
+    ## Running under: Windows 11 x64 (build 22631)
     ## 
     ## Matrix products: default
     ## 
@@ -3810,59 +3845,52 @@ sessionInfo()
     ## [1] stats     graphics  grDevices utils     datasets  methods   base     
     ## 
     ## other attached packages:
-    ##  [1] arrow_12.0.1.1   tictoc_1.2       brms_2.19.0      Rcpp_1.0.10     
-    ##  [5] tidybayes_3.0.4  bayesplot_1.10.0 itertools_0.1-3  iterators_1.0.14
-    ##  [9] foreach_1.5.2    future_1.32.0    lubridate_1.9.2  forcats_1.0.0   
-    ## [13] stringr_1.5.0    purrr_1.0.1      readr_2.1.4      tidyr_1.3.0     
-    ## [17] tibble_3.2.1     tidyverse_2.0.0  dplyr_1.1.2      ggrepel_0.9.3   
-    ## [21] kableExtra_1.3.4 gridExtra_2.3    ggExtra_0.10.0   moments_0.14.1  
-    ## [25] ggpubr_0.6.0     ggplot2_3.4.2   
+    ##  [1] archive_1.1.11   arrow_19.0.1     tictoc_1.2.1     brms_2.22.0     
+    ##  [5] Rcpp_1.0.14      tidybayes_3.0.7  bayesplot_1.11.1 itertools_0.1-3 
+    ##  [9] iterators_1.0.14 foreach_1.5.2    future_1.34.0    lubridate_1.9.4 
+    ## [13] forcats_1.0.0    stringr_1.5.1    purrr_1.0.4      readr_2.1.5     
+    ## [17] tidyr_1.3.1      tibble_3.2.1     tidyverse_2.0.0  dplyr_1.1.4     
+    ## [21] ggrepel_0.9.6    kableExtra_1.4.0 gridExtra_2.3    ggExtra_0.10.1  
+    ## [25] moments_0.14.1   ggpubr_0.6.0     ggplot2_3.5.1   
     ## 
     ## loaded via a namespace (and not attached):
-    ##   [1] jsonlite_1.8.8       tensorA_0.36.2       rstudioapi_0.14     
-    ##   [4] magrittr_2.0.3       farver_2.1.1         rmarkdown_2.21      
-    ##   [7] vctrs_0.6.2          base64enc_0.1-3      rstatix_0.7.2       
-    ##  [10] webshot_0.5.4        htmltools_0.5.5      distributional_0.3.2
-    ##  [13] broom_1.0.4          StanHeaders_2.32.5   parallelly_1.36.0   
-    ##  [16] htmlwidgets_1.6.2    plyr_1.8.8           zoo_1.8-12          
-    ##  [19] igraph_1.5.0         mime_0.12            lifecycle_1.0.3     
-    ##  [22] pkgconfig_2.0.3      colourpicker_1.2.0   Matrix_1.5-4        
-    ##  [25] R6_2.5.1             fastmap_1.1.1        shiny_1.7.4         
-    ##  [28] digest_0.6.31        colorspace_2.1-0     ps_1.7.5            
-    ##  [31] crosstalk_1.2.0      labeling_0.4.2       fansi_1.0.4         
-    ##  [34] timechange_0.2.0     mgcv_1.8-42          httr_1.4.6          
-    ##  [37] abind_1.4-5          compiler_4.3.0       bit64_4.0.5         
-    ##  [40] withr_2.5.0          backports_1.4.1      inline_0.3.19       
-    ##  [43] shinystan_2.6.0      carData_3.0-5        highr_0.10          
-    ##  [46] QuickJSR_1.1.0       pkgbuild_1.4.0       ggsignif_0.6.4      
-    ##  [49] gtools_3.9.4         loo_2.6.0            tools_4.3.0         
-    ##  [52] httpuv_1.6.10        threejs_0.3.3        glue_1.6.2          
-    ##  [55] callr_3.7.3          nlme_3.1-162         promises_1.2.0.1    
-    ##  [58] grid_4.3.0           checkmate_2.2.0      reshape2_1.4.4      
-    ##  [61] generics_0.1.3       diffobj_0.3.5        gtable_0.3.3        
-    ##  [64] tzdb_0.3.0           hms_1.1.3            xml2_1.3.4          
-    ##  [67] car_3.1-2            utf8_1.2.3           pillar_1.9.0        
-    ##  [70] ggdist_3.3.0         markdown_1.6         posterior_1.4.1     
-    ##  [73] later_1.3.1          splines_4.3.0        lattice_0.21-8      
-    ##  [76] bit_4.0.5            tidyselect_1.2.0     miniUI_0.1.1.1      
-    ##  [79] knitr_1.42           arrayhelpers_1.1-0   svglite_2.1.1       
-    ##  [82] stats4_4.3.0         xfun_0.39            bridgesampling_1.1-2
-    ##  [85] matrixStats_1.0.0    DT_0.28              rstan_2.32.5        
-    ##  [88] stringi_1.7.12       yaml_2.3.7           evaluate_0.21       
-    ##  [91] codetools_0.2-19     cli_3.6.1            RcppParallel_5.1.7  
-    ##  [94] shinythemes_1.2.0    xtable_1.8-4         systemfonts_1.0.4   
-    ##  [97] munsell_0.5.0        processx_3.8.1       globals_0.16.2      
-    ## [100] coda_0.19-4          svUnit_1.0.6         parallel_4.3.0      
-    ## [103] rstantools_2.3.1     ellipsis_0.3.2       assertthat_0.2.1    
-    ## [106] prettyunits_1.1.1    dygraphs_1.1.1.6     Brobdingnag_1.2-9   
-    ## [109] listenv_0.9.0        viridisLite_0.4.2    mvtnorm_1.2-2       
-    ## [112] scales_1.2.1         xts_0.13.1           crayon_1.5.2        
-    ## [115] rlang_1.1.1          cowplot_1.1.1        rvest_1.0.3         
-    ## [118] shinyjs_2.1.0
+    ##  [1] inline_0.3.21        rlang_1.1.5          magrittr_2.0.3      
+    ##  [4] matrixStats_1.5.0    compiler_4.4.0       mgcv_1.9-1          
+    ##  [7] loo_2.8.0            reshape2_1.4.4       systemfonts_1.2.1   
+    ## [10] vctrs_0.6.5          crayon_1.5.3         pkgconfig_2.0.3     
+    ## [13] arrayhelpers_1.1-0   fastmap_1.2.0        backports_1.5.0     
+    ## [16] labeling_0.4.3       utf8_1.2.4           promises_1.3.2      
+    ## [19] rmarkdown_2.29       tzdb_0.4.0           ragg_1.3.3          
+    ## [22] bit_4.5.0.1          xfun_0.51            later_1.4.1         
+    ## [25] broom_1.0.7          parallel_4.4.0       R6_2.6.1            
+    ## [28] RColorBrewer_1.1-3   StanHeaders_2.32.10  stringi_1.8.4       
+    ## [31] parallelly_1.42.0    car_3.1-3            rstan_2.32.6        
+    ## [34] assertthat_0.2.1     knitr_1.49           splines_4.4.0       
+    ## [37] httpuv_1.6.15        Matrix_1.7-0         timechange_0.3.0    
+    ## [40] tidyselect_1.2.1     rstudioapi_0.17.1    abind_1.4-8         
+    ## [43] yaml_2.3.10          codetools_0.2-20     miniUI_0.1.1.1      
+    ## [46] pkgbuild_1.4.6       listenv_0.9.1        plyr_1.8.9          
+    ## [49] lattice_0.22-6       shiny_1.10.0         withr_3.0.2         
+    ## [52] bridgesampling_1.1-2 posterior_1.6.1      coda_0.19-4.1       
+    ## [55] evaluate_1.0.3       RcppParallel_5.1.10  ggdist_3.3.2        
+    ## [58] xml2_1.3.7           pillar_1.10.1        carData_3.0-5       
+    ## [61] tensorA_0.36.2.1     stats4_4.4.0         checkmate_2.3.2     
+    ## [64] distributional_0.5.0 generics_0.1.3       hms_1.1.3           
+    ## [67] rstantools_2.4.0     munsell_0.5.1        scales_1.3.0        
+    ## [70] globals_0.16.3       xtable_1.8-4         glue_1.8.0          
+    ## [73] tools_4.4.0          diffobj_0.3.5        ggsignif_0.6.4      
+    ## [76] mvtnorm_1.3-3        cowplot_1.1.3        grid_4.4.0          
+    ## [79] QuickJSR_1.6.0       colorspace_2.1-1     nlme_3.1-164        
+    ## [82] Formula_1.2-5        cli_3.6.4            textshaping_1.0.0   
+    ## [85] svUnit_1.0.6         viridisLite_0.4.2    svglite_2.1.3       
+    ## [88] Brobdingnag_1.2-9    gtable_0.3.6         rstatix_0.7.2       
+    ## [91] digest_0.6.37        farver_2.1.2         htmltools_0.5.8.1   
+    ## [94] lifecycle_1.0.4      mime_0.12            bit64_4.6.0-1
 
 # 7 References
 
-<div id="refs" class="references csl-bib-body hanging-indent">
+<div id="refs" class="references csl-bib-body hanging-indent"
+entry-spacing="0">
 
 <div id="ref-Bafumi_Gelman_2007" class="csl-entry">
 

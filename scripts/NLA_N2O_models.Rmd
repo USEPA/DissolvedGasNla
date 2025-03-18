@@ -5622,7 +5622,7 @@ Below are the estimated conditional effects of the covariates on means
 for both n2o responses as well as the implied effects on the mean
 saturation ratio.
 
-```{r conditional_effects_mod_n2osat_temp_F, echo=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
+```{r conditional_effects_mod_n2osat_temp_F, echo=FALSE, message=FALSE, warning=FALSE, cache.lazy=FALSE}
 effect_no3_surftemp <- expand.grid(no3_cat = levels(df_model$no3_cat),
                                surftemp = round(quantile(df_model$surftemp, 
                                                    probs = seq(0.10, 0.90, 0.2)), 0),
@@ -5759,7 +5759,7 @@ legend1 <- effect_surftemp_no3 %>%
   labs(color = expression(paste("NO"[3], " category"))) +
   guides(color = guide_legend(title.position = "top", title.hjust = 0.5, title.vjust = 0.5))
 
-legend1 <- get_legend(legend1)
+legend1 <- ggpubr::get_legend(legend1)
 
 legend2 <- 
   effect_no3_surftemp %>%
@@ -5777,7 +5777,7 @@ legend2 <-
   labs(color = "Surface temperature (\u00B0C)") +
   guides(color = guide_legend(title.position = "top", title.hjust = 0.5, title.vjust = 1))
 
-legend2 <- get_legend(legend2)
+legend2 <- ggpubr::get_legend(legend2)
 
 legendPlot <- ggarrange(legend1, legend2, ncol = 1)
 
@@ -5816,7 +5816,7 @@ ggsave(filename = "cond_effect_surftemp_no3.tif",
 plt_surftemp_effects
 ```
 
-```{r conditional_effects_mod_n2osat_area_F, echo=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
+```{r conditional_effects_mod_n2osat_area_F, echo=FALSE, message=FALSE, warning=FALSE, cache.lazy = FALSE}
 effect_no3_area <- expand.grid(no3_cat = levels(df_model$no3_cat),
                                log_area = round(quantile(df_model$log_area, 
                                                    probs = seq(0.10, 0.90, 0.2)), 0),
@@ -5953,7 +5953,7 @@ legend1 <- effect_area_no3 %>%
   labs(color = expression(paste("NO"[3], " category"))) +
   guides(color = guide_legend(title.position = "top", title.hjust = 0.5, title.vjust = 0.5))
 
-legend1 <- get_legend(legend1)
+legend1 <- ggpubr::get_legend(legend1)
 
 legend2 <- 
   effect_no3_area %>%
@@ -5971,7 +5971,7 @@ legend2 <-
   labs(color = "log(surface area (ha))") +
   guides(color = guide_legend(title.position = "top", title.hjust = 0.5, title.vjust = 1))
 
-legend2 <- get_legend(legend2)
+legend2 <- ggpubr::get_legend(legend2)
 
 legendPlot <- ggarrange(legend1, legend2, ncol = 1)
 
@@ -6005,11 +6005,11 @@ ggsave(filename = "cond_effect_area_no3.tif",
        units = "in")
 ```
 
-```{r plot_area_effects, fig.align='center', fig.asp=1.166667, fig.width=8, }
+```{r plot_area_effects, fig.align='center', fig.asp=1.166667, fig.width=8}
 plt_area_effects
 ```
 
-```{r conditional_effects_mod_n2osat_temp_area_F, echo=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
+```{r conditional_effects_mod_n2osat_temp_area_F, echo=FALSE, message=FALSE, warning=FALSE, cache.lazy=FALSE}
 effect_no3_surftemp <- expand.grid(no3_cat = levels(df_model$no3_cat),
                                surftemp = round(quantile(df_model$surftemp, 
                                                    probs = seq(0.10, 0.90, 0.2)), 0),
@@ -6173,7 +6173,7 @@ ggsave(filename = "cond_effect_no3.tif",
        bg = "white")
 ```
 
-```{r plot_temp_area_effects, fig.align='center', fig.asp=1.166667, fig.width=8, }
+```{r plot_temp_area_effects, fig.align='center', fig.asp=1.166667, fig.width=8}
 plt_temp_area_effects
 ```
 
