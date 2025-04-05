@@ -5,7 +5,9 @@ Beaulieu, J.J., Martin, R. and McManus, M. Pervasive nitrous oxide undersaturati
 
 # Users Guide
 
-The entire manuscript can be reproduced by runing the scripts in the following order: dataMunge.Rmd -> DG_sensitivity_to_measurement_error.Rmd -> Design_Based_Estimates_N2O.Rmd -> manuscript_file.Rmd
+The entire manuscript can be reproduced by runing the scripts in the following order: dataMunge.Rmd -> DG_sensitivity_to_measurement_error.Rmd -> Design_Based_Estimates_N2O.Rmd -> manuscript_file.Rmd. These scripts depend on data contained in this repository and a 45GB dataset hosted at Zenodo (in progress). The dataset at Zenodo can be created via NLA17_N2O_models.Rmd included in this script but the computations are resource intensive, requiring 48 hours of run time on a well resourced desktop.
+
+`renv` is used for package management. After forking the repo, run `renv::restore` to recreate the package depency environment used for this project. The code has been tested using R version 4.4.1. 
 
 # EPA Disclaimer
 The United States Environmental Protection Agency (EPA) GitHub project code is provided on an "as is" basis and the user assumes responsibility for its use. EPA has relinquished control of the information and no longer has responsibility to protect the integrity, confidentiality, or availability of the information. Any reference to specific commercial products, processes, or services by service mark, trademark, manufacturer, or otherwise, does not constitute or imply their endorsement, recommendation or favoring by EPA. The EPA seal and logo shall not be used in any manner to imply endorsement of any commercial product or activity by EPA or the United States Government. 
