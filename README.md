@@ -5,7 +5,13 @@ Beaulieu, J.J., Martin, R. and McManus, M. Pervasive nitrous oxide undersaturati
 
 # Users Guide
 
-The entire manuscript can be reproduced by runing the scripts in the following order: dataMunge.Rmd -> DG_sensitivity_to_measurement_error.Rmd -> Design_Based_Estimates_N2O.Rmd -> manuscript_file.Rmd. These scripts depend on data contained in this repository and a 45GB dataset hosted at Zenodo (in progress). The dataset at Zenodo can be created via NLA17_N2O_models.Rmd included in this script but the computations are resource intensive, requiring 48 hours of run time on a well resourced desktop.
+The entire manuscript can be reproduced by runing the scripts in the following order: 
+1. scripts/dataMunge.Rmd
+2. scripts/DG_sensitivity_to_measurement_error.Rmd
+3. scripts/Design_Based_Estimates_N2O.Rmd
+4. manuscript/manuscript_file.Rmd
+
+These scripts depend on data contained in this repository and a 45GB dataset of predicted N2O for the population of interest. This dataset can be created by running scripts/NLA17_N2O_models.Rmd, but the computations are resource intensive, requiring 48 hours of run time on a well resourced desktop. Alternatively, the dataset can be downloaded from Zenodo (https://zenodo.org/records/15159394) using `utils::download.file` in manuscript_file.Rmd. Download time using a laptop and home internet connection providing download speeds up to 3 Gig was 29 hours.
 
 `renv` is used for package management. After forking the repo, run `renv::restore` to recreate the package depency environment used for this project. The code has been tested using R version 4.4.1. 
 
