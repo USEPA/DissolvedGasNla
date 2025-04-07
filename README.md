@@ -11,7 +11,7 @@ The entire manuscript can be reproduced by runing the scripts in the following o
 3. scripts/Design_Based_Estimates_N2O.Rmd
 4. manuscript/manuscript_file.Rmd
 
-These scripts depend on data contained in this repository and a 45GB dataset of predicted N2O for the population of interest. This dataset can be created by running scripts/NLA17_N2O_models.Rmd, but the computations are resource intensive, requiring 48 hours of run time on a well resourced desktop. Alternatively, the dataset can be downloaded from Zenodo (https://zenodo.org/records/15159394) using `utils::download.file` in manuscript_file.Rmd. Download time using a laptop and home internet connection providing download speeds up to 3 Gig was 29 hours.
+These scripts depend on data contained in this repository and a 45GB dataset of predicted N2O for the population of interest. This dataset can be created by running scripts/NLA17_N2O_models.Rmd, but the computations are resource intensive, requiring 48 hours of run time and ~ 256GB RAM. Alternatively, the dataset can be downloaded from Zenodo (https://zenodo.org/records/15159394) using `utils::download.file` in manuscript/manuscript_support.R. Download time using a laptop and home internet connection providing download speeds up to 3 Gig was 29 hours.
 
 `renv` is used for package management. After forking the repo, run `renv::restore` to recreate the package depency environment used for this project. The code has been tested using R version 4.4.1. 
 
