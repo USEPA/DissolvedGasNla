@@ -97,7 +97,16 @@ if(!("ecoreg_stats.rda" %in% list.files("manuscript/manuscript_files"))) {
       
 ## load posterior predictions from modeling----
 #tic() # 7.6min on DMAP.  5 minutes on Dell Precision workstation
-load("./inputData/all_predictions.rda")
+if(!("all_predictions.rda" %in% list.files("inputData"))){
+  inUrl1  <- "https://zenodo.org/records/15159394/files/all_predictions.rda?download=1"
+  infile1 <- tempfile()
+  try(download.file(inUrl1,infile1,method="curl")) 
+  if (is.na(file.size(infile1))) download.file(inUrl1,infile1,method="auto")
+  
+  save(all_predictions, file = "inputData/all_predictions.rda")
+} else {
+  load("inputData/all_predictions.rda")
+}
 
 #toc()
 
