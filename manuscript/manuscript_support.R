@@ -175,16 +175,16 @@ pred.k600 <- function(ws, area) {
 
 ### calculate emission and flux----
 all_predictions_ms <- all_predictions_ms %>%
-  mutate(k600.cm.h = pred.k600(ws = ws, area = area_ha/100), # 100ha = 1km2
-         ScN2o = 2055.6 - 137.11*surftemp + 4.3173*surftemp^2 - 0.05435*surftemp^3, # schmidt number (Wanninkhof et al 1992)
+  mutate(k600.cm.h = pred.k600(ws = ws, area = area_ha / 100), # 100ha = 1km2
+         ScN2o = 2055.6 - 137.11 * surftemp + 4.3173 * surftemp ^ 2 - 0.05435 * surftemp ^ 3, # schmidt number (Wanninkhof et al 1992)
          #k600 to kn2o
-         kn2o.cm.h = case_when(surftemp <= 30 ~ k600.cm.h * (ScN2o/600)^-(2/3), # conversion only good up to 30C. see paper!
+         kn2o.cm.h = case_when(surftemp <= 30 ~ k600.cm.h * (ScN2o / 600) ^ -(2 / 3), # conversion only good up to 30C. see paper!
                                TRUE ~ k600.cm.h),
          # 1000 L to m3. 44ng to 1nmol. ng->ug. ug->mg
          e.n2o.mg.m2.d = (((n2o - n2oeq) * 1000 * 44) / (1000 * 1000)) * 
-           (k600.cm.h * (24/100)), #h->day. cm->m
-         f.n2o.Mg.y = (e.n2o.mg.m2.d * 365 * (area_ha*10000)) / # day to year. ha to m2.
-           (1000*1000*1000)) #mg-g, g-kg, kg-Mg
+           (k600.cm.h * (24 / 100)), #h->day. cm->m
+         f.n2o.Mg.p = (e.n2o.mg.m2.d * 121 * (area_ha * 10000)) / # e.n2o per day times index period length (121d) = flux over summer index period. ha to m2.
+           (1000 * 1000 * 1000)) #mg-g, g-kg, kg-Mg
 
 all_predictions_ms  <- all_predictions_ms %>%
   select(.row, 
@@ -199,7 +199,7 @@ all_predictions_ms  <- all_predictions_ms %>%
          n2oeq, 
          n2osat,
          e.n2o.mg.m2.d,
-         f.n2o.Mg.y)
+         f.n2o.Mg.p)
               } # ecoreg_stats
             } # national_stats
           } #fig2
@@ -220,7 +220,7 @@ ecoreg_stats <- all_predictions_ms %>%
              prop_sat = sum(n2osat < 1) / length(unique(.row)),
              mean_en2o = mean(e.n2o.mg.m2.d),
              median_en2o = median(e.n2o.mg.m2.d),
-             fn2o_Mg = sum(f.n2o.Mg.y),
+             fn2o_Mg = sum(f.n2o.Mg.p),
              median_no3 = median(no3_cat),
              total_sa = sum(area_ha),
              prop_small = sum(size_cat == "min_4") / length(unique(.row))) %>%
@@ -268,7 +268,7 @@ national_stats <- all_predictions_ms %>%
              prop_sat = sum(n2osat < 1) / length(unique(.row)),
              mean_en2o = mean(e.n2o.mg.m2.d),
              median_en2o = median(e.n2o.mg.m2.d),
-             fn2o_Mg = sum(f.n2o.Mg.y),
+             fn2o_Mg = sum(f.n2o.Mg.p),
              total_sa = sum(area_ha)) %>%
   summarise( post_m_mean_n2o = round(mean(mean_n2o), 1),
              LCL_mean_n2o = round(quantile(mean_n2o, probs = 0.025), 1),
@@ -686,9 +686,9 @@ if(!("n2oFluxAndEmissionRateVsContinuousArea.tiff" %in% list.files("manuscript/m
     #filter(.draw %in% 1:200) %>% # subset for practice
     group_by(.row) %>%
     # mean and CI of all realizations for each lake
-    summarise(post_m_pred = mean(f.n2o.Mg.y),
-              LCL_pred = quantile(f.n2o.Mg.y, probs = 0.025),
-              UCL_pred = quantile(f.n2o.Mg.y, probs = 0.975)) %>% 
+    summarise(post_m_pred = mean(f.n2o.Mg.p),
+              LCL_pred = quantile(f.n2o.Mg.p, probs = 0.025),
+              UCL_pred = quantile(f.n2o.Mg.p, probs = 0.975)) %>% 
     full_join(., # add other data back in
               all_predictions_ms %>% 
                 filter(.draw == 1) %>%# just 1 realization
@@ -703,7 +703,7 @@ if(!("n2oFluxAndEmissionRateVsContinuousArea.tiff" %in% list.files("manuscript/m
     scale_y_continuous(trans = ggallin::pseudolog10_trans, 
                        breaks =c(-1000, -500, -50, -5, 0, 5, 50, 500, 1000)) +
     #xlab("waterbody size (Ha)") +
-    ylab(expression(atop(Annual~Flux,"("*metric~tons~N[2]*O~year^-1*")"))) +
+    ylab(expression(atop(Summer~Flux,"("*metric~tons~N[2]*O~ summer^-1*")"))) +
     theme_bw()  +
     theme(panel.grid.major = element_blank(), 
           panel.grid.minor = element_blank(),
@@ -713,12 +713,12 @@ if(!("n2oFluxAndEmissionRateVsContinuousArea.tiff" %in% list.files("manuscript/m
   # Proportion of total CONUS flux by lake size class------
   PropFluxBySize <- all_predictions_ms %>%
     group_by(.draw) %>% # group by iteration
-    mutate(sum_f.n2o.Mg.y = sum(f.n2o.Mg.y)) %>% # 2000 estimates for total flux across CONUS
+    mutate(sum_f.n2o.Mg.p = sum(f.n2o.Mg.p)) %>% # 2000 estimates for total flux across CONUS
     #left_join(all_predictions_ms, by = ".draw") %>% # rejoin to full predictions (note duplicate sum flux value for same draw)
     # now sum flux by size cat (and draw) then calc proportion of total CONUS flux for each size class for each draw
     group_by(size_cat, .draw) %>%
-    mutate(size_f = sum(f.n2o.Mg.y),
-           size_p_f = (size_f / sum_f.n2o.Mg.y)) %>% # This step leaves duplicates for .draw
+    mutate(size_f = sum(f.n2o.Mg.p),
+           size_p_f = (size_f / sum_f.n2o.Mg.p)) %>% # This step leaves duplicates for .draw
     #distinct(.draw, .keep_all = TRUE) %>% # remove duplicate data
     group_by(size_cat) %>%
     # Now summarize (over draws) the posterior distributions of proportions by mean and 95% CI
@@ -757,9 +757,9 @@ if(!("n2oFluxAndEmissionRateVsContinuousArea.tiff" %in% list.files("manuscript/m
   
   b3.dat <- all_predictions_ms %>%
     group_by(.draw) %>% # group by iteration
-    mutate(sum_f.n2o.Mg.y = sum(f.n2o.Mg.y)) %>% # 2000 estimates for total flux across CONUS
+    mutate(sum_f.n2o.Mg.p = sum(f.n2o.Mg.p)) %>% # 2000 estimates for total flux across CONUS
     ungroup() %>%
-    mutate(p_total_f = f.n2o.Mg.y / sum_f.n2o.Mg.y) %>%
+    mutate(p_total_f = f.n2o.Mg.p / sum_f.n2o.Mg.p) %>%
     select(.row, .draw, area_ha, p_total_f) %>%
     group_by(.row) %>% 
     mean_qi()
@@ -780,11 +780,11 @@ if(!("n2oFluxAndEmissionRateVsContinuousArea.tiff" %in% list.files("manuscript/m
   # # National flux by lake size class: point and line range
   # b3 <- all_predictions %>%
   #   group_by(size_cat, .draw) %>% # group by iteration
-  #   summarise(mean_f.n2o.Mg.y = sum(f.n2o.Mg.y)) %>% # 2000 means for size cat
+  #   summarise(mean_f.n2o.Mg.p = sum(f.n2o.Mg.p)) %>% # 2000 means for size cat
   #   # now summarize to 1 statistic per size_cat
-  #   summarise( estimate = round(median(mean_f.n2o.Mg.y), 3), 
-  #              LCL = round(quantile(mean_f.n2o.Mg.y, probs = 0.025), 3),
-  #              UCL = round(quantile(mean_f.n2o.Mg.y, probs = 0.975), 3)) %>% 
+  #   summarise( estimate = round(median(mean_f.n2o.Mg.p), 3), 
+  #              LCL = round(quantile(mean_f.n2o.Mg.p, probs = 0.025), 3),
+  #              UCL = round(quantile(mean_f.n2o.Mg.p, probs = 0.975), 3)) %>% 
   #   ggplot(., aes(x = estimate, y = size_cat)) +
   #   geom_point() +
   #   geom_linerange(aes(xmin = LCL, xmax = UCL)) +
@@ -858,11 +858,11 @@ if(!("FluxBySize.rda" %in% list.files("manuscript/manuscript_files"))) {
 # Total flux by lake size class------
 FluxBySize <- all_predictions_ms %>%
   group_by(size_cat, .draw) %>% # group by iteration
-  summarise(sum_f.n2o.Mg.y = sum(f.n2o.Mg.y)) %>% # 2000 sums of flux by size cat
+  summarise(sum_f.n2o.Mg.p = sum(f.n2o.Mg.p)) %>% # 2000 sums of flux by size cat
   # now summarize to 1 statistic per size_cat
-  summarise( post_m_flux = round(mean(sum_f.n2o.Mg.y), 3), 
-             LCL = round(quantile(sum_f.n2o.Mg.y, probs = 0.025), 3),
-             UCL = round(quantile(sum_f.n2o.Mg.y, probs = 0.975), 3))
+  summarise( post_m_flux = round(mean(sum_f.n2o.Mg.p), 3), 
+             LCL = round(quantile(sum_f.n2o.Mg.p, probs = 0.025), 3),
+             UCL = round(quantile(sum_f.n2o.Mg.p, probs = 0.975), 3))
 
 save(FluxBySize, file = "manuscript/manuscript_files/FluxBySize.rda")
 
