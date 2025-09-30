@@ -70,7 +70,7 @@ st_crs(ecoR) # 5070
 # Custom color pallette for ecoregion polygons. Attempted to mirror
 # https://www.epa.gov/national-aquatic-resource-surveys/
 # ecoregional-results-national-lakes-assessment-2012
-cols <- c("Coastal Plains" = "orange1",
+cols <- c("Coastal Plains" = rgb(0.25, 0.25, 0.25),
           "Northern Appalachians" = "lightpink1",
           "Northern Plains" = "darksalmon",
           "Southern Appalachians" = "mediumturquoise",
@@ -319,25 +319,29 @@ save(national_stats, file = "manuscript/manuscript_files/national_stats.rda")
 # if the image is already on computer, then nothing, else create image
 if(!("figure1.png" %in% list.files("manuscript/manuscript_figures"))) {
   ggplot() +
-    geom_sf(data = ecoR, color = NA, aes(fill = WSA9_NAME)) +
+    geom_sf(data = ecoR, color = NA, aes(fill = WSA9_NAME), alpha = 0.5) +
+    geom_sf(data = states, fill = NA, color = "cornsilk3", size = 0.1) +
     geom_sf(data = dg.sf %>% 
               filter(!is.na(n2o.src.snk.error), sitetype == "PROB", visit.no == 1) %>%
               arrange(desc(n2o.src.snk.error)), # grey on top of black
             aes(size = dissolved.n2o.nmol, color = n2o.src.snk.error),
             show.legend = "point") +
-    geom_sf(data = states, fill = NA, color = "cornsilk3", size = 0.1) +
+    
     # guide argument below removes points from the boxes in the ecoregion legend
     # https://aosmith.rbind.io/2020/07/09/ggplot2-override-aes/
     scale_fill_manual("Ecoregion", values = cols,
                       guide = guide_legend(override.aes = list(shape = NA))) +
-    scale_color_manual(values = c("red4", "black", "grey"), name = "source/sink") +
+    scale_color_manual(values = c("red4", "black", "azure4"), name = "source/sink") +
     scale_size(name = expression(N[2]*O~(nM)),
                range = c(0.1, 10), # custom size range
                breaks = c(1, 10, 25, 50, 100)) + # custom breaks
     theme(legend.key.size = unit(0.4, "cm"), # size of boxes in legend
           legend.title = element_text(size = 8),
           plot.margin = unit(c(0.3, 0, 0.2, 0), 
-                             "inches"))
+                             "inches"),
+          panel.background = element_rect(fill = "transparent", colour = NA), # Makes the panel background transparent
+          plot.background = element_rect(fill = "transparent", colour = NA)) +   # Makes the overall plot background transparent
+    coord_sf(datum = NA) # This removes the graticules
   ggsave("manuscript/manuscript_figures/figure1.png", width = 8, height = 4, units = "in")
 } # fig 1
 
