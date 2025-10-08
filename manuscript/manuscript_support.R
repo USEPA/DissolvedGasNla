@@ -484,10 +484,10 @@ if(!("cond_effect_no3.tiff" %in% list.files("manuscript/manuscript_figures"))) {
     ylab("Saturation ratio") +
     theme_pubr() +
     scale_y_continuous(expand = c(0, 0), limits = c(0, 7), breaks = seq(0, 7, 1)) +
-    scale_x_continuous(expand = c(0, 0)) +
+    scale_x_continuous(expand = c(0, 0), limits = c(10, 35)) +
     geom_hline(yintercept = 1, linetype = "dashed") +
     scale_fill_brewer(palette = "Greys", guide = "none") +
-    theme(legend.position = c(0.4, 0.6)) + 
+    theme(legend.position = c(0.2, 0.6)) + 
     labs(color = expression(paste("NO"[3], " category")))
   
   plt_sat_no3_area <-
