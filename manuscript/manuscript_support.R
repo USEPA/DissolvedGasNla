@@ -339,9 +339,10 @@ if(!("figure1.png" %in% list.files("manuscript/manuscript_figures"))) {
           legend.title = element_text(size = 8),
           plot.margin = unit(c(0.3, 0, 0.2, 0), 
                              "inches"),
-          panel.background = element_rect(fill = "transparent", colour = NA), # Makes the panel background transparent
-          plot.background = element_rect(fill = "transparent", colour = NA)) +   # Makes the overall plot background transparent
-    coord_sf(datum = NA) # This removes the graticules
+          panel.border = element_rect(colour = "black", fill = NA, size = 0.5),
+          panel.background = element_rect(fill = "transparent", colour = NA) # Makes the panel background transparent
+          # plot.background = element_rect(fill = "transparent", colour = NA)
+    )    # Makes the overall plot background transparent
   ggsave("manuscript/manuscript_figures/figure1.png", width = 8, height = 4, units = "in")
 } # fig 1
 
