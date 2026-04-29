@@ -312,11 +312,11 @@ Where U~10~ is wind speed 10m above the water surface. Average U~10~ values for 
 
 ## Data Availability
 
-All data presented in this manuscript are available at <https://github.com/USEPA/DissolvedGasNla>.
+All data presented in this manuscript are available at <https://github.com/USEPA/DissolvedGasNla> and have been archived at <https://doi.org/10.5281/zenodo.19886361>[@Beaulieu_et_al_2026].
 
 ## Code Availability
 
-The code to reproduce the entire analysis is available at <https://github.com/USEPA/DissolvedGasNla>. Supplementary information files 1 and 2 can be found at <https://github.com/USEPA/DissolvedGasNla/blob/master/scripts/NLA_N2O_models.md> and <https://github.com/USEPA/DissolvedGasNla/blob/master/scripts/DG_sensitivity_to_measurement_error.md>, respectively.
+The code to reproduce the entire analysis is available at <https://github.com/USEPA/DissolvedGasNla>. Supplementary information files 1 and 2 can be found at <https://github.com/USEPA/DissolvedGasNla/blob/master/scripts/NLA_N2O_models.md> and <https://github.com/USEPA/DissolvedGasNla/blob/master/scripts/DG_sensitivity_to_measurement_error.md>, respectively. A stable version of the repository is archived at <https://doi.org/10.5281/zenodo.19886361>[@Beaulieu_et_al_2026].
 
 ## References
 
