@@ -1,7 +1,7 @@
 # DissolvedGasNla
 
 The purpose of this repository is to provide the code required to replicate the analysis presented in
-Beaulieu, J.J., Martin, R. and McManus, M. Pervasive nitrous oxide undersaturation in U.S. lakes and reservoirs.
+Beaulieu, J.J., Martin, R. and McManus, M. Pervasive summertime nitrous oxide undersaturation in U.S. lakes and reservoirs.
 
 # Users Guide
 
